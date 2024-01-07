@@ -1,0 +1,224 @@
+{
+	"apiVersion": "apps/v1",
+	"kind": "Deployment",
+	"metadata": {
+		"name": "cluster-autoscaler",
+		"namespace": "kube-system",
+		"labels": {
+			"k8s-app": "cluster-autoscaler"
+		}
+	},
+	"spec": {
+		"replicas": 1,
+		"selector": {
+			"matchLabels": {
+				"k8s-app": "cluster-autoscaler"
+			}
+		},
+		"template": {
+			"metadata": {
+				"labels": {
+					"k8s-app": "cluster-autoscaler"
+				}
+			},
+			"spec": {
+				"priorityClassName": "system-cluster-critical",
+				"serviceAccountName": "cluster-autoscaler",
+				"securityContext": {
+					"runAsUser": 65532,
+					"runAsGroup": 65532,
+					"fsGroup": 65532,
+					"fsGroupChangePolicy": "OnRootMismatch"
+				},
+				"nodeSelector": {
+					"master": "true"
+				},
+				"tolerations": [
+					{
+						"key": "node-role.kubernetes.io/master",
+						"effect": "NoSchedule"
+					},
+					{
+						"key": "node-role.kubernetes.io/control-plane",
+						"effect": "NoSchedule"
+					}
+				],
+				"initContainers": [
+					{
+						"image": "busybox",
+						"name": "cluster-autoscaler-init",
+						"securityContext": {
+							"privileged": true
+						},
+						"command":[
+							"/bin/sh",
+							"-c",
+							"rm -f /var/run/cluster-autoscaler/autoscaler.sock"
+						],
+						"volumeMounts": [
+							{
+								"name": "cluster-socket",
+								"mountPath": "/var/run/cluster-autoscaler"
+							}
+						]
+					}
+				],
+				"containers": [
+					{
+						"image": "$REGISTRY/kubernetes-cloud-autoscaler:$CLOUD_AUTOSCALER_VERSION",
+						"name": "kubernetes-cloud-autoscaler",
+						"resources": {
+							"limits": {
+								"cpu": "100m",
+								"memory": "300Mi"
+							},
+							"requests": {
+								"cpu": "100m",
+								"memory": "300Mi"
+							}
+						},
+						"command": [
+							"/usr/local/bin/kubernetes-cloud-autoscaler",
+							"$EXTERNAL_ETCD_ARGS",
+							"$USE_VANILLA_GRPC_ARGS",
+							"--max-memory=$MAX_MEMORY",
+							"--max-cpus=$MAX_VCPUS",
+							"--use-controller-manager",
+							"--src-etcd-ssl-dir=/etc/etcd/ssl",
+							"--dst-etcd-ssl-dir=/etc/etcd/ssl",
+							"--config=/etc/cluster/autoscaler.json",
+							"--provider-congig=/etc/cluster/provider.json",
+							"--save=/var/run/cluster-autoscaler/autoscaler-state.json",
+							"--log-level=info"
+						],
+						"imagePullPolicy": "Always",
+						"volumeMounts": [
+							{
+								"name": "cluster-socket",
+								"mountPath": "/var/run/cluster-autoscaler"
+							},
+							{
+								"name": "config-cluster-autoscaler",
+								"mountPath": "/etc/cluster"
+							},
+							{
+								"name": "autoscaler-ssh-keys",
+								"mountPath": "/etc/ssh"
+							},
+							{
+								"name": "etcd-ssl",
+								"mountPath": "/etc/etcd/ssl"
+							},
+							{
+								"name": "kubernetes-pki",
+								"mountPath": "/etc/kubernetes/pki"
+							},
+							{
+								"name": "autoscaler-utility-cert",
+								"mountPath": "/etc/ssl/certs/autoscaler-utility",
+								"readOnly": true
+							}
+						]
+					},
+					{
+						"image": "$AUTOSCALER_REGISTRY/cluster-autoscaler:$CLUSTER_AUTOSCALER_VERSION",
+						"name": "cluster-autoscaler",
+						"resources": {
+							"limits": {
+								"cpu": "100m",
+								"memory": "300Mi"
+							},
+							"requests": {
+								"cpu": "100m",
+								"memory": "300Mi"
+							}
+						},
+						"command": [
+							"./cluster-autoscaler",
+							"--v=1",
+							"--stderrthreshold=info",
+							"--cloud-provider=${GRPC_PROVIDER}",
+							"--cloud-config=${CLOUDPROVIDER_CONFIG}",
+							"--nodes=$MINNODES:$MAXNODES:true/$NODEGROUP_NAME",
+							"--max-nodes-total=$MAXTOTALNODES",
+							"--cores-total=$CORESTOTAL",
+							"--memory-total=$MEMORYTOTAL",
+							"--node-autoprovisioning-enabled",
+							"--max-autoprovisioned-node-group-count=$MAXAUTOPROVISIONNEDNODEGROUPCOUNT",
+							"--scale-down-enabled=$SCALEDOWNENABLED",
+							"--scale-down-delay-after-add=$SCALEDOWNDELAYAFTERADD",
+							"--scale-down-delay-after-delete=$SCALEDOWNDELAYAFTERDELETE",
+							"--scale-down-delay-after-failure=$SCALEDOWNDELAYAFTERFAILURE",
+							"--scale-down-unneeded-time=$SCALEDOWNUNEEDEDTIME",
+							"--scale-down-unready-time=$SCALEDOWNUNREADYTIME",
+							"--unremovable-node-recheck-timeout=$UNREMOVABLENODERECHECKTIMEOUT"
+						],
+						"imagePullPolicy": "Always",
+						"volumeMounts": [
+							{
+								"name": "cluster-socket",
+								"mountPath": "/var/run/cluster-autoscaler"
+							},
+							{
+								"name": "ssl-certs",
+								"mountPath": "/etc/ssl/certs/ca-certificates.crt",
+								"readOnly": true
+							},
+							{
+								"name": "config-cluster-autoscaler",
+								"mountPath": "/etc/cluster",
+								"readOnly": true
+							}
+						]
+					}
+				],
+				"volumes": [
+					{
+						"name": "cluster-socket",
+						"emptyDir": {
+						}
+					},
+					{
+						"name": "config-cluster-autoscaler",
+						"configMap": {
+							"name": "config-cluster-autoscaler"
+						}
+					},
+					{
+						"name": "ssl-certs",
+						"hostPath": {
+							"path": "/etc/ssl/certs/ca-certificates.crt"
+						}
+					},
+					{
+						"name": "autoscaler-ssh-keys",
+						"secret": {
+							"secretName": "autoscaler-ssh-keys",
+							"defaultMode": 416
+						}
+					},
+					{
+						"name": "etcd-ssl",
+						"secret": {
+							"secretName": "etcd-ssl",
+							"defaultMode": 416
+						}
+					},
+					{
+						"name": "autoscaler-utility-cert",
+						"secret": {
+							"secretName": "autoscaler-utility-cert",
+							"defaultMode": 416
+						}
+					},
+					{
+						"name": "kubernetes-pki",
+						"configMap": {
+							"name": "kubernetes-pki"
+						}
+					}
+				]
+			}
+		}
+	}
+}

@@ -1,0 +1,48 @@
+{
+	"apiVersion": "networking.k8s.io/v1",
+	"kind": "Ingress",
+	"metadata": {
+		"name": "helloworld-ingress",
+		"namespace": "$K8NAMESPACE",
+		"annotations": {
+			"nginx.ingress.kubernetes.io/ssl-redirect": "true",
+			"nginx.ingress.kubernetes.io/use-regex": "true",
+			"nginx.ingress.kubernetes.io/rewrite-target": "$REWRITE_TARGET",
+			"nginx.ingress.kubernetes.io/backend-protocol": "HTTP",
+			"cert-manager.io/cluster-issuer": "cert-issuer-prod",
+			"external-dns.alpha.kubernetes.io/register": "true"
+		}
+	},
+	"spec": {
+		"ingressClassName": "nginx",
+		"tls": [
+			{
+				"hosts": [
+					"masterkube-local.$DOMAIN_NAME"
+				],
+				"secretName": "helloworld-ingress-tls"
+			}
+		],
+		"rules": [
+			{
+				"host": "masterkube-local.$DOMAIN_NAME",
+				"http": {
+					"paths": [
+						{
+							"path": "/(.*)",
+							"pathType": "ImplementationSpecific",
+							"backend": {
+								"service": {
+									"name": "helloworld",
+									"port": {
+										"number": 8080
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		]
+	}
+}

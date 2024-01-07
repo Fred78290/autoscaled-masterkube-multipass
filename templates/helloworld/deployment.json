@@ -1,0 +1,83 @@
+{
+	"apiVersion": "apps/v1",
+	"kind": "Deployment",
+	"metadata": {
+		"name": "helloworld",
+		"namespace": "$K8NAMESPACE",
+		"labels": {
+			"app": "helloworld"
+		}
+	},
+	"spec": {
+		"replicas": 1,
+		"selector": {
+			"matchLabels": {
+				"app": "helloworld"
+			}
+		},
+		"template": {
+			"metadata": {
+				"labels": {
+					"app": "helloworld"
+				}
+			},
+			"spec": {
+				"restartPolicy": "Always",
+				"terminationGracePeriodSeconds": 30,
+				"affinity": {
+					"podAntiAffinity": {
+						"requiredDuringSchedulingIgnoredDuringExecution": [
+							{
+								"labelSelector": {
+									"matchExpressions": [
+										{
+											"key": "app",
+											"operator": "In",
+											"values": [
+												"helloworld"
+											]
+										}
+									]
+								},
+								"topologyKey": "kubernetes.io/hostname"
+							}
+						]
+					}
+				},
+				"containers": [
+					{
+						"name": "helloworld",
+						"image": "fred78290/helloworld:v1.0.0",
+						"imagePullPolicy": "IfNotPresent",
+						"resources": {
+							"limits": {
+								"cpu": "10m",
+								"memory": "20Mi"
+							},
+							"requests": {
+								"cpu": "10m",
+								"memory": "20Mi"
+							}
+						},
+						"ports": [
+							{
+								"containerPort": 8080,
+								"protocol": "TCP"
+							}
+						],
+						"env": [
+							{
+								"name": "POD_NAME",
+								"valueFrom": {
+									"fieldRef": {
+										"fieldPath": "metadata.name"
+									}
+								}
+							}
+						]
+					}
+				]
+			}
+		}
+	}
+}

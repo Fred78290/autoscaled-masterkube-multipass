@@ -17,7 +17,14 @@
 			"qemu_binary": "{{ user `QEMU_BINARY` }}",
 			"qemuargs": [
 				[
-					"{{ user `QEMUARGS` }}",
+					"-display",
+					"cocoa"
+				],
+				[
+					"-cpu",
+					"{{ user `CPU_HOST` }}"
+				],
+				[
 					"-smbios",
 					"type=1,serial=ds=nocloud-net;instance-id=packer;seedfrom=http://{{ .HTTPIP }}:{{ .HTTPPort }}/"
 				]

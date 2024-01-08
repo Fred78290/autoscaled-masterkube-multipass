@@ -556,28 +556,27 @@ read ISO_CHECKSUM ISO_FILE <<< "$(curl -s http://cloud-images.ubuntu.com/release
 
 cp $CURDIR/../templates/packer/template.json $CACHE/packer/template.json
 
-set -x
-
 MACHINE_TYPE="pc"
 ACCEL=kvm
+CPU_HOST=host
 
 if [ ${SEED_ARCH} == "amd64" ]; then
     QEMU_BINARY=qemu-system-x86_64
 else
     QEMU_BINARY=qemu-system-aarch64
-fi
 
-if [ "${OSDISTRO}" == "Darwin" ] && [ ${SEED_ARCH} == "amd64" ]; then
-    ACCEL=none
-    MACHINE_TYPE="virt,highmem=off"
-    QEMUARGS="-cpu cortex-a72"
+    if [ "${OSDISTRO}" == "Darwin" ]; then
+        ACCEL=hvf
+        MACHINE_TYPE="virt,gic-version=3,highmem=off"
+        CPU_HOST="cortex-a72"
+    fi
 fi
 
 pushd $CACHE/packer
 export PACKER_LOG=1
 packer build \
     -var QEMU_BINARY=${QEMU_BINARY} \
-    -var QEMUARGS="${QEMUARGS}" \
+    -var CPU_HOST="${CPU_HOST}" \
     -var MACHINE_TYPE="${MACHINE_TYPE}" \
     -var DISTRO=${DISTRO} \
     -var ACCEL=${ACCEL} \

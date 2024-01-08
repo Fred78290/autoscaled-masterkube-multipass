@@ -2,7 +2,7 @@
 	"builders": [
 		{
 			"type": "qemu",
-			"accelerator": "kvm",
+			"accelerator": "{{ user `ACCEL` }}",
 			"iso_url": "http://cloud-images.ubuntu.com/releases/{{ user `DISTRO` }}/release/{{ user `ISO_FILE` }}",
 			"iso_checksum": "{{ user `ISO_CHECKSUM` }}",
 			"disk_image": true,
@@ -13,8 +13,11 @@
 			"ssh_password": "packerpassword",
 			"ssh_private_key_file": "{{user `SSH_PRIV_KEY`}}",
 			"http_directory": "cloud-data",
+			"machine_type": "{{ user `MACHINE_TYPE` }}",
+			"qemu_binary": "{{ user `QEMU_BINARY` }}",
 			"qemuargs": [
 				[
+					"{{ user `QEMUARGS` }}",
 					"-smbios",
 					"type=1,serial=ds=nocloud-net;instance-id=packer;seedfrom=http://{{ .HTTPIP }}:{{ .HTTPPort }}/"
 				]

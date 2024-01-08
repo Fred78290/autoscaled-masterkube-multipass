@@ -552,14 +552,37 @@ EOF
 
 chmod +x "${INIT_SCRIPT}"
 
-read ISO_CHECKSUM ISO_FILE <<< "$(curl -s http://cloud-images.ubuntu.com/releases/${DISTRO}/release/MD5SUMS | grep server-cloudimg-${SEED_ARCH}.img | tr -d '*')" 
+read ISO_CHECKSUM ISO_FILE <<< "$(curl -s http://cloud-images.ubuntu.com/releases/${DISTRO}/release/SHA256SUMS | grep server-cloudimg-${SEED_ARCH}.img | tr -d '*')" 
 
 cp $CURDIR/../templates/packer/template.json $CACHE/packer/template.json
 
+set -x
+
+MACHINE_TYPE="pc"
+ACCEL=kvm
+
+if [ ${SEED_ARCH} == "amd64" ]; then
+    QEMU_BINARY=qemu-system-x86_64
+else
+    QEMU_BINARY=qemu-system-aarch64
+fi
+
+if [ "${OSDISTRO}" == "Darwin" ] && [ ${SEED_ARCH} == "amd64" ]; then
+    ACCEL=none
+    MACHINE_TYPE="virt,highmem=off"
+    QEMUARGS="-cpu cortex-a72"
+fi
+
 pushd $CACHE/packer
+export PACKER_LOG=1
 packer build \
+    -var QEMU_BINARY=${QEMU_BINARY} \
+    -var QEMUARGS="${QEMUARGS}" \
+    -var MACHINE_TYPE="${MACHINE_TYPE}" \
+    -var DISTRO=${DISTRO} \
+    -var ACCEL=${ACCEL} \
     -var SSH_PRIV_KEY="${SSH_PRIV_KEY}" \
-    -var ISO_CHECKSUM="md5:${ISO_CHECKSUM}" \
+    -var ISO_CHECKSUM="sha256:${ISO_CHECKSUM}" \
     -var ISO_FILE="${ISO_FILE}" \
     -var INIT_SCRIPT="${INIT_SCRIPT}" \
     -var KUBERNETES_PASSWORD="${KUBERNETES_PASSWORD}" \

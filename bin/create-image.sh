@@ -17,7 +17,6 @@ CACHE=~/.local/multipass
 TARGET_IMAGE=
 OSDISTRO=$(uname -s)
 SEEDIMAGE=${DISTRO}-server-cloudimg-seed
-CURDIR=$(dirname $0)
 USER=ubuntu
 SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
 CONTAINER_ENGINE=docker
@@ -554,12 +553,14 @@ chmod +x "${INIT_SCRIPT}"
 
 read ISO_CHECKSUM ISO_FILE <<< "$(curl -s http://cloud-images.ubuntu.com/releases/${DISTRO}/release/SHA256SUMS | grep server-cloudimg-${SEED_ARCH}.img | tr -d '*')" 
 
-cp $CURDIR/../templates/packer/template.json $CACHE/packer/template.json
-
 ACCEL=kvm
 CPU_HOST=host
 
+pushd $CURDIR/..
+
 if [ ${SEED_ARCH} == "amd64" ]; then
+    cp ./templates/packer/template.json $CACHE/packer/template.json
+
     QEMU_BINARY=qemu-system-x86_64
     MACHINE_TYPE="pc"
 
@@ -571,12 +572,15 @@ else
     QEMU_BINARY=qemu-system-aarch64
     MACHINE_TYPE="virt"
 
+    jq --arg BIOS "${PWD}/qemu-efi-aarch64/QEMU_EFI.fd" '.builders[0].qemuargs += [[ "-bios", $BIOS ]]' \
+        ./templates/packer/template.json > $CACHE/packer/template.json
+
     if [ "${OSDISTRO}" == "Darwin" ]; then
         ACCEL=hvf
-        XCPU_HOST="cortex-a72"
-        CPU_HOST="cortex-a72"
     fi
 fi
+
+popd
 
 pushd $CACHE/packer
 rm -rf output-qemu
@@ -584,7 +588,6 @@ export PACKER_LOG=1
 packer build \
     -var QEMU_BINARY=${QEMU_BINARY} \
     -var CPU_HOST="${CPU_HOST}" \
-    -var BIOS=${HOME}/Projects/GitHub/autoscaled-masterkube-multipass/qemu-efi-aarch64/QEMU_EFI.fd \
     -var MACHINE_TYPE="${MACHINE_TYPE}" \
     -var DISTRO=${DISTRO} \
     -var ACCEL=${ACCEL} \

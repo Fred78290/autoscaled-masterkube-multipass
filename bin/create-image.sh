@@ -556,12 +556,12 @@ read ISO_CHECKSUM ISO_FILE <<< "$(curl -s http://cloud-images.ubuntu.com/release
 
 cp $CURDIR/../templates/packer/template.json $CACHE/packer/template.json
 
-MACHINE_TYPE="pc"
 ACCEL=kvm
 CPU_HOST=host
 
 if [ ${SEED_ARCH} == "amd64" ]; then
     QEMU_BINARY=qemu-system-x86_64
+    MACHINE_TYPE="pc"
 
     if [ "${OSDISTRO}" == "Darwin" ]; then
         ACCEL=hvf
@@ -569,10 +569,11 @@ if [ ${SEED_ARCH} == "amd64" ]; then
     fi
 else
     QEMU_BINARY=qemu-system-aarch64
+    MACHINE_TYPE="virt"
 
     if [ "${OSDISTRO}" == "Darwin" ]; then
         ACCEL=hvf
-        MACHINE_TYPE="virt,gic-version=3,highmem=off"
+        XCPU_HOST="cortex-a72"
         CPU_HOST="cortex-a72"
     fi
 fi
@@ -583,6 +584,7 @@ export PACKER_LOG=1
 packer build \
     -var QEMU_BINARY=${QEMU_BINARY} \
     -var CPU_HOST="${CPU_HOST}" \
+    -var BIOS=${HOME}/Projects/GitHub/autoscaled-masterkube-multipass/qemu-efi-aarch64/QEMU_EFI.fd \
     -var MACHINE_TYPE="${MACHINE_TYPE}" \
     -var DISTRO=${DISTRO} \
     -var ACCEL=${ACCEL} \

@@ -562,6 +562,11 @@ CPU_HOST=host
 
 if [ ${SEED_ARCH} == "amd64" ]; then
     QEMU_BINARY=qemu-system-x86_64
+
+    if [ "${OSDISTRO}" == "Darwin" ]; then
+        ACCEL=hvf
+        CPU_HOST="host"
+    fi
 else
     QEMU_BINARY=qemu-system-aarch64
 
@@ -573,6 +578,7 @@ else
 fi
 
 pushd $CACHE/packer
+rm -rf output-qemu
 export PACKER_LOG=1
 packer build \
     -var QEMU_BINARY=${QEMU_BINARY} \
@@ -586,7 +592,7 @@ packer build \
     -var INIT_SCRIPT="${INIT_SCRIPT}" \
     -var KUBERNETES_PASSWORD="${KUBERNETES_PASSWORD}" \
     template.json
-mv output-qemu/packer-qemu ${CACHE}/${TARGET_IMAGE}
+mv output-qemu/packer-qemu ${TARGET_IMAGE}
 popd
 
 echo_blue_bold "Created image ${TARGET_IMAGE} with kubernetes version ${KUBERNETES_VERSION}"

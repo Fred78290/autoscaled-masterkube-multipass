@@ -25,3 +25,5 @@ guestinfos/*\.yaml
 bin/*.defs
 
 *.log
+
+images/

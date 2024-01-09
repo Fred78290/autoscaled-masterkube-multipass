@@ -1038,7 +1038,7 @@ function create_vm() {
         MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${NODEINDEX}"
     fi
 
-    if [ -z "$(multipass info ${MASTERKUBE_NODE} 2>&1)" ]; then
+    if [ -z "$(multipass info ${MASTERKUBE_NODE} 2>/dev/null)" ]; then
         if [ "${PUBLIC_NODE_IP}" = "DHCP" ]; then
             NETWORK_DEFS=$(cat <<EOF
             {
@@ -1103,7 +1103,7 @@ EOF
 
         # Cloud init meta-data
         echo ${NETWORK_DEFS} | yq -P - | tee > /dev/null > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
-        NETWORKCONFIG=$(gzip -c9 <${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64)
+        NETWORKCONFIG=$(cat ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64)
 
         # Cloud init user-data
         cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
@@ -1134,7 +1134,12 @@ runcmd:
 - echo "Create ${MASTERKUBE_NODE}" > /var/log/masterkube.log
 EOF
 
-        IFS=\n read MEMSIZE NUM_VCPUS DISK_SIZE <<<"$(echo ${MACHINE_DEFS} | jq -r --arg MACHINE ${MACHINE_TYPE} '.[$MACHINE]|.memsize,.vcpus,.disksize' templates/setup/machines.json)"
+        read MEMSIZE NUM_VCPUS DISK_SIZE <<<"$(jq -r --arg MACHINE ${MACHINE_TYPE} '.[$MACHINE]|.memsize,.vcpus,.disksize' templates/setup/machines.json | tr '\n' ' ')"
+
+        if [ -z "${MEMSIZE}" ] || [ -z "${NUM_VCPUS}" ] || [ -z "${DISK_SIZE}" ]; then
+            echo_red_bold "MACHINE_TYPE=${MACHINE_TYPE} MEMSIZE=${MEMSIZE} NUM_VCPUS=${NUM_VCPUS} DISK_SIZE=${DISK_SIZE} not correctly defined"
+            exit 1
+        fi
 
         # Clone my template
         echo_title "Launch ${MASTERKUBE_NODE}"

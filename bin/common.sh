@@ -131,7 +131,7 @@ else
     }
 fi
 
-for MANDATORY in envsubst helm kubectl kubectl packer qemu-img jq yq cfssl
+for MANDATORY in envsubst helm kubectl kubectl packer qemu-img jq yq cfssl kubernetes-desktop-autoscaler-utility
 do
     if [ -z "$(command -v $MANDATORY)" ]; then
         echo_red "The command $MANDATORY is missing"

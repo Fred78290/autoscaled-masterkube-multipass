@@ -109,19 +109,20 @@ cat >  ${CACHE}/packer/cloud-data/user-data <<EOF
 timezone: $TZ
 package_update: false
 ssh_pwauth: true
-ssh_authorized_keys:
-    - ${SSH_KEY}
 users:
   - default
+  - name: kubernetes
+    groups: users, admin
+    lock_passwd: false
+    shell: /bin/bash
+    plain_text_passwd: ${KUBERNETES_PASSWORD}
+    ssh_authorized_keys:
+      - ${SSH_KEY}
   - name: packer
     sudo: ALL=(ALL) NOPASSWD:ALL
     groups: users, admin
     ssh_authorized_keys:
       - ${SSH_KEY}
-    lock_passwd: true
-system_info:
-    default_user:
-        name: kubernetes
 apt:
     preserve_sources_list: true
 EOF

@@ -1,3 +1,6 @@
+sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"/' /etc/default/grub
+update-grub
+
 echo "==============================================================================================================================="
 echo "= Upgrade ubuntu distro"
 echo "==============================================================================================================================="
@@ -31,6 +34,8 @@ sysctl --system
 
 mkdir -p $(dirname ${CREDENTIALS_CONFIG})
 mkdir -p ${CREDENTIALS_BIN}
+
+echo "kubernetes ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kubernetes
 
 if [ -n "${AWS_ACCESS_KEY_ID}" ] && [ -n "${AWS_SECRET_ACCESS_KEY}" ]; then
 

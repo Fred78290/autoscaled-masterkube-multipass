@@ -20,8 +20,10 @@
 		"interfaces": [
 			{
 				"primary": true,
+				"exists": true,
 				"network": "${VC_NETWORK_PRIVATE}",
-				"nic": "enp0s1",
+				"nic": "eth0:1",
+				"type": "nat",
 				"dhcp": ${SCALEDNODES_DHCP},
 				"use-dhcp-routes": ${USE_DHCP_ROUTES_PRIVATE},
 				"address": "${NODE_IP}",
@@ -33,7 +35,9 @@
 				"primary": false,
 				"exists": false,
 				"network": "${VC_NETWORK_PUBLIC}",
-				"nic": "enp0s2",
+				"nic": "eth1",
+				"type": "manual",
+				"mac-address": "generate",
 				"dhcp": true,
 				"use-dhcp-routes": ${USE_DHCP_ROUTES_PUBLIC},
 				"routes": ${PUBLIC_ROUTES_DEFS}

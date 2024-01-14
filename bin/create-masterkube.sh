@@ -1045,13 +1045,16 @@ function create_vm() {
                 "network": {
                     "version": 2,
                     "ethernets": {
-                        "enp0s1": {
+                        "eth0": {
+                            "dhcp4": true,
                             "gateway4": "${NET_GATEWAY}",
                             "addresses": [
-                                "${NODE_IP}/${NET_MASK_CIDR}"
+                                "${NODE_IP}/${NET_MASK_CIDR}": {
+                                    "label": "eth0:1"
+                                }
                             ]
                         },
-                        "enp0s2": {
+                        "eth1": {
                             "dhcp4": true,
                             "dhcp4-overrides": {
                                 "use-routes": ${USE_DHCP_ROUTES_PUBLIC}
@@ -1068,12 +1071,14 @@ EOF
                 "network": {
                     "version": 2,
                     "ethernets": {
-                        "enp0s1": {
+                        "eth0": {
                             "addresses": [
-                                "${NODE_IP}/${NET_MASK_CIDR}"
+                                "${NODE_IP}/${NET_MASK_CIDR}": {
+                                    "label": "eth0:1"
+                                }
                             ]
                         },
-                        "enp0s2": {
+                        "eth1": {
                             "gateway4": "${NET_GATEWAY}",
                             "addresses": [
                                 "${PUBLIC_NODE_IP}/${PUBLIC_MASK_CIDR}"
@@ -1126,7 +1131,7 @@ write_files:
 - encoding: b64
   content: ${NETWORKCONFIG}
   owner: root:root
-  path: /etc/netplan/51-override.yaml
+  path: /etc/netplan/10-custom.yaml
   permissions: '0644'
 runcmd:
 - hostnamectl set-hostname ${MASTERKUBE_NODE}

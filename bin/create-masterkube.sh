@@ -1116,13 +1116,6 @@ EOF
 package_update: true
 package_upgrade: true
 timezone: ${TZ}
-ssh_authorized_keys:
-  - ${SSH_KEY}
-users:
-  - default
-system_info:
-  default_user:
-    name: ${KUBERNETES_USER}
 growpart:
   mode: auto
   devices: ["/"]

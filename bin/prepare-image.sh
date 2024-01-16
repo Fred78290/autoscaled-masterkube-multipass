@@ -381,3 +381,4 @@ rm -f /var/lib/update-notifier/fsck-at-reboot /var/lib/update-notifier/hwe-eol
 find /var/log -type f -exec rm -f {} +
 rm -r /tmp/* /tmp/.*-unix /var/tmp/*
 /bin/sync
+

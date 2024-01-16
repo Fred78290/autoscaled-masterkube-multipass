@@ -123,15 +123,15 @@ if [ "${OSDISTRO}" == "Darwin" ]; then
 	PATH=${HOME}/Library/DesktopAutoscalerUtility:${PATH}
 else
     TZ=$(cat /etc/timezone)
-	PATH=${HOME}/.local/vmware:${PATH}
     VMWAREWM=""
+	PATH=${HOME}/.local/vmware:${PATH}
 
     function delete_host() {
         sudo sed -i "/$1/d" /etc/hosts
     }
 fi
 
-for MANDATORY in envsubst helm kubectl kubectl packer qemu-img jq yq cfssl kubernetes-desktop-autoscaler-utility
+for MANDATORY in envsubst helm kubectl jq yq cfssl kubernetes-desktop-autoscaler-utility packer qemu-img
 do
     if [ -z "$(command -v $MANDATORY)" ]; then
         echo_red "The command $MANDATORY is missing"

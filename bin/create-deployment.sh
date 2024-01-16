@@ -61,8 +61,8 @@ create-external-dns.sh
 
 NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o json | jq -r '.status.loadBalancer.ingress[0].ip//""')
 
-sudo sed -i '' -e "/masterkube-local/d" /etc/hosts
-sudo bash -c "echo '${NGINX_IP} masterkube-local.${DOMAIN_NAME} ${DASHBOARD_HOSTNAME}.${DOMAIN_NAME}' >> /etc/hosts"
+sudo sed -i '' -e "/masterkube-$SCHEME/d" /etc/hosts
+sudo bash -c "echo '${NGINX_IP} masterkube-$SCHEME.${DOMAIN_NAME} ${DASHBOARD_HOSTNAME}.${DOMAIN_NAME}' >> /etc/hosts"
 
 echo_title "Save templates into cluster"
 

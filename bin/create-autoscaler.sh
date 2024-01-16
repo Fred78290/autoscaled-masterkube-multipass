@@ -50,7 +50,6 @@ EOF") | jq . | tee $ETC_DIR/$1.json | kubectl apply --kubeconfig=${TARGET_CLUSTE
 }
 
 deploy service-account-autoscaler
-deploy service-account-desktop
 deploy cluster-role
 deploy role
 deploy cluster-role-binding

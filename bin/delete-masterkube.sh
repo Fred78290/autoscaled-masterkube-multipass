@@ -1,6 +1,6 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
-SCHEME="desktop"
+SCHEME="multipass"
 NODEGROUP_NAME="${SCHEME}-ca-k8s"
 MASTERKUBE=${NODEGROUP_NAME}-masterkube
 CONTROLNODES=3
@@ -24,7 +24,7 @@ while true; do
         --defs)
             SCHEMEDEFS=$2
             if [ ! -f ${SCHEMEDEFS} ]; then
-                echo_red "Multipass definitions: ${SCHEMEDEFS} not found"
+                echo_red "definitions: ${SCHEMEDEFS} not found"
                 exit 1
             fi
             shift 2
@@ -67,6 +67,8 @@ while true; do
             ;;
     esac
 done
+
+source ${SCHEMEDEFS}
 
 if [ "${TRACE}" = "YES" ]; then
     set -x
@@ -115,15 +117,6 @@ elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
 
     for NODE in $WORKERNODES
     do
-        IPADDR=$(kubectl get node $NODE -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config | jq -r '.status.addresses[]|select(.type == "InternalIP")|.address')
-
-        kubectl --kubeconfig ${TARGET_CLUSTER_LOCATION}/config --ignore-daemonsets --delete-emptydir-data drain "${NODE}" 
-        kubectl --kubeconfig ${TARGET_CLUSTER_LOCATION}/config delete no "${NODE}"
-
-        if [ "${KUBERNETES_DISTRO}" = "k3s" ]; then
-            ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo k3s-killall.sh
-        fi
-
 		delete_vm_by_name ${NODE}
     done
 	delete_vm_by_name ${MASTERKUBE}
@@ -140,6 +133,6 @@ rm -rf ${TARGET_CONFIG_LOCATION}
 rm -rf ${TARGET_DEPLOY_LOCATION}
 
 delete_host "${MASTERKUBE}"
-delete_host "masterkube-local"
+delete_host "masterkube-${SCHEME}"
 
 popd &>/dev/null

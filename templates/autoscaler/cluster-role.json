@@ -63,8 +63,7 @@
 				"endpoints"
 			],
 			"resourceNames": [
-				"cluster-autoscaler",
-				"desktop-autoscaler"
+				"cluster-autoscaler"
 			],
 			"verbs": [
 				"get",

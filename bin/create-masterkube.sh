@@ -14,10 +14,10 @@ pushd ${CURDIR}/../ &>/dev/null
 
 export PATH=${PWD}/bin:${PATH}
 export DISTRO=jammy
-export SCHEME="desktop"
+export SCHEME="multipass"
 export NODEGROUP_NAME="${SCHEME}-ca-k8s"
 export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
-export DASHBOARD_HOSTNAME=masterkube-local-dashboard
+export DASHBOARD_HOSTNAME=masterkube-${SCHEME}-dashboard
 export SSH_PRIVATE_KEY="${HOME}/.ssh/id_rsa"
 export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
 export KUBERNETES_DISTRO=kubeadm
@@ -1332,9 +1332,9 @@ do
                 eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
                     --k8s-distribution=${KUBERNETES_DISTRO} \
                     --delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
+                    --vm-uuid=${VMUUID} \
                     --csi-region=${CSI_REGION} \
                     --csi-zone=${CSI_ZONE} \
-                    --vm-uuid=${VMUUID} \
                     --max-pods=${MAX_PODS} \
                     --allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
                     --control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
@@ -1362,9 +1362,9 @@ do
                 ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
                     --k8s-distribution=${KUBERNETES_DISTRO} \
                     --delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
+                    --vm-uuid=${VMUUID} \
                     --csi-region=${CSI_REGION} \
                     --csi-zone=${CSI_ZONE} \
-                    --vm-uuid=${VMUUID} \
                     --max-pods=${MAX_PODS} \
                     --allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
                     --container-runtime=${CONTAINER_ENGINE} \

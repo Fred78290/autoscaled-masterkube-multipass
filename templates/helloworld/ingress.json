@@ -18,14 +18,14 @@
 		"tls": [
 			{
 				"hosts": [
-					"masterkube-local.$DOMAIN_NAME"
+					"masterkube-$SCHEME.$DOMAIN_NAME"
 				],
 				"secretName": "helloworld-ingress-tls"
 			}
 		],
 		"rules": [
 			{
-				"host": "masterkube-local.$DOMAIN_NAME",
+				"host": "masterkube-$SCHEME.$DOMAIN_NAME",
 				"http": {
 					"paths": [
 						{

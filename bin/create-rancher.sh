@@ -25,7 +25,7 @@ else
 fi
 
 cat > ${TARGET_DEPLOY_LOCATION}/rancher/rancher.yaml <<EOF
-hostname: rancher-local.$DOMAIN_NAME
+hostname: rancher-$SCHEME.$DOMAIN_NAME
 ingress:
   ingressClassName: nginx
   extraAnnotations:
@@ -62,7 +62,7 @@ done
 echo
 
 echo_title "Rancher setup URL"
-echo_blue_bold "https://rancher-local.$DOMAIN_NAME/dashboard/?setup=${BOOTSTRAP_SECRET}" | tee ${TARGET_DEPLOY_LOCATION}/rancher/rancher.log
+echo_blue_bold "https://rancher-$SCHEME.$DOMAIN_NAME/dashboard/?setup=${BOOTSTRAP_SECRET}" | tee ${TARGET_DEPLOY_LOCATION}/rancher/rancher.log
 echo_line
 echo
 

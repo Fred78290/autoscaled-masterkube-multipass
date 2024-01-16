@@ -89,7 +89,7 @@
 							"--dst-etcd-ssl-dir=/etc/etcd/ssl",
 							"--config=/etc/cluster/autoscaler.json",
 							"--machines=/etc/cluster/machines.json",
-							"--provider=multipass",
+							"--provider=${SCHEME}",
 							"--provider-congig=/etc/cluster/provider.json",
 							"--save=/var/run/cluster-autoscaler/state.json",
 							"--log-level=info"

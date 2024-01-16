@@ -18,11 +18,6 @@
 			"kind": "ServiceAccount",
 			"name": "cluster-autoscaler",
 			"namespace": "kube-system"
-		},
-		{
-			"kind": "ServiceAccount",
-			"name": "desktop-autoscaler",
-			"namespace": "kube-system"
 		}
 	]
 }

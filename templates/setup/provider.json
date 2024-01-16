@@ -6,6 +6,7 @@
 	"nodegroup": "${NODEGROUP_NAME}",
 	"timeout": 300,
 	"template-name": "file://${TARGET_IMAGE}",
+	"netplan-name": "10-custom.yaml",
 	"allow-upgrade": false,
 	"network": {
 		"domain": "${NET_DOMAIN}",

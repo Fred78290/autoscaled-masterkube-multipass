@@ -6,7 +6,6 @@
 	"cloud-provider": "${SCHEME}",
 	"kubernetes-pki-srcdir": "/etc/kubernetes/pki",
 	"kubernetes-pki-dstdir": "/etc/kubernetes/pki",
-	"network": "${TRANSPORT}",
 	"listen": "${LISTEN}",
 	"secret": "${SCHEME}",
 	"minNode": ${MINNODES},
@@ -38,7 +37,6 @@
 		"extras-commands": []
 	},
 	"default-machine": "${DEFAULT_MACHINE}",
-	"machines": ${MACHINE_DEFS},
 	"node-labels": [
 		"topology.kubernetes.io/region=${CSI_REGION}",
 		"topology.kubernetes.io/zone=${CSI_ZONE}",

@@ -3,6 +3,7 @@ kubectl create configmap config-cluster-autoscaler -n kube-system --dry-run=clie
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	--from-file ${TARGET_CONFIG_LOCATION}/${CLOUDPROVIDER_CONFIG} \
 	--from-file ${TARGET_CONFIG_LOCATION}/provider.json \
+	--from-file ${TARGET_CONFIG_LOCATION}/machines.json \
 	--from-file ${TARGET_CONFIG_LOCATION}/autoscaler.json | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 kubectl create configmap kubernetes-pki -n kube-system --dry-run=client -o yaml \

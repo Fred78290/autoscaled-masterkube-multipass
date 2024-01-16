@@ -1,6 +1,7 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
-NODEGROUP_NAME="multipass-ca-k8s"
+SCHEME="desktop"
+NODEGROUP_NAME="${SCHEME}-ca-k8s"
 MASTERKUBE=${NODEGROUP_NAME}-masterkube
 CONTROLNODES=3
 WORKERNODES=3
@@ -82,7 +83,7 @@ function delete_vm_by_name() {
 
     if [ "$(multipass info ${VMNAME} 2>/dev/null)" ]; then
         echo_blue_bold "Delete VM: $VMNAME"
-        multipass delete $VMNAME -f -p
+        multipass delete $VMNAME -p
 	fi
 
     delete_host "${VMNAME}"

@@ -742,10 +742,10 @@ if [ "${LAUNCH_CA}" != "YES" ]; then
     SSH_PRIVATE_KEY_LOCAL="${SSH_PRIVATE_KEY}"
 
     if [ "${TRANSPORT}" == "unix" ]; then
-        LISTEN="/var/run/cluster-autoscaler/autoscaler.sock"
+        LISTEN="unix:/var/run/cluster-autoscaler/autoscaler.sock"
         CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
     elif [ "${TRANSPORT}" == "tcp" ]; then
-        LISTEN="${LOCAL_IPADDR}:5200"
+        LISTEN="tcp://${LOCAL_IPADDR}:5200"
         CONNECTTO="${LOCAL_IPADDR}:5200"
     else
         echo_red "Unknown transport: ${TRANSPORT}, should be unix or tcp"
@@ -754,7 +754,7 @@ if [ "${LAUNCH_CA}" != "YES" ]; then
 else
     SSH_PRIVATE_KEY_LOCAL="/etc/ssh/id_rsa"
     TRANSPORT=unix
-    LISTEN="/var/run/cluster-autoscaler/autoscaler.sock"
+    LISTEN="unix:/var/run/cluster-autoscaler/autoscaler.sock"
     CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
 fi
 
@@ -1107,8 +1107,8 @@ EOF
         echo ${NETWORK_DEFS} | jq . > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.json
 
         # Cloud init meta-data
-        echo ${NETWORK_DEFS} | yq -P - | tee > /dev/null > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
-        NETWORKCONFIG=$(cat ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64)
+        echo ${NETWORK_DEFS} | yq -P - > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
+        export NETWORKCONFIG=$(cat ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml | base64 -w 0 | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64)
 
         # Cloud init user-data
         cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
@@ -1146,10 +1146,11 @@ EOF
             -c ${NUM_VCPUS} \
             -m "${MEMSIZE}M" \
             -d "${DISK_SIZE}M" \
+            --network name=${VC_NETWORK_PUBLIC},mode=manual \
             --cloud-init ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml \
             file://${TARGET_IMAGE}
 
-        IPADDR=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME test  '.info.[$NAME].ipv4[0]')
+        IPADDR=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE}  '.info|.[$NAME].ipv4[0]')
 
         echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${IPADDR}"
         eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
@@ -1483,13 +1484,15 @@ else
     DELETE_CREDENTIALS_CONFIG=false
 fi
 
-echo $(eval "cat <<EOF
-$(<${PWD}/templates/setup/machines.json)
-EOF") | jq . > $${TARGET_CONFIG_LOCATION}/autoscaler.json
+echo ${MACHINE_DEFS} | jq . > ${TARGET_CONFIG_LOCATION}/machines.json
 
 echo $(eval "cat <<EOF
-$(<${PWD}/templates/setup/config.json)
-EOF") | jq . > $${TARGET_CONFIG_LOCATION}/provider.json
+$(<${PWD}/templates/setup/autoscaler.json)
+EOF") | jq . > ${TARGET_CONFIG_LOCATION}/autoscaler.json
+
+echo $(eval "cat <<EOF
+$(<${PWD}/templates/setup/provider.json)
+EOF") | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
 
 source ./bin/create-deployment.sh
 

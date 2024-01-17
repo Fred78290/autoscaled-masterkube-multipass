@@ -36,6 +36,14 @@
 		},
 		{
 			"type": "shell",
+			"inline": [
+				"apt install jq socat conntrack net-tools traceroute nfs-common unzip -y",
+				"sed -i 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0\"/' /etc/default/grub",
+				"update-grub"
+			]
+		},
+		{
+			"type": "shell",
 			"execute_command": "sudo sh -c '{{ .Vars }} {{ .Path }}'",
 			"remote_folder": "/tmp",
 			"inline": [

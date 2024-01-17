@@ -1,17 +1,8 @@
-sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"/' /etc/default/grub
-update-grub
-
 echo "==============================================================================================================================="
 echo "= Upgrade ubuntu distro"
 echo "==============================================================================================================================="
 apt update
-apt dist-upgrade -y
-echo
-
-echo "==============================================================================================================================="
-echo "= Install mandatories packages"
-echo "==============================================================================================================================="
-apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
+apt upgrade -y
 echo
 
 mkdir -p /etc/kubernetes

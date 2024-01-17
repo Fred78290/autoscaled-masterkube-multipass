@@ -14,10 +14,6 @@ pushd ${CURDIR}/../ &>/dev/null
 
 export PATH=${PWD}/bin:${PATH}
 export DISTRO=jammy
-export SCHEME="multipass"
-export NODEGROUP_NAME="${SCHEME}-ca-k8s"
-export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
-export DASHBOARD_HOSTNAME=masterkube-${SCHEME}-dashboard
 export SSH_PRIVATE_KEY="${HOME}/.ssh/id_rsa"
 export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
 export KUBERNETES_DISTRO=kubeadm
@@ -35,8 +31,6 @@ export USE_ZEROSSL=YES
 export USE_KEEPALIVED=NO
 export HA_CLUSTER=false
 export FIRSTNODE=0
-export CONTROLNODES=1
-export WORKERNODES=0
 export MINNODES=0
 export MAXNODES=9
 export MAXTOTALNODES=${MAXNODES}
@@ -87,7 +81,6 @@ export NFS_SERVER_PATH=
 export NFS_STORAGE_CLASS=nfs-client
 export CONFIGURATION_LOCATION=${PWD}
 export SSL_LOCATION=${CONFIGURATION_LOCATION}/etc/ssl
-export SCHEMEDEFS=${CONFIGURATION_LOCATION}/bin/vars.defs
 export AWS_ROUTE53_PUBLIC_ZONE_ID=
 export AWS_ROUTE53_ACCESSKEY=
 export AWS_ROUTE53_SECRETKEY=
@@ -104,11 +97,6 @@ export PUBLIC_DOMAIN_NAME=
 MACHINE_DEFS=$(cat ${PWD}/templates/setup/machines.json)
 
 DELETE_CLUSTER=NO
-
-# import hidden definitions
-if [ -f ${SCHEMEDEFS} ]; then
-    source ${SCHEMEDEFS}
-fi
 
 source ${PWD}/bin/common.sh
 

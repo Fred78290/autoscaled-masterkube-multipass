@@ -1,5 +1,5 @@
 #!/bin/bash
-NODEGROUP_NAME="desktop-ca-k8s"
+NODEGROUP_NAME="multipass-ca-k8s"
 MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 CNI=flannel
 CLUSTER_DIR=/etc/cluster

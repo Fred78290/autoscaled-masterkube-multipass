@@ -1,14 +1,7 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
-SCHEME="multipass"
-NODEGROUP_NAME="${SCHEME}-ca-k8s"
-MASTERKUBE=${NODEGROUP_NAME}-masterkube
-CONTROLNODES=3
-WORKERNODES=3
 FORCE=NO
-SCHEMEDEFS=${CURDIR}/vars.defs
 
-source ${SCHEMEDEFS}
 source $CURDIR/common.sh
 
 pushd ${CURDIR}/../ &>/dev/null
@@ -79,17 +72,6 @@ TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deploy
 TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
 echo_blue_bold "Delete masterkube ${MASTERKUBE} previous instance"
-
-function delete_vm_by_name() {
-	local VMNAME=$1
-
-    if [ "$(multipass info ${VMNAME} 2>/dev/null)" ]; then
-        echo_blue_bold "Delete VM: $VMNAME"
-        multipass delete $VMNAME -p
-	fi
-
-    delete_host "${VMNAME}"
-}
 
 if [ -f ${TARGET_CONFIG_LOCATION}/buildenv ]; then
     source ${TARGET_CONFIG_LOCATION}/buildenv

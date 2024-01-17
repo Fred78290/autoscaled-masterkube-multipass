@@ -2,7 +2,7 @@
 
 set -e
 
-NODEGROUP_NAME="desktop-ca-k8s"
+NODEGROUP_NAME=
 CNI_PLUGIN=flannel
 NET_IF=$(ip route get 1|awk '{print $5;exit}')
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
@@ -173,6 +173,11 @@ while true; do
         ;;
     esac
 done
+
+if [ -z "${NODEGROUP_NAME}" ]; then
+    echo "NODEGROUP_NAME not defined"
+    exit 1
+fi
 
 # Hack because k3s and rke2 1.28.4 don't set the good feature gates
 if [ "${DELETE_CREDENTIALS_CONFIG}" == "YES" ]; then

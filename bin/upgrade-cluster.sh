@@ -170,7 +170,7 @@ EOF
 
 PROVIDER_AUTOSCALER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
 
-echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE "file://${PWD}/images/${TARGET_IMAGE}" '.template-name = ${TARGET_IMAGE}' > ${TARGET_CONFIG_LOCATION}/provider.json
+echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE "file://${TARGET_IMAGE}" '.template-name = ${TARGET_IMAGE}' > ${TARGET_CONFIG_LOCATION}/provider.json
 
 source ${PWD}/bin/create-deployment.sh
 

@@ -1,6 +1,15 @@
-SSH_OPTIONS="-o BatchMode=yes -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-SCP_OPTIONS="${SSH_OPTIONS} -p -r"
-OSDISTRO=$(uname -s)
+export SSH_OPTIONS="-o BatchMode=yes -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+export SCP_OPTIONS="${SSH_OPTIONS} -p -r"
+export OSDISTRO=$(uname -s)
+export SCHEME="multipass"
+export NODEGROUP_NAME="${SCHEME}-ca-k8s"
+export MASTERKUBE=${NODEGROUP_NAME}-masterkube
+export DASHBOARD_HOSTNAME=masterkube-${SCHEME}-dashboard
+export CONTROLNODES=3
+export WORKERNODES=3
+export SCHEMEDEFS=${CURDIR}/vars.defs
+
+source ${SCHEMEDEFS}
 
 function add_host() {
     local LINE=
@@ -130,6 +139,26 @@ else
         sudo sed -i "/$1/d" /etc/hosts
     }
 fi
+
+function delete_vm_by_name() {
+	local VMNAME=$1
+
+    if [ "$(multipass info ${VMNAME} 2>/dev/null)" ]; then
+        echo_blue_bold "Delete VM: $VMNAME"
+        multipass delete $VMNAME -p
+	fi
+
+    delete_host "${VMNAME}"
+}
+
+function wait_ssh_ready() {
+    while :
+    do
+        ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=1 $1 'exit 0' && break
+ 
+        sleep 5
+    done
+}
 
 for MANDATORY in envsubst helm kubectl jq yq cfssl kubernetes-desktop-autoscaler-utility packer qemu-img
 do

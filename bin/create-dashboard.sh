@@ -19,7 +19,7 @@ export REWRITE_TARGET='/$1'
 mkdir -p $ETC_DIR
 
 function deploy {
-    echo "Create $ETC_DIR/$1.json"
+	echo "Create $ETC_DIR/$1.json"
 echo $(eval "cat <<EOF
 $(<$KUBERNETES_TEMPLATE/$1.json)
 EOF") | jq . | tee $ETC_DIR/$1.json | kubectl apply -f $ETC_DIR/$1.json --kubeconfig=${TARGET_CLUSTER_LOCATION}/config
@@ -30,9 +30,9 @@ deploy serviceaccount
 deploy service
 
 kubectl create secret generic kubernetes-dashboard-certs -n $K8NAMESPACE --dry-run=client -o yaml \
-    --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-    --from-file=dashboard.key=${SSL_LOCATION}/privkey.pem \
-    --from-file=dashboard.crt=${SSL_LOCATION}/fullchain.pem | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+	--from-file=dashboard.key=${SSL_LOCATION}/privkey.pem \
+	--from-file=dashboard.crt=${SSL_LOCATION}/fullchain.pem | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 deploy csrf
 deploy keyholder
@@ -60,9 +60,9 @@ kubectl get secrets -n $K8NAMESPACE --kubeconfig=${TARGET_CLUSTER_LOCATION}/conf
 IFS=. read VERSION MAJOR MINOR <<< "$KUBERNETES_VERSION"
 
 if [ $MAJOR -gt 23 ]; then
-    DASHBOARD_TOKEN=$(kubectl create token my-dashboard-sa --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -n $K8NAMESPACE --duration 86400h)
+	DASHBOARD_TOKEN=$(kubectl create token my-dashboard-sa --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -n $K8NAMESPACE --duration 86400h)
 else
-    DASHBOARD_TOKEN=$(kubectl --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -n $K8NAMESPACE describe secret $(kubectl get secret -n $K8NAMESPACE --kubeconfig=${TARGET_CLUSTER_LOCATION}/config | awk '/^my-dashboard-sa-token-/{print $1}') | awk '$1=="token:"{print $2}')
+	DASHBOARD_TOKEN=$(kubectl --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -n $K8NAMESPACE describe secret $(kubectl get secret -n $K8NAMESPACE --kubeconfig=${TARGET_CLUSTER_LOCATION}/config | awk '/^my-dashboard-sa-token-/{print $1}') | awk '$1=="token:"{print $2}')
 fi
 
 echo_blue_bold "Dashboard token:$DASHBOARD_TOKEN"

@@ -19,14 +19,14 @@
 		"tls": [
 			{
 				"hosts": [
-					"helloworld-$SCHEME.$DOMAIN_NAME"
+					"helloworld-$PLATEFORM.$DOMAIN_NAME"
 				],
 				"secretName": "helloworld-ingress-tls"
 			}
 		],
 		"rules": [
 			{
-				"host": "helloworld-$SCHEME.$DOMAIN_NAME",
+				"host": "helloworld-$PLATEFORM.$DOMAIN_NAME",
 				"http": {
 					"paths": [
 						{

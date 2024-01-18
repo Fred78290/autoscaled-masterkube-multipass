@@ -73,8 +73,8 @@ spec:
             - --domain-filter=__DOMAIN_NAME__
             - --annotation-filter=external-dns.alpha.kubernetes.io/register=true
             - --ignore-ingress-tls-spec
-            - --txt-prefix=${SCHEME}..
-            - --txt-owner-id=${SCHEME}.
+            - --txt-prefix=${PLATEFORM}..
+            - --txt-owner-id=${PLATEFORM}.
             - --provider=aws
             - --policy=upsert-only
             - --aws-zone-type=__ZONE_TYPE__

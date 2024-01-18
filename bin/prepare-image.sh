@@ -29,44 +29,29 @@ mkdir -p ${CREDENTIALS_BIN}
 echo "kubernetes ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kubernetes
 
 if [ -n "${AWS_ACCESS_KEY_ID}" ] && [ -n "${AWS_SECRET_ACCESS_KEY}" ]; then
+	mkdir -p /root/.aws
 
-    if [ ${KUBERNETES_MINOR_RELEASE} -gt 28 ]; then
-        ECR_CREDS_VERSION=v1.29.0
-        KUBELET_CREDS_VERSION=v1
-    elif [ ${KUBERNETES_MINOR_RELEASE} -gt 27 ]; then
-        ECR_CREDS_VERSION=v1.28.5
-        KUBELET_CREDS_VERSION=v1
-    elif [ ${KUBERNETES_MINOR_RELEASE} -gt 26 ]; then
-        ECR_CREDS_VERSION=v1.27.1
-        KUBELET_CREDS_VERSION=v1
-    elif [ ${KUBERNETES_MINOR_RELEASE} -gt 25 ]; then
-        ECR_CREDS_VERSION=v1.26.1
-        KUBELET_CREDS_VERSION=v1alpha1
-    else
-        ECR_CREDS_VERSION=v1.0.0
-        KUBELET_CREDS_VERSION=v1alpha1
-    fi
-    
-    curl -sL https://github.com/Fred78290/aws-ecr-credential-provider/releases/download/${ECR_CREDS_VERSION}/ecr-credential-provider-${SEED_ARCH} -o ${CREDENTIALS_BIN}/ecr-credential-provider
-    chmod +x ${CREDENTIALS_BIN}/ecr-credential-provider
-
-    mkdir -p /root/.aws
-
-    cat > /root/.aws/config <<EOF
+	cat > /root/.aws/config <<EOF
 [default]
 output = json
 region = us-east-1
 cli_binary_format=raw-in-base64-out
 EOF
 
-    cat > /root/.aws/credentials <<EOF
+	cat > /root/.aws/credentials <<EOF
 [default]
 aws_access_key_id = ${AWS_ACCESS_KEY_ID}
 aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
 EOF
 
-    cat > ${CREDENTIALS_CONFIG} <<EOF
-apiVersion: kubelet.config.k8s.io/${KUBELET_CREDS_VERSION}
+	KUBELET_CREDS_ARGS="--image-credential-provider-config=${CREDENTIALS_CONFIG} --image-credential-provider-bin-dir=${CREDENTIALS_BIN}"
+	ECR_CREDS_VERSION=v1.29.0
+
+	curl -sL https://github.com/Fred78290/aws-ecr-credential-provider/releases/download/${ECR_CREDS_VERSION}/ecr-credential-provider-${SEED_ARCH} -o ${CREDENTIALS_BIN}/ecr-credential-provider
+	chmod +x ${CREDENTIALS_BIN}/ecr-credential-provider
+
+	cat > ${CREDENTIALS_CONFIG} <<EOF
+apiVersion: kubelet.config.k8s.io/v1
 kind: CredentialProviderConfig
 providers:
   - name: ecr-credential-provider
@@ -89,41 +74,41 @@ EOF
 fi
 
 if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-    echo "prepare rke2 image"
+	echo "prepare rke2 image"
 
-    curl -sfL https://get.rke2.io | INSTALL_RKE2_CHANNEL="${KUBERNETES_VERSION}" sh -
+	curl -sfL https://get.rke2.io | INSTALL_RKE2_CHANNEL="${KUBERNETES_VERSION}" sh -
 
-    pushd /usr/local/bin
-    curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION%%+*}/bin/linux/${SEED_ARCH}/{kubectl,kube-proxy}
-    chmod +x /usr/local/bin/kube*
-    popd
+	pushd /usr/local/bin
+	curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION%%+*}/bin/linux/${SEED_ARCH}/{kubectl,kube-proxy}
+	chmod +x /usr/local/bin/kube*
+	popd
 
-    mkdir -p /etc/rancher/rke2
-    mkdir -p /etc/NetworkManager/conf.d
+	mkdir -p /etc/rancher/rke2
+	mkdir -p /etc/NetworkManager/conf.d
 
-    cat > /etc/NetworkManager/conf.d/rke2-canal.conf <<"EOF"
+	cat > /etc/NetworkManager/conf.d/rke2-canal.conf <<"EOF"
 [keyfile]
 unmanaged-devices=interface-name:cali*;interface-name:flannel*
 EOF
-    cat > /etc/rancher/rke2/config.yaml <<"EOF"
+	cat > /etc/rancher/rke2/config.yaml <<"EOF"
 kubelet-arg:
   - cloud-provider=external
   - fail-swap-on=false
 EOF
 
 elif [ "${KUBERNETES_DISTRO}" == "k3s" ]; then
-    echo "prepare k3s image"
+	echo "prepare k3s image"
 
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${KUBERNETES_VERSION}" INSTALL_K3S_SKIP_ENABLE=true sh -
+	curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${KUBERNETES_VERSION}" INSTALL_K3S_SKIP_ENABLE=true sh -
 
-    mkdir -p /etc/systemd/system/k3s.service.d
-    echo "K3S_MODE=agent" > /etc/default/k3s
-    echo "K3S_ARGS=" > /etc/systemd/system/k3s.service.env
-    echo "K3S_SERVER_ARGS=" > /etc/systemd/system/k3s.server.env
-    echo "K3S_AGENT_ARGS=" > /etc/systemd/system/k3s.agent.env
-    echo "K3S_DISABLE_ARGS=" > /etc/systemd/system/k3s.disabled.env
+	mkdir -p /etc/systemd/system/k3s.service.d
+	echo "K3S_MODE=agent" > /etc/default/k3s
+	echo "K3S_ARGS=" > /etc/systemd/system/k3s.service.env
+	echo "K3S_SERVER_ARGS=" > /etc/systemd/system/k3s.server.env
+	echo "K3S_AGENT_ARGS=" > /etc/systemd/system/k3s.agent.env
+	echo "K3S_DISABLE_ARGS=" > /etc/systemd/system/k3s.disabled.env
 
-    cat > /etc/systemd/system/k3s.service.d/10-k3s.conf <<"EOF"
+	cat > /etc/systemd/system/k3s.service.d/10-k3s.conf <<"EOF"
 [Service]
 Environment="KUBELET_ARGS=--kubelet-arg=cloud-provider=external --kubelet-arg=fail-swap-on=false"
 EnvironmentFile=-/etc/default/%N
@@ -138,133 +123,146 @@ ExecStart=/usr/local/bin/k3s $K3S_MODE $K3S_ARGS $K3S_SERVER_ARGS $K3S_AGENT_ARG
 EOF
 
 else
-    echo "prepare kubeadm image"
+	echo "prepare kubeadm image"
 
-    function pull_image() {
-        DOCKER_IMAGES=$(curl -s $1 | grep -E "\simage: " | sed -E 's/.+image: (.+)/\1/g')
-        
-        for DOCKER_IMAGE in $DOCKER_IMAGES
-        do
-            echo "Pull image $DOCKER_IMAGE"
-            ${CONTAINER_CTL} pull $DOCKER_IMAGE
-        done
-    }
+	function pull_image() {
+		local DOCKER_IMAGES=$(curl -s $1 | yq eval -P - | grep -E "\simage: " | sed -E 's/.+image: (.+)/\1/g')
+		local USERNAME=$2
+		local PASSWORD=$3
 
-    mkdir -p /etc/systemd/system/kubelet.service.d
-    mkdir -p /var/lib/kubelet
-    mkdir -p /opt/cni/bin
+		if [ "${USERNAME}X${PASSWORD}" != "X" ]; then
+			if [ ${CONTAINER_CTL} == crictl ]; then
+				AUTHENT="--creds ${USERNAME}:${PASSWORD}"
+			else
+				${CONTAINER_CTL} login -u ${USERNAME} -p "${PASSWORD}" "602401143452.dkr.ecr.us-west-2.amazonaws.com"
+			fi
+		fi
 
-    . /etc/os-release
+		for DOCKER_IMAGE in $DOCKER_IMAGES
+		do
+			echo "Pull image $DOCKER_IMAGE"
+			${CONTAINER_CTL} pull ${AUTHENT} $DOCKER_IMAGE
+		done
+	}
 
-    OS=x${NAME}_${VERSION_ID}
+	mkdir -p /etc/systemd/system/kubelet.service.d
+	mkdir -p /etc/kubernetes
+	mkdir -p /var/lib/kubelet
+	mkdir -p /opt/cni/bin
+	mkdir -p /usr/local/bin
 
-    systemctl disable apparmor
+	. /etc/os-release
 
-    echo "Prepare to install CNI plugins"
+	OS=x${NAME}_${VERSION_ID}
 
-    echo "==============================================================================================================================="
-    echo "= Install CNI plugins"
-    echo "==============================================================================================================================="
+	systemctl disable apparmor
 
-    curl -sL "https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGIN_VERSION}/cni-plugins-linux-${SEED_ARCH}-${CNI_PLUGIN_VERSION}.tgz" | tar -C /opt/cni/bin -xz
+	echo "Prepare to install CNI plugins"
 
-    ls -l /opt/cni/bin
+	echo "==============================================================================================================================="
+	echo "= Install CNI plugins"
+	echo "==============================================================================================================================="
 
-    echo
+	curl -sL "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-${SEED_ARCH}-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
 
-    if [ "${CONTAINER_ENGINE}" = "docker" ]; then
+	ls -l /opt/cni/bin
 
-        echo "==============================================================================================================================="
-        echo "Install Docker"
-        echo "==============================================================================================================================="
+	echo
 
-        mkdir -p /etc/docker
-        mkdir -p /etc/systemd/system/docker.service.d
+	if [ "${CONTAINER_ENGINE}" = "docker" ]; then
 
-        curl -s https://get.docker.com | bash
+		echo "==============================================================================================================================="
+		echo "Install Docker"
+		echo "==============================================================================================================================="
 
-        cat > /etc/docker/daemon.json <<EOF
+		mkdir -p /etc/docker
+		mkdir -p /etc/systemd/system/docker.service.d
+
+		curl -s https://get.docker.com | bash
+
+		cat > /etc/docker/daemon.json <<EOF
 {
-    "exec-opts": [
-        "native.cgroupdriver=systemd"
-    ],
-    "log-driver": "json-file",
-    "log-opts": {
-        "max-size": "100m"
-    },
-    "storage-driver": "overlay2"
+	"exec-opts": [
+		"native.cgroupdriver=systemd"
+	],
+	"log-driver": "json-file",
+	"log-opts": {
+		"max-size": "100m"
+	},
+	"storage-driver": "overlay2"
 }
 EOF
 
-        # Restart docker.
-        systemctl daemon-reload
-        systemctl restart docker
+		# Restart docker.
+		systemctl daemon-reload
+		systemctl restart docker
 
-        usermod -aG docker ubuntu
+		usermod -aG docker ubuntu
 
-    elif [ "${CONTAINER_ENGINE}" == "containerd" ]; then
+	elif [ "${CONTAINER_ENGINE}" == "containerd" ]; then
 
-        echo "==============================================================================================================================="
-        echo "Install Containerd"
-        echo "==============================================================================================================================="
+		echo "==============================================================================================================================="
+		echo "Install Containerd"
+		echo "==============================================================================================================================="
 
-        curl -sL https://github.com/containerd/containerd/releases/download/v1.7.11/cri-containerd-cni-1.7.11-linux-${SEED_ARCH}.tar.gz | tar -C / -xz
+		curl -sL https://github.com/containerd/containerd/releases/download/v1.7.11/cri-containerd-cni-1.7.11-linux-${SEED_ARCH}.tar.gz | tar -C / -xz
 
-        mkdir -p /etc/containerd
-        containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/g' | tee /etc/containerd/config.toml
+		mkdir -p /etc/containerd
+		containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/g' | tee /etc/containerd/config.toml
 
-        systemctl enable containerd.service
-        systemctl restart containerd
+		systemctl enable containerd.service
+		systemctl restart containerd
 
-        curl -sL https://github.com/containerd/nerdctl/releases/download/v1.7.2/nerdctl-1.7.2-linux-${SEED_ARCH}.tar.gz | tar -C /usr/local/bin -xz
-    else
+		curl -sL https://github.com/containerd/nerdctl/releases/download/v1.7.2/nerdctl-1.7.2-linux-${SEED_ARCH}.tar.gz | tar -C /usr/local/bin -xz
 
-        echo "==============================================================================================================================="
-        echo "Install CRI-O repositories"
-        echo "==============================================================================================================================="
+	else
 
-        echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$CRIO_VERSION/$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION.list
-        curl -sL https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers-cri-o.gpg add -
+		echo "==============================================================================================================================="
+		echo "Install CRI-O repositories"
+		echo "==============================================================================================================================="
 
-        apt update
-        apt install cri-o cri-o-runc -y
-        echo
+		echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$CRIO_VERSION/$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION.list
+		curl -sL https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers-cri-o.gpg add -
 
-        mkdir -p /etc/crio/crio.conf.d/
+		apt update
+		apt install cri-o cri-o-runc -y
+		echo
 
-        systemctl daemon-reload
-        systemctl enable crio
-        systemctl restart crio
-    fi
+		mkdir -p /etc/crio/crio.conf.d/
 
-    echo "==============================================================================================================================="
-    echo "= Install crictl"
-    echo "==============================================================================================================================="
-    curl -sL https://github.com/kubernetes-sigs/cri-tools/releases/download/v${CRIO_VERSION}.0/crictl-v${CRIO_VERSION}.0-linux-${SEED_ARCH}.tar.gz | tar -C /usr/local/bin -xz
-    chmod +x /usr/local/bin/crictl
+		systemctl daemon-reload
+		systemctl enable crio
+		systemctl restart crio
+	fi
 
-    echo "==============================================================================================================================="
-    echo "= Clean ubuntu distro"
-    echo "==============================================================================================================================="
-    apt-get autoremove -y
-    apt-get autoclean -y
-    echo
+	echo "==============================================================================================================================="
+	echo "= Install crictl"
+	echo "==============================================================================================================================="
+	curl -sL https://github.com/kubernetes-sigs/cri-tools/releases/download/v${CRIO_VERSION}.0/crictl-v${CRIO_VERSION}.0-linux-${SEED_ARCH}.tar.gz | tar -C /usr/local/bin -xz
+	chmod +x /usr/local/bin/crictl
 
-    echo "==============================================================================================================================="
-    echo "= Install kubernetes binaries"
-    echo "==============================================================================================================================="
+	echo "==============================================================================================================================="
+	echo "= Clean ubuntu distro"
+	echo "==============================================================================================================================="
+	apt-get autoremove -y
+	apt-get autoclean -y
+	echo
 
-    cd /usr/local/bin
-    curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/${SEED_ARCH}/{kubeadm,kubelet,kubectl,kube-proxy}
-    chmod +x /usr/local/bin/kube*
+	echo "==============================================================================================================================="
+	echo "= Install kubernetes binaries"
+	echo "==============================================================================================================================="
 
-    echo
+	cd /usr/local/bin
+	curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/${SEED_ARCH}/{kubeadm,kubelet,kubectl,kube-proxy}
+	chmod +x /usr/local/bin/kube*
 
-    echo "==============================================================================================================================="
-    echo "= Configure kubelet"
-    echo "==============================================================================================================================="
+	echo
 
-    cat > /etc/systemd/system/kubelet.service <<EOF
+	echo "==============================================================================================================================="
+	echo "= Configure kubelet"
+	echo "==============================================================================================================================="
+
+	cat > /etc/systemd/system/kubelet.service <<EOF
 [Unit]
 Description=kubelet: The Kubernetes Node Agent
 Documentation=http://kubernetes.io/docs/
@@ -279,9 +277,9 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
-    mkdir -p /etc/systemd/system/kubelet.service.d
+	mkdir -p /etc/systemd/system/kubelet.service.d
 
-    cat > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf <<"EOF"
+	cat > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf <<"EOF"
 # Note: This dropin only works with kubeadm and kubelet v1.11+
 [Service]
 Environment="KUBELET_KUBECONFIG_ARGS=--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf"
@@ -295,48 +293,85 @@ ExecStart=
 ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
 EOF
 
-    if [ -z "${AWS_ACCESS_KEY_ID}" ] && [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
-        echo "KUBELET_EXTRA_ARGS='--cloud-provider=external --fail-swap-on=false --read-only-port=10255'" > /etc/default/kubelet
-    else
-        echo "KUBELET_EXTRA_ARGS='--image-credential-provider-config=${CREDENTIALS_CONFIG} --image-credential-provider-bin-dir=${CREDENTIALS_BIN} --cloud-provider=external --fail-swap-on=false --read-only-port=10255'" > /etc/default/kubelet
-    fi
+	if [ $CNI_PLUGIN = "aws" ]; then
+		# Add some EKS init 
+		UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2 | cut -d '.' -f 1)
+		
+		# Set NTP server
+		echo "set NTP server"
+		sed -i '/^NTP/d' /etc/systemd/timesyncd.conf
+		echo "NTP=169.254.169.123" >>/etc/systemd/timesyncd.conf
+		timedatectl set-timezone UTC
+		systemctl restart systemd-timesyncd.service
 
-    echo 'export PATH=/opt/cni/bin:$PATH' >> /etc/profile.d/apps-bin-path.sh
+		mkdir -p /etc/eks
+		mkdir -p /etc/sysconfig
+		wget https://raw.githubusercontent.com/awslabs/amazon-eks-ami/master/files/eni-max-pods.txt -O /etc/eks/eni-max-pods.txt
 
-    echo "==============================================================================================================================="
-    echo "= Restart kubelet"
-    echo "==============================================================================================================================="
+		/sbin/iptables-save > /etc/sysconfig/iptables
 
-    systemctl enable kubelet
-    systemctl restart kubelet
+		wget https://raw.githubusercontent.com/awslabs/amazon-eks-ami/master/files/iptables-restore.service -O /etc/systemd/system/iptables-restore.service
 
-    echo "==============================================================================================================================="
-    echo "= Pull kube images"
-    echo "==============================================================================================================================="
+		sudo systemctl daemon-reload
+		sudo systemctl enable iptables-restore
 
-    /usr/local/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}
+		# https://github.com/aws/amazon-vpc-cni-k8s/issues/2103#issuecomment-1321698870
+		if [ $UBUNTU_VERSION_ID -ge 22 ]; then
+			echo -e "\x1B[90m= \x1B[31m\x1B[1m\x1B[31mWARNING: Patch network for aws with ubuntu 22.x, see issue: https://github.com/aws/amazon-vpc-cni-k8s/issues/2103\x1B[0m\x1B[39m"
+			mkdir -p /etc/systemd/network/99-default.link.d/
+			cat << EOF > /etc/systemd/network/99-default.link.d/aws-cni-workaround.conf
+[Link]
+MACAddressPolicy=none
+EOF
+		fi
 
-    echo "==============================================================================================================================="
-    echo "= Pull cni image"
-    echo "==============================================================================================================================="
+		cat >> /etc/systemd/system/kubelet.service.d/10-kubeadm.conf <<"EOF"
+# Add iptables enable forwarding
+ExecStartPre=/sbin/iptables -P FORWARD ACCEPT -w 5
+EOF
+	fi
 
-    if [ "$CNI_PLUGIN" = "calico" ]; then
-        curl -s -O -L "https://github.com/projectcalico/calico/releases/download/v3.27.0/calicoctl-linux-${SEED_ARCH}"
-        chmod +x calicoctl-linux-${SEED_ARCH}
-        mv calicoctl-linux-${SEED_ARCH} /usr/local/bin/calicoctl
-        pull_image https://docs.projectcalico.org/manifests/calico-vxlan.yaml
-    elif [ "$CNI_PLUGIN" = "flannel" ]; then
-        pull_image https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
-    elif [ "$CNI_PLUGIN" = "weave" ]; then
-        pull_image "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
-    elif [ "$CNI_PLUGIN" = "canal" ]; then
-        pull_image https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/canal.yaml
-    elif [ "$CNI_PLUGIN" = "kube" ]; then
-        pull_image https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
-        pull_image https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter-all-features.yaml
-    elif [ "$CNI_PLUGIN" = "romana" ]; then
-        pull_image https://raw.githubusercontent.com/romana/romana/master/containerize/specs/romana-kubeadm.yml
-    fi
+	echo "KUBELET_EXTRA_ARGS='${KUBELET_CREDS_ARGS} --fail-swap-on=false --read-only-port=10255'" > /etc/default/kubelet
+
+	echo 'export PATH=/opt/cni/bin:$PATH' >> /etc/profile.d/apps-bin-path.sh
+
+	echo "==============================================================================================================================="
+	echo "= Restart kubelet"
+	echo "==============================================================================================================================="
+
+	systemctl enable kubelet
+	systemctl restart kubelet
+
+	echo "==============================================================================================================================="
+	echo "= Pull kube images"
+	echo "==============================================================================================================================="
+
+	/usr/local/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}
+
+	echo "==============================================================================================================================="
+	echo "= Pull cni image"
+	echo "==============================================================================================================================="
+
+	if [ "$CNI_PLUGIN" = "aws" ]; then
+		AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.16.0/config/master/aws-k8s-cni.yaml
+		pull_image ${AWS_CNI_URL} AWS ${ECR_PASSWORD}
+	elif [ "$CNI_PLUGIN" = "calico" ]; then
+		curl -s -O -L "https://github.com/projectcalico/calico/releases/download/v3.27.0/calicoctl-linux-${SEED_ARCH}"
+		chmod +x calicoctl-linux-${SEED_ARCH}
+		mv calicoctl-linux-${SEED_ARCH} /usr/local/bin/calicoctl
+		pull_image https://docs.projectcalico.org/manifests/calico-vxlan.yaml
+	elif [ "$CNI_PLUGIN" = "flannel" ]; then
+		pull_image https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+	elif [ "$CNI_PLUGIN" = "weave" ]; then
+		pull_image "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+	elif [ "$CNI_PLUGIN" = "canal" ]; then
+		pull_image https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/canal.yaml
+	elif [ "$CNI_PLUGIN" = "kube" ]; then
+		pull_image https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
+		pull_image https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter-all-features.yaml
+	elif [ "$CNI_PLUGIN" = "romana" ]; then
+		pull_image https://raw.githubusercontent.com/romana/romana/master/containerize/specs/romana-kubeadm.yml
+	fi
 fi
 
 apt upgrade -y

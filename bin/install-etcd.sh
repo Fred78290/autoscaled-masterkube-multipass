@@ -17,40 +17,40 @@ eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true; do
-    case "$1" in
-    -c|--cluster-nodes)
-        CLUSTER_NODES="$2"
-        shift 2
-        ;;
+	case "$1" in
+	-c|--cluster-nodes)
+		CLUSTER_NODES="$2"
+		shift 2
+		;;
 
-    -n|--node-index)
-        NODE_INDEX="$2"
-        shift 2
-        ;;
+	-n|--node-index)
+		NODE_INDEX="$2"
+		shift 2
+		;;
 
-    -u | --user)
-        USER=$2
-        shift 2
-        ;;
+	-u | --user)
+		USER=$2
+		shift 2
+		;;
 
-    --)
-        shift
-        break
-        ;;
+	--)
+		shift
+		break
+		;;
 
-    *)
-        echo "$1 - Internal error!"
-        exit 1
-        ;;
-    esac
+	*)
+		echo "$1 - Internal error!"
+		exit 1
+		;;
+	esac
 done
 
 for CLUSTER_NODE in $(echo -n ${CLUSTER_NODES} | tr ',' ' ')
 do
-    IFS=: read HOST IP <<< "${CLUSTER_NODE}"
+	IFS=: read HOST IP <<< "${CLUSTER_NODE}"
 
-    sed -i "/${HOST}/d" /etc/hosts
-    echo "${IP}   ${HOST} ${HOST%%.*}" >> /etc/hosts
+	sed -i "/${HOST}/d" /etc/hosts
+	echo "${IP}   ${HOST} ${HOST%%.*}" >> /etc/hosts
 done
 
 mkdir -p /etc/etcd

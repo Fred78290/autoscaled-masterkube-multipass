@@ -18,8 +18,8 @@ echo -n "Wait for ingress controller availability"
 
 while [ -z "$(kubectl --kubeconfig=${TARGET_CLUSTER_LOCATION}/config get po -n $K8NAMESPACE 2>/dev/null | grep 'ingress-nginx-controller')" ];
 do
-    sleep 1
-    echo -n "."
+	sleep 1
+	echo -n "."
 done
 
 echo

@@ -10,8 +10,8 @@ export KUBERNETES_TEMPLATE=./templates/metrics-server
 mkdir -p $ETC_DIR
 
 function deploy {
-    echo "Create $ETC_DIR/$1.json"
-    mkdir -p $(dirname $ETC_DIR/$1.json)
+	echo "Create $ETC_DIR/$1.json"
+	mkdir -p $(dirname $ETC_DIR/$1.json)
 echo $(eval "cat <<EOF
 $(<$KUBERNETES_TEMPLATE/$1.json)
 EOF") | jq . | tee $ETC_DIR/$1.json | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f $ETC_DIR/$1.json

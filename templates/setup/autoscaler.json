@@ -3,11 +3,11 @@
 	"src-etcd-ssl-dir": "/etc/etcd/ssl",
 	"dst-etcd-ssl-dir": "${ETCD_DST_DIR}",
 	"distribution": "${KUBERNETES_DISTRO}",
-	"cloud-provider": "${SCHEME}",
+	"cloud-provider": "${PLATEFORM}",
 	"kubernetes-pki-srcdir": "/etc/kubernetes/pki",
 	"kubernetes-pki-dstdir": "/etc/kubernetes/pki",
 	"listen": "${LISTEN}",
-	"secret": "${SCHEME}",
+	"secret": "${PLATEFORM}",
 	"minNode": ${MINNODES},
 	"maxNode": ${MAXNODES},
 	"maxPods": ${MAX_PODS},
@@ -37,12 +37,6 @@
 		"extras-commands": []
 	},
 	"default-machine": "${AUTOSCALE_MACHINE}",
-	"node-labels": [
-		"topology.kubernetes.io/region=${CSI_REGION}",
-		"topology.kubernetes.io/zone=${CSI_ZONE}",
-		"topology.csi.vmware.com/k8s-region=${CSI_REGION}",
-		"topology.csi.vmware.com/k8s-zone=${CSI_ZONE}"
-	],
 	"cloud-init": {
 		"package_update": false,
 		"package_upgrade": false,

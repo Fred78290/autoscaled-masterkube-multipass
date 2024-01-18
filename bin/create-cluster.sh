@@ -49,27 +49,19 @@ else
 	ARCH="amd64"
 fi
 
-TEMP=$(getopt -o xm:g:r:i:c:n:k: --long tls-san:,delete-credentials-provider:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace:,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if: -n "$0" -- "$@")
+TEMP=$(getopt -o xm:g:r:i:c:n:k: --long cloud-provider:,plateform:,tls-san:,delete-credentials-provider:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace:,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true; do
 	case "$1" in
-	--vm-uuid)
-		INSTANCEID=$2
+	--cloud-provider)
+		CLOUD_PROVIDER=$2
 		shift 2
 		;;
-	--net-if)
-		NET_IF=$2
-		shift 2
-		;;
-	--csi-region)
-		REGION=$2
-		shift 2
-		;;
-	--csi-zone)
-		ZONEID=$2
+	--plateform)
+		PLATEFORM=$2
 		shift 2
 		;;
 	-x|--trace)
@@ -140,12 +132,11 @@ while true; do
 		shift 2
 		;;
 	--load-balancer-ip)
-		LOAD_BALANCER_IP="$2"
+		IFS=, read -a LOAD_BALANCER_IP <<< "$2"
 		shift 2
 		;;
 	-c|--control-plane-endpoint)
-		CONTROL_PLANE_ENDPOINT_HOST="$2"
-		IFS=: read CONTROL_PLANE_ENDPOINT CONTROL_PLANE_ENDPOINT_ADDR <<< "$CONTROL_PLANE_ENDPOINT_HOST"
+		IFS=: read CONTROL_PLANE_ENDPOINT CONTROL_PLANE_ENDPOINT_ADDR <<< "$2"
 		shift 2
 		;;
 	-n|--cluster-nodes)
@@ -168,6 +159,36 @@ while true; do
 		ETCD_ENDPOINT="$2"
 		shift 2
 		;;
+# Specific per plateform
+	--ecr-password)
+		ECR_PASSWORD=$2
+		shift 2
+		;;
+	--private-zone-id)
+		AWS_ROUTE53_ZONE_ID="$2"
+		shift 2
+		;;
+	--private-zone-name)
+		PRIVATE_DOMAIN_NAME="$2"
+		shift 2
+		;;
+	--vm-uuid)
+		INSTANCEID=$2
+		shift 2
+		;;
+	--net-if)
+		NET_IF=$2
+		shift 2
+		;;
+	--csi-region)
+		REGION=$2
+		shift 2
+		;;
+	--csi-zone)
+		ZONEID=$2
+		shift 2
+		;;
+
 	--)
 		shift
 		break
@@ -179,6 +200,44 @@ while true; do
 		;;
 	esac
 done
+
+if [ ${PLATEFORM} == "aws" ]; then
+	REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
+	LOCALHOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)
+	MAC_ADDRESS="$(curl -s http://169.254.169.254/latest/meta-data/mac)"
+	INSTANCEID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+	INSTANCENAME=$(aws ec2  describe-instances --region $REGION --instance-ids $INSTANCEID | jq -r '.Reservations[0].Instances[0].Tags[]|select(.Key == "Name")|.Value')
+	SUBNET_IPV4_CIDR_BLOCK=$(curl -s http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/subnet-ipv4-cidr-block)
+	VPC_IPV4_CIDR_BLOCK=$(curl -s http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/vpc-ipv4-cidr-block)
+	ZONEID=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
+	DNS_SERVER=$(echo $VPC_IPV4_CIDR_BLOCK | tr './' ' '| awk '{print $1"."$2"."$3".2"}')
+	AWS_DOMAIN=${LOCALHOSTNAME#*.*}
+	AWS_ROUTE53_ZONE_ID=
+	APISERVER_ADVERTISE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+	PROVIDERID=aws://${ZONEID}/${INSTANCEID}
+else
+	# Check if interface exists, else take inet default gateway
+	ifconfig $NET_IF &> /dev/null || NET_IF=$(ip route get 1|awk '{print $5;exit}')
+	APISERVER_ADVERTISE_ADDRESS=$(ip addr show $NET_IF | grep "inet\s" | tr '/' ' ' | awk '{print $2}')
+	APISERVER_ADVERTISE_ADDRESS=$(echo $APISERVER_ADVERTISE_ADDRESS | awk '{print $1}')
+
+	if [ "${CLOUD_PROVIDER}" == "external" ]; then
+		PROVIDERID=${PLATEFORM}://${INSTANCEID}
+	fi
+
+	if [ "$HA_CLUSTER" = "true" ]; then
+		for CLUSTER_NODE in ${CLUSTER_NODES[*]}
+		do
+			IFS=: read HOST IP <<< "$CLUSTER_NODE"
+			sed -i "/$HOST/d" /etc/hosts
+			echo "${IP}   ${HOST} ${HOST%%.*}" >> /etc/hosts
+		done
+	fi
+fi
+
+if [ -z "$LOAD_BALANCER_IP" ]; then
+	LOAD_BALANCER_IP=($APISERVER_ADVERTISE_ADDRESS)
+fi
 
 if [ -z "${NODEGROUP_NAME}" ]; then
 	echo "NODEGROUP_NAME not defined"
@@ -194,41 +253,17 @@ if [ "${DELETE_CREDENTIALS_CONFIG}" == "YES" ]; then
 	esac
 fi
 
-# Check if interface exists, else take inet default gateway
-ifconfig $NET_IF &> /dev/null || NET_IF=$(ip route get 1|awk '{print $5;exit}')
-APISERVER_ADVERTISE_ADDRESS=$(ip addr show $NET_IF | grep "inet\s" | tr '/' ' ' | awk '{print $2}')
-APISERVER_ADVERTISE_ADDRESS=$(echo $APISERVER_ADVERTISE_ADDRESS | awk '{print $1}')
-
-if [ -z "$LOAD_BALANCER_IP" ]; then
-	LOAD_BALANCER_IP=$APISERVER_ADVERTISE_ADDRESS
-fi
-
-if [ "$HA_CLUSTER" = "true" ]; then
-	for CLUSTER_NODE in ${CLUSTER_NODES[*]}
-	do
-		IFS=: read HOST IP <<< "$CLUSTER_NODE"
-		sed -i "/$HOST/d" /etc/hosts
-		echo "${IP}   ${HOST} ${HOST%%.*}" >> /etc/hosts
-	done
-fi
-
-PROVIDERID=
-
 mkdir -p /etc/kubernetes
 mkdir -p $CLUSTER_DIR/etcd
 
 echo "${APISERVER_ADVERTISE_ADDRESS} $(hostname) ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 
-if [ "$CLOUD_PROVIDER" == "aws" ]; then
-	NODENAME=$LOCALHOSTNAME
-else
-	NODENAME=$HOSTNAME
-fi
+NODENAME=$HOSTNAME
 
 if [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 	ANNOTE_MASTER=true
 
-	if [ -n "${CLOUD_PROVIDER}" ]; then
+	if [ "${CLOUD_PROVIDER}" == "external" ]; then
 		cat > /etc/rancher/rke2/config.yaml <<EOF
 kubelet-arg:
   - cloud-provider=external
@@ -316,7 +351,7 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 	echo "K3S_MODE=server" > /etc/default/k3s
 	echo "K3S_ARGS='--kubelet-arg=provider-id=${PROVIDERID} --kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --advertise-address=${APISERVER_ADVERTISE_ADDRESS} --advertise-port=${APISERVER_ADVERTISE_PORT} --tls-san=${CERT_SANS}'" > /etc/systemd/system/k3s.service.env
 
-	if [ "$CLOUD_PROVIDER" == "aws" ] || [ "$CLOUD_PROVIDER" == "external" ]; then
+	if [ "$CLOUD_PROVIDER" == "external" ]; then
 		echo "K3S_DISABLE_ARGS='--disable-cloud-controller --disable=servicelb --disable=traefik --disable=metrics-server'" > /etc/systemd/system/k3s.disabled.env
 	else
 		echo "K3S_DISABLE_ARGS='--disable=servicelb --disable=traefik --disable=metrics-server'" > /etc/systemd/system/k3s.disabled.env
@@ -538,7 +573,7 @@ EOF
 		do
 			echo "    - ${ENDPOINT}" >> ${KUBEADM_CONFIG}
 		done
-    fi
+	fi
 
 	# If version 27 or greater, remove this kuletet argument
 	if [ $MAJOR -ge 27 ]; then
@@ -708,6 +743,6 @@ fi
 
 sed -i -e "/${CONTROL_PLANE_ENDPOINT%%.}/d" /etc/hosts
 
-echo -n "${LOAD_BALANCER_IP}:${APISERVER_ADVERTISE_PORT}" > $CLUSTER_DIR/manager-ip
+echo -n "${LOAD_BALANCER_IP[0]}:${APISERVER_ADVERTISE_PORT}" > $CLUSTER_DIR/manager-ip
 
 echo "Done k8s master node"

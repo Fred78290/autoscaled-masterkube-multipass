@@ -20,8 +20,8 @@ kubectl create secret generic -n metallb-system memberlist --dry-run=client -o y
 echo -n "Wait MetalLB ready"
 while [ -z "$(kubectl --kubeconfig=${TARGET_CLUSTER_LOCATION}/config get po -n metallb-system 2>/dev/null | grep 'controller')" ];
 do
-    sleep 1
-    echo -n "."
+	sleep 1
+	echo -n "."
 done
 
 echo

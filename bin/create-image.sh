@@ -32,73 +32,73 @@ eval set -- "$TEMP"
 
 # extract options and their arguments into variables.
 while true ; do
-    #echo "1:$1"
-    case "$1" in
-        -d|--distribution)
-            DISTRO="$2"
-            TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
-            SEEDIMAGE=${DISTRO}-server-cloudimg-seed
-            shift 2
-            ;;
-        -i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
-        -k|--ssh-key) SSH_KEY=$2 ; shift 2;;
-        -k|--ssh-priv-key) SSH_PRIV_KEY=$2 ; shift 2;;
-        -n|--cni-version) CNI_PLUGIN_VERSION=$2 ; shift 2;;
-        -p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
-        -s|--seed) SEEDIMAGE=$2 ; shift 2;;
-        -a|--arch) SEED_ARCH=$2 ; shift 2;;
-        -u|--user) USER=$2 ; shift 2;;
-        -v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
-        --k8s-distribution) 
-            case "$2" in
-                kubeadm|k3s|rke2)
-                KUBERNETES_DISTRO=$2
-                ;;
-            *)
-                echo "Unsupported kubernetes distribution: $2"
-                exit 1
-                ;;
-            esac
-            shift 2
-            ;;
-        --container-runtime)
-            case "$2" in
-                "docker")
-                    CONTAINER_ENGINE="$2"
-                    CONTAINER_CTL=docker
-                    ;;
-                "cri-o"|"containerd")
-                    CONTAINER_ENGINE="$2"
-                    CONTAINER_CTL=crictl
-                    ;;
-                *)
-                    echo_red_bold "Unsupported container runtime: $2"
-                    exit 1
-                    ;;
-            esac
-            shift 2;;
+	#echo "1:$1"
+	case "$1" in
+		-d|--distribution)
+			DISTRO="$2"
+			TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
+			SEEDIMAGE=${DISTRO}-server-cloudimg-seed
+			shift 2
+			;;
+		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
+		-k|--ssh-key) SSH_KEY=$2 ; shift 2;;
+		-k|--ssh-priv-key) SSH_PRIV_KEY=$2 ; shift 2;;
+		-n|--cni-version) CNI_PLUGIN_VERSION=$2 ; shift 2;;
+		-p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
+		-s|--seed) SEEDIMAGE=$2 ; shift 2;;
+		-a|--arch) SEED_ARCH=$2 ; shift 2;;
+		-u|--user) USER=$2 ; shift 2;;
+		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
+		--k8s-distribution) 
+			case "$2" in
+				kubeadm|k3s|rke2)
+				KUBERNETES_DISTRO=$2
+				;;
+			*)
+				echo "Unsupported kubernetes distribution: $2"
+				exit 1
+				;;
+			esac
+			shift 2
+			;;
+		--container-runtime)
+			case "$2" in
+				"docker")
+					CONTAINER_ENGINE="$2"
+					CONTAINER_CTL=docker
+					;;
+				"cri-o"|"containerd")
+					CONTAINER_ENGINE="$2"
+					CONTAINER_CTL=crictl
+					;;
+				*)
+					echo_red_bold "Unsupported container runtime: $2"
+					exit 1
+					;;
+			esac
+			shift 2;;
 
-        --aws-access-key)
-            AWS_ACCESS_KEY_ID=$2
-            shift 2
-            ;;
-        --aws-secret-key)
-            AWS_SECRET_ACCESS_KEY=$2
-            shift 2
-            ;;
+		--aws-access-key)
+			AWS_ACCESS_KEY_ID=$2
+			shift 2
+			;;
+		--aws-secret-key)
+			AWS_SECRET_ACCESS_KEY=$2
+			shift 2
+			;;
 
-        --) shift ; break ;;
-        *) echo_red_bold "$1 - Internal error!" ; exit 1 ;;
-    esac
+		--) shift ; break ;;
+		*) echo_red_bold "$1 - Internal error!" ; exit 1 ;;
+	esac
 done
 
 if [ -z $TARGET_IMAGE ]; then
-    TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
+	TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
 fi
 
 if [ -f "${CACHE}/${TARGET_IMAGE}" ]; then
-    echo_blue_bold "${CACHE}/${TARGET_IMAGE} already exists!"
-    exit 0
+	echo_blue_bold "${CACHE}/${TARGET_IMAGE} already exists!"
+	exit 0
 fi
 
 mkdir -p ${CACHE}/packer/cloud-data
@@ -112,30 +112,30 @@ ssh_pwauth: true
 users:
   - default
   - name: kubernetes
-    groups: users, admin
-    lock_passwd: false
-    shell: /bin/bash
-    plain_text_passwd: ${KUBERNETES_PASSWORD}
-    ssh_authorized_keys:
-      - ${SSH_KEY}
+	groups: users, admin
+	lock_passwd: false
+	shell: /bin/bash
+	plain_text_passwd: ${KUBERNETES_PASSWORD}
+	ssh_authorized_keys:
+	  - ${SSH_KEY}
   - name: packer
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: users, admin
-    ssh_authorized_keys:
-      - ${SSH_KEY}
+	sudo: ALL=(ALL) NOPASSWD:ALL
+	groups: users, admin
+	ssh_authorized_keys:
+	  - ${SSH_KEY}
 apt:
-    preserve_sources_list: true
+	preserve_sources_list: true
 EOF
 
 case "${KUBERNETES_DISTRO}" in
-    k3s|rke2)
-        CREDENTIALS_CONFIG=/var/lib/rancher/credentialprovider/config.yaml
-        CREDENTIALS_BIN=/var/lib/rancher/credentialprovider/bin
-        ;;
-    kubeadm)
-        CREDENTIALS_CONFIG=/etc/kubernetes/credential.yaml
-        CREDENTIALS_BIN=/usr/local/bin
-        ;;
+	k3s|rke2)
+		CREDENTIALS_CONFIG=/var/lib/rancher/credentialprovider/config.yaml
+		CREDENTIALS_BIN=/var/lib/rancher/credentialprovider/bin
+		;;
+	kubeadm)
+		CREDENTIALS_CONFIG=/etc/kubernetes/credential.yaml
+		CREDENTIALS_BIN=/usr/local/bin
+		;;
 esac
 
 KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | tr '.' ' ' | awk '{ print $2 }')
@@ -172,25 +172,25 @@ CPU_HOST=host
 pushd $CURDIR/..
 
 if [ ${SEED_ARCH} == "amd64" ]; then
-    cp ./templates/packer/template.json $CACHE/packer/template.json
+	cp ./templates/packer/template.json $CACHE/packer/template.json
 
-    QEMU_BINARY=qemu-system-x86_64
-    MACHINE_TYPE="pc"
+	QEMU_BINARY=qemu-system-x86_64
+	MACHINE_TYPE="pc"
 
-    if [ "${OSDISTRO}" == "Darwin" ]; then
-        ACCEL=hvf
-        CPU_HOST="host"
-    fi
+	if [ "${OSDISTRO}" == "Darwin" ]; then
+		ACCEL=hvf
+		CPU_HOST="host"
+	fi
 else
-    QEMU_BINARY=qemu-system-aarch64
-    MACHINE_TYPE="virt"
+	QEMU_BINARY=qemu-system-aarch64
+	MACHINE_TYPE="virt"
 
-    jq --arg BIOS "${PWD}/qemu-efi-aarch64/QEMU_EFI.fd" '.builders[0].qemuargs += [[ "-bios", $BIOS ]]' \
-        ./templates/packer/template.json > $CACHE/packer/template.json
+	jq --arg BIOS "${PWD}/qemu-efi-aarch64/QEMU_EFI.fd" '.builders[0].qemuargs += [[ "-bios", $BIOS ]]' \
+		./templates/packer/template.json > $CACHE/packer/template.json
 
-    if [ "${OSDISTRO}" == "Darwin" ]; then
-        ACCEL=hvf
-    fi
+	if [ "${OSDISTRO}" == "Darwin" ]; then
+		ACCEL=hvf
+	fi
 fi
 
 popd
@@ -199,17 +199,17 @@ pushd $CACHE/packer
 rm -rf output-qemu
 export PACKER_LOG=1
 packer build \
-    -var QEMU_BINARY=${QEMU_BINARY} \
-    -var CPU_HOST="${CPU_HOST}" \
-    -var MACHINE_TYPE="${MACHINE_TYPE}" \
-    -var DISTRO=${DISTRO} \
-    -var ACCEL=${ACCEL} \
-    -var SSH_PRIV_KEY="${SSH_PRIV_KEY}" \
-    -var ISO_CHECKSUM="sha256:${ISO_CHECKSUM}" \
-    -var ISO_FILE="${ISO_FILE}" \
-    -var INIT_SCRIPT="${CACHE}/prepare-image.sh" \
-    -var KUBERNETES_PASSWORD="${KUBERNETES_PASSWORD}" \
-    template.json
+	-var QEMU_BINARY=${QEMU_BINARY} \
+	-var CPU_HOST="${CPU_HOST}" \
+	-var MACHINE_TYPE="${MACHINE_TYPE}" \
+	-var DISTRO=${DISTRO} \
+	-var ACCEL=${ACCEL} \
+	-var SSH_PRIV_KEY="${SSH_PRIV_KEY}" \
+	-var ISO_CHECKSUM="sha256:${ISO_CHECKSUM}" \
+	-var ISO_FILE="${ISO_FILE}" \
+	-var INIT_SCRIPT="${CACHE}/prepare-image.sh" \
+	-var KUBERNETES_PASSWORD="${KUBERNETES_PASSWORD}" \
+	template.json
 mv output-qemu/packer-qemu ${TARGET_IMAGE}
 popd
 

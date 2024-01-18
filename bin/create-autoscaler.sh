@@ -1,7 +1,7 @@
 #/bin/bash
 LAUNCH_CA=$1
 
-if [ $LAUNCH_CA == "NO" ]; then
+if [ "${LAUNCH_CA}" == "NO" ]; then
     exit
 fi
 
@@ -22,6 +22,7 @@ export CLOUD_AUTOSCALER_VERSION=v1.29.0
 export AUTOSCALER_REGISTRY=$REGISTRY
 export CLOUDPROVIDER_CONFIG=/etc/cluster/grpc-config.json
 export USE_VANILLA_GRPC_ARGS=--no-use-vanilla-grpc
+export USE_CONTROLER_MANAGER_ARGS="--use-controller-manager"
 export MAX_MEMORY=$(($(echo -n $MEMORYTOTAL | cut -d ':' -f 2) * 1024))
 export MAX_VCPUS=$(echo -n ${CORESTOTAL} | cut -d ':' -f 2)
 
@@ -29,6 +30,10 @@ if [ "${GRPC_PROVIDER}" = "externalgrpc" ]; then
     USE_VANILLA_GRPC_ARGS=--use-vanilla-grpc
     AUTOSCALER_REGISTRY=registry.k8s.io/autoscaling
     CLOUDPROVIDER_CONFIG=/etc/cluster/grpc-config.yaml
+fi
+
+if [ -z "${CLOUD_PROVIDER}" ]; then
+    USE_CONTROLER_MANAGER_ARGS="--no-use-controller-manager"
 fi
 
 case $KUBERNETES_MINOR_RELEASE in
@@ -46,7 +51,7 @@ function deploy {
     echo "Create $ETC_DIR/$1.json"
 echo $(eval "cat <<EOF
 $(<$KUBERNETES_TEMPLATE/$1.json)
-EOF") | jq . | tee $ETC_DIR/$1.json | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f $ETC_DIR/$1.json
+EOF") | jq . | tee $ETC_DIR/$1.json | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 }
 
 deploy service-account-autoscaler
@@ -64,6 +69,7 @@ elif [ "$LAUNCH_CA" == "LOCAL" ]; then
     GOARCH=$(go env GOARCH)
     nohup ../out/$GOOS/$GOARCH/kubernetes-cloud-autoscaler \
         --kubeconfig=$KUBECONFIG \
+        --provider=${SCHEME} \
         --config=${TARGET_CONFIG_LOCATION}/autoscaler.json \
         --provider-config=${TARGET_CONFIG_LOCATION}/provider.json \
         --save=${TARGET_CONFIG_LOCATION}/autoscaler-state.json \

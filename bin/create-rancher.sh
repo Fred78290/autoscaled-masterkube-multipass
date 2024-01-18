@@ -9,7 +9,7 @@ pushd ${TARGET_DEPLOY_LOCATION} &>/dev/null
 
 export K8NAMESPACE=cattle-system
 
-kubectl create ns ${K8NAMESPACE} --kubeconfig=${TARGET_CLUSTER_LOCATION}/config --dry-run=client -o yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+kubectl create ns ${K8NAMESPACE} --dry-run=client --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 if [ ${KUBERNETES_MINOR_RELEASE} -lt 27 ]; then
     REPO=rancher-latest/rancher
@@ -31,6 +31,7 @@ ingress:
   extraAnnotations:
     "cert-manager.io/cluster-issuer": cert-issuer-prod
     "external-dns.alpha.kubernetes.io/register": 'true'
+    "external-dns.alpha.kubernetes.io/ttl": '600'
   tls:
     source: secret
     secretName: tls-rancher-ingress

@@ -15,16 +15,17 @@ aws_access_key_id =  $AWS_ROUTE53_ACCESSKEY
 aws_secret_access_key = $AWS_ROUTE53_SECRETKEY
 EOF
 
-    kubectl create ns external-dns --kubeconfig=${TARGET_CLUSTER_LOCATION}/config --dry-run=client -o yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+    kubectl create ns external-dns --dry-run=client -o yaml \
+	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
     kubectl create configmap config-external-dns -n external-dns --dry-run=client -o yaml \
-		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-        "--from-literal=DOMAIN_NAME=$DOMAIN_NAME" \
-        "--from-literal=AWS_REGION=$AWS_REGION" | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+	"--from-literal=DOMAIN_NAME=$DOMAIN_NAME" \
+	"--from-literal=AWS_REGION=$AWS_REGION" | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
     kubectl create secret generic aws-external-dns -n external-dns --dry-run=client -o yaml \
-			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-            --from-file ${ETC_DIR}/credentials | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+	--from-file ${ETC_DIR}/credentials | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
     [ "${DOMAIN_NAME}" = "${PRIVATE_DOMAIN_NAME}" ] && ZONE_TYPE=private || ZONE_TYPE=public
 

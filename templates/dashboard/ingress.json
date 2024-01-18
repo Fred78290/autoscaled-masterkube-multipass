@@ -10,7 +10,8 @@
 			"nginx.ingress.kubernetes.io/rewrite-target": "$REWRITE_TARGET",
 			"nginx.ingress.kubernetes.io/backend-protocol": "HTTPS",
 			"cert-manager.io/cluster-issuer": "cert-issuer-prod",
-			"external-dns.alpha.kubernetes.io/register": "true"
+			"external-dns.alpha.kubernetes.io/register": "true",
+			"external-dns.alpha.kubernetes.io/ttl": "600"
 		}
 	},
 	"spec": {

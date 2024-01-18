@@ -129,11 +129,11 @@ if [ "${OSDISTRO}" == "Darwin" ]; then
     }
 
     TZ=$(sudo systemsetup -gettimezone | awk -F: '{print $2}' | tr -d ' ')
-	PATH=${HOME}/Library/DesktopAutoscalerUtility:${PATH}
+    PATH=${HOME}/Library/DesktopAutoscalerUtility:${PATH}
 else
     TZ=$(cat /etc/timezone)
     VMWAREWM=""
-	PATH=${HOME}/.local/vmware:${PATH}
+    PATH=${HOME}/.local/vmware:${PATH}
 
     function delete_host() {
         sudo sed -i "/$1/d" /etc/hosts
@@ -141,7 +141,7 @@ else
 fi
 
 function delete_vm_by_name() {
-	local VMNAME=$1
+    local VMNAME=$1
 
     if [ "$(multipass info ${VMNAME} 2>/dev/null)" ]; then
         echo_blue_bold "Delete VM: $VMNAME"

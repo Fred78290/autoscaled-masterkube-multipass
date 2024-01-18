@@ -9,6 +9,17 @@
 set -e
 
 CURDIR=$(dirname $0)
+OUTPUT=${CURDIR}/../config/deploy.log
+TIMEFORMAT='It takes %R seconds to complete this task...'
+
+echo -n > ${OUTPUT}
+
+echo "==================================================================================" | tee -a ${OUTPUT}
+echo "Start at: " $(date) | tee -a ${OUTPUT}
+echo "==================================================================================" | tee -a ${OUTPUT}
+echo | tee -a ${OUTPUT}
+
+time {
 
 pushd ${CURDIR}/../ &>/dev/null
 
@@ -44,7 +55,7 @@ export SCALEDOWNDELAYAFTERDELETE="1m"
 export SCALEDOWNDELAYAFTERFAILURE="1m"
 export SCALEDOWNUNEEDEDTIME="1m"
 export SCALEDOWNUNREADYTIME="1m"
-export DEFAULT_MACHINE="medium"
+export AUTOSCALE_MACHINE="medium"
 export NGINX_MACHINE="tiny"
 export CONTROL_PLANE_MACHINE="small"
 export WORKER_NODE_MACHINE="medium"
@@ -161,8 +172,8 @@ Options are:
 ### Flags to set some location informations
 
 --configuration-location                       # Specify where configuration will be stored, default ${CONFIGURATION_LOCATION}
---ssl-location                                 # Specify where the etc/ssl dir is stored, default ${SSL_LOCATION}
---defs                                         # Override the ${SCHEME} definitions, default ${SCHEMEDEFS}
+--ssl-location=<path>                          # Specify where the etc/ssl dir is stored, default ${SSL_LOCATION}
+--defs=<path>                                  # Specify the ${SCHEME} definitions, default ${SCHEMEDEFS}
 
 ### Design domain
 
@@ -192,7 +203,7 @@ Options are:
 --worker-nodes=<value>                         # Specify the number of worker node created in HA cluster, default ${WORKERNODES}
 --container-runtime=<docker|containerd|cri-o>  # Specify which OCI runtime to use, default ${CONTAINER_ENGINE}
 --max-pods                                     # Specify the max pods per created VM, default ${MAX_PODS}
---default-machine | -d=<value>                 # Override machine type used for auto scaling, default ${DEFAULT_MACHINE}
+--autoscale-machine | -d=<value>               # Override machine type used for auto scaling, default ${AUTOSCALE_MACHINE}
 --nginx-machine                                # Override machine type used for nginx as ELB, default ${NGINX_MACHINE}
 --control-plane-machine                        # Override machine type used for control plane, default ${CONTROL_PLANE_MACHINE}
 --worker-node-machine                          # Override machine type used for worker node, default ${WORKER_NODE_MACHINE}
@@ -253,13 +264,31 @@ Options are:
 EOF
 }
 
-TEMP=$(getopt -o xvheucrk:n:p:s:t: --long upgrade,distribution:,k8s-distribution:,cloudprovider:,route53-zone-id:,route53-access-key:,route53-secret-key:,use-zerossl,dont-use-zerossl,zerossl-eab-kid:,zerossl-eab-hmac-secret:,godaddy-key:,godaddy-secret:,nfs-server-adress:,nfs-server-mount:,nfs-storage-class:,add-route-private:,add-route-public:,dont-use-dhcp-routes-private,dont-use-dhcp-routes-public,nginx-machine:,control-plane-machine:,worker-node-machine:,delete,configuration-location:,ssl-location:,cert-email:,public-domain:,dashboard-hostname:,create-image-only,no-dhcp-autoscaled-node,metallb-ip-range:,trace,container-runtime:,verbose,help,create-external-etcd,use-keepalived,defs:,worker-nodes:,ha-cluster,public-address:,resume,node-group:,target-image:,seed-image:,seed-user:,vm-public-network:,vm-private-network:,net-address:,net-gateway:,net-dns:,net-domain:,transport:,ssh-private-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
+export PATH=${PWD}/bin:${PATH}
+
+TEMP=$(getopt -o xvheucrk:n:p:s:t: --long upgrade,autoscale-machine:,distribution:,k8s-distribution:,cloudprovider:,route53-zone-id:,route53-access-key:,route53-secret-key:,use-zerossl,dont-use-zerossl,zerossl-eab-kid:,zerossl-eab-hmac-secret:,godaddy-key:,godaddy-secret:,nfs-server-adress:,nfs-server-mount:,nfs-storage-class:,add-route-private:,add-route-public:,dont-use-dhcp-routes-private,dont-use-dhcp-routes-public,nginx-machine:,control-plane-machine:,worker-node-machine:,delete,configuration-location:,ssl-location:,cert-email:,public-domain:,dashboard-hostname:,create-image-only,no-dhcp-autoscaled-node,metallb-ip-range:,trace,container-runtime:,verbose,help,create-external-etcd,use-keepalived,defs:,worker-nodes:,ha-cluster,public-address:,resume,node-group:,target-image:,seed-image:,seed-user:,vm-public-network:,vm-private-network:,net-address:,net-gateway:,net-dns:,net-domain:,transport:,ssh-private-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true; do
     case "$1" in
+    --no-dhcp-autoscaled-node)
+        SCALEDNODES_DHCP=false
+        shift 1
+        ;;
+    --public-address)
+        PUBLIC_IP="$2"
+        shift 2
+        ;;
+    --metallb-ip-range)
+        METALLB_IP_RANGE="$2"
+        shift 2
+        ;;
+    -u|--use-keepalived)
+        USE_KEEPALIVED=YES
+        shift 1
+        ;;
     -h|--help)
         usage
         exit 0
@@ -277,18 +306,6 @@ while true; do
     -v|--verbose)
         VERBOSE=YES
         shift 1
-        ;;
-    --no-dhcp-autoscaled-node)
-        SCALEDNODES_DHCP=false
-        shift 1
-        ;;
-    --public-address)
-        PUBLIC_IP="$2"
-        shift 2
-        ;;
-    --metallb-ip-range)
-        METALLB_IP_RANGE="$2"
-        shift 2
         ;;
     -x|--trace)
         set -x
@@ -406,10 +423,6 @@ while true; do
         EXTERNAL_ETCD=true
         shift 1
         ;;
-    -u|--use-keepalived)
-        USE_KEEPALIVED=YES
-        shift 1
-        ;;
     --node-group)
         NODEGROUP_NAME="$2"
         MASTERKUBE="${NODEGROUP_NAME}-masterkube"
@@ -506,10 +519,6 @@ while true; do
         shift 2
         ;;
 
-    -d | --default-machine)
-        DEFAULT_MACHINE="$2"
-        shift 2
-        ;;
     --nginx-machine)
         NGINX_MACHINE="$2"
         shift 2
@@ -520,6 +529,10 @@ while true; do
         ;;
     --worker-node-machine)
         WORKER_NODE_MACHINE="$2"
+        shift 2
+        ;;
+    --autoscale-machine)
+        AUTOSCALE_MACHINE="$2"
         shift 2
         ;;
     -s | --ssh-private-key)
@@ -534,16 +547,16 @@ while true; do
         CNI_PLUGIN_VERSION="$2"
         shift 2
         ;;
-    -p | --password)
-        KUBERNETES_PASSWORD="$2"
-        shift 2
-        ;;
     -t | --transport)
         TRANSPORT="$2"
         shift 2
         ;;
     -k | --kubernetes-version)
         KUBERNETES_VERSION="$2"
+        shift 2
+        ;;
+    -p | --password)
+        KUBERNETES_PASSWORD="$2"
         shift 2
         ;;
     --worker-nodes)
@@ -611,6 +624,19 @@ while true; do
     esac
 done
 
+export AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)
+
+AUTOSCALER_DESKTOP_UTILITY_KEY="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientKey)"
+AUTOSCALER_DESKTOP_UTILITY_CERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientCertificate)"
+AUTOSCALER_DESKTOP_UTILITY_CACERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .Certificate)"
+AUTOSCALER_DESKTOP_UTILITY_ADDR=${LOCAL_IPADDR}:5700
+
+if [ "$LAUNCH_CA" == YES ]; then
+	AUTOSCALER_DESKTOP_UTILITY_CERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CERT})"
+	AUTOSCALER_DESKTOP_UTILITY_KEY="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_KEY})"
+	AUTOSCALER_DESKTOP_UTILITY_CACERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CACERT})"
+fi
+
 if [ "${UPGRADE_CLUSTER}" == "YES" ] && [ "${DELETE_CLUSTER}" = "YES" ]; then
     echo_red_bold "Can't upgrade deleted cluster, exit"
     exit
@@ -624,6 +650,12 @@ fi
 if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
     LOAD_BALANCER_PORT="${LOAD_BALANCER_PORT},9345"
     EXTERNAL_ETCD=false
+fi
+
+if [ "${HA_CLUSTER}" = "true" ]; then
+    CONTROLNODES=3
+else
+    CONTROLNODES=1
 fi
 
 if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
@@ -657,13 +689,13 @@ else
     SCP_OPTIONS="${SCP_OPTIONS} -q"
 fi
 
-if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-    TARGET_IMAGE="${PWD}/images/${ROOT_IMG_NAME}-rke2-${KUBERNETES_VERSION}-${SEED_ARCH}".img
-elif [ "${KUBERNETES_DISTRO}" == "k3s" ]; then
-    TARGET_IMAGE="${PWD}/images/${ROOT_IMG_NAME}-k3s-${KUBERNETES_VERSION}-${SEED_ARCH}".img
+if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+    TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}"
 else
-    TARGET_IMAGE="${PWD}/images/${ROOT_IMG_NAME}-k8s-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}".img
+    TARGET_IMAGE="${ROOT_IMG_NAME}-k8s-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 fi
+
+TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}".img
 
 export SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
 export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
@@ -746,9 +778,7 @@ else
     CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
 fi
 
-eval echo_grey "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}" ${SILENT}
-
-export PATH=${PWD}/bin:${PATH}
+echo_blue_bold "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
 
 # If CERT doesn't exist, create one autosigned
 if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
@@ -793,6 +823,7 @@ if [ ! -f "${TARGET_IMAGE}" ]; then
 fi
 
 if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
+    echo_blue_bold "Create image only, done..."
     exit 0
 fi
 
@@ -814,19 +845,6 @@ fi
 # Extract the domain name from CERT
 export DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
 
-export AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)
-
-AUTOSCALER_DESKTOP_UTILITY_KEY="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientKey)"
-AUTOSCALER_DESKTOP_UTILITY_CERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientCertificate)"
-AUTOSCALER_DESKTOP_UTILITY_CACERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .Certificate)"
-AUTOSCALER_DESKTOP_UTILITY_ADDR=${LOCAL_IPADDR}:5700
-
-if [ "$LAUNCH_CA" == YES ]; then
-	AUTOSCALER_DESKTOP_UTILITY_CERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CERT})"
-	AUTOSCALER_DESKTOP_UTILITY_KEY="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_KEY})"
-	AUTOSCALER_DESKTOP_UTILITY_CACERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CACERT})"
-fi
-
 # Delete previous exixting version
 if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
     echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
@@ -840,6 +858,7 @@ else
 fi
 
 mkdir -p ${TARGET_CONFIG_LOCATION}
+mkdir -p ${TARGET_DEPLOY_LOCATION}
 mkdir -p ${TARGET_CLUSTER_LOCATION}
 
 if [ "${RESUME}" = "NO" ]; then
@@ -853,7 +872,7 @@ export CNI_PLUGIN_VERSION=${CNI_PLUGIN_VERSION}
 export CNI_PLUGIN=${CNI_PLUGIN}
 export CONTROLNODES=${CONTROLNODES}
 export CORESTOTAL="${CORESTOTAL}"
-export DEFAULT_MACHINE=${DEFAULT_MACHINE}
+export AUTOSCALE_MACHINE=${AUTOSCALE_MACHINE}
 export DELETE_CREDENTIALS_CONFIG=${DELETE_CREDENTIALS_CONFIG}
 export DOMAIN_NAME=${DOMAIN_NAME}
 export EXTERNAL_ETCD=${EXTERNAL_ETCD}
@@ -927,6 +946,23 @@ fi
 
 echo "${KUBERNETES_PASSWORD}" >${TARGET_CONFIG_LOCATION}/kubernetes-password.txt
 
+# Cloud init vendor-data
+cat >${TARGET_CONFIG_LOCATION}/vendordata.yaml <<EOF
+#cloud-config
+package_update: true
+package_upgrade: true
+timezone: ${TZ}
+ssh_authorized_keys:
+  - ${SSH_KEY}
+users:
+  - default
+system_info:
+  default_user:
+    name: ${KUBERNETES_USER}
+EOF
+
+gzip -c9 <${TARGET_CONFIG_LOCATION}/vendordata.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/vendordata.base64
+
 IPADDRS=()
 NODE_IP=${NET_IP}
 
@@ -959,6 +995,9 @@ fi
 PUBLIC_ROUTES_DEFS=$(build_routes ${NETWORK_PUBLIC_ROUTES[@]})
 PRIVATE_ROUTES_DEFS=$(build_routes ${NETWORK_PRIVATE_ROUTES[@]})
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function collect_cert_sans() {
     local LOAD_BALANCER_IP=$1
     local CLUSTER_NODES=$2
@@ -999,6 +1038,9 @@ function collect_cert_sans() {
     echo -n "${TLS_SNA[*]}" | tr ' ' ','
 }
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function create_vm() {
     local INDEX=$1
     local PUBLIC_NODE_IP=$2
@@ -1006,7 +1048,9 @@ function create_vm() {
     local MACHINE_TYPE=${CONTROL_PLANE_MACHINE}
     local NODEINDEX=${INDEX}
     local MASTERKUBE_NODE=
+    local MASTERKUBE_NODE_UUID=
     local IPADDR=
+    local VMHOST=
     local DISK_SIZE=
     local NUM_VCPUS=
     local MEMSIZE=
@@ -1126,6 +1170,10 @@ EOF
             echo_red_bold "MACHINE_TYPE=${MACHINE_TYPE} MEMSIZE=${MEMSIZE} NUM_VCPUS=${NUM_VCPUS} DISK_SIZE=${DISK_SIZE} not correctly defined"
             exit 1
         fi
+
+        echo_line
+        echo_blue_bold "Clone ${TARGET_IMAGE} to ${MASTERKUBE_NODE} TARGET_IMAGE=${TARGET_IMAGE} MASTERKUBE_NODE=${MASTERKUBE_NODE} MEMSIZE=${MEMSIZE} NUM_VCPUS=${NUM_VCPUS} DISK_SIZE=${DISK_SIZE}M"
+        echo_line
 
         # Clone my template
         echo_title "Launch ${MASTERKUBE_NODE}"
@@ -1485,3 +1533,8 @@ EOF") | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
 source ./bin/create-deployment.sh
 
 popd &>/dev/null
+
+} 2>&1 | tee -a ${OUTPUT}
+echo "==================================================================================" | tee -a ${OUTPUT}
+echo "= End at: " $(date) | tee -a ${OUTPUT}
+echo "==================================================================================" | tee -a ${OUTPUT}

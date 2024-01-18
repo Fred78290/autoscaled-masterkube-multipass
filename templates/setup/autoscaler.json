@@ -36,7 +36,7 @@
 		"delete-credentials-provider": ${DELETE_CREDENTIALS_CONFIG},
 		"extras-commands": []
 	},
-	"default-machine": "${DEFAULT_MACHINE}",
+	"default-machine": "${AUTOSCALE_MACHINE}",
 	"node-labels": [
 		"topology.kubernetes.io/region=${CSI_REGION}",
 		"topology.kubernetes.io/zone=${CSI_ZONE}",

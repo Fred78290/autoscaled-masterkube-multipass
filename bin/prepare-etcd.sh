@@ -76,11 +76,11 @@ cat > ${TARGET_CLUSTER_LOCATION}/etcd/ca-csr.json <<EOF
   },
   "names": [
     {
-        "C": "FR",
-        "ST": "PARIS",
-        "L": "Paris",
-        "O": "k8s",
-        "OU": "System"
+        "C": "US",
+        "ST": "California",
+        "L": "San Francisco",
+        "O": "GitHub",
+        "OU": "Fred78290"
     }
   ]
 }
@@ -107,11 +107,11 @@ cat > ${TARGET_CLUSTER_LOCATION}/etcd/etcd-csr.json <<EOF
     },
     "names": [
         {
-            "C": "FR",
-            "ST": "PARIS",
-            "L": "Paris",
-            "O": "k8s",
-            "OU": "System"
+            "C": "US",
+            "ST": "California",
+            "L": "San Francisco",
+            "O": "GitHub",
+            "OU": "Fred78290"
         }
     ]
 }

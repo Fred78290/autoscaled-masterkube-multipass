@@ -33,7 +33,7 @@ export K8NAMESPACE=cert-manager
 export ETC_DIR=${TARGET_DEPLOY_LOCATION}/cert-manager
 export KUBERNETES_TEMPLATE=./templates/cert-manager
 
-KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | tr '.' ' ' | awk '{ print $2 }')
+KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | awk -F. '{ print $2 }')
 
 case $KUBERNETES_MINOR_RELEASE in
     26)
@@ -71,8 +71,9 @@ helm upgrade -i $K8NAMESPACE jetstack/cert-manager \
 
 if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
     echo_blue_bold "Register CA self signed issuer"
-    kubectl create secret generic ca-key-pair -n $K8NAMESPACE --dry-run=client -o yaml \
+    kubectl create secret generic ca-key-pair --dry-run=client -o yaml \
         --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+        --namespace $K8NAMESPACE \
         --from-file=tls.crt=${SSL_LOCATION}/ca.pem \
         --from-file=tls.key=${SSL_LOCATION}/ca.key | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
@@ -94,7 +95,7 @@ else
     elif [ -n ${GODADDY_API_KEY} ]; then
         echo_blue_bold "Register godaddy issuer"
         helm upgrade -i godaddy-webhook godaddy-webhook/godaddy-webhook \
-	        --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+	    --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
             --version ${GODADDY_WEBHOOK_VERSION} \
             --set groupName=${PUBLIC_DOMAIN_NAME} \
             --set dnsPolicy=ClusterFirst \

@@ -1,16 +1,19 @@
+if [ -z "${PLATEFORM}" ]; then
+    echo "env PLATEFORM= [ aws | vsphere | multipass | desktop ] not defined!"
+    exit 1
+fi
+
 export SSH_OPTIONS="-o BatchMode=yes -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 export SCP_OPTIONS="${SSH_OPTIONS} -p -r"
 export OSDISTRO=$(uname -s)
-export PLATEFORM=
 export CONTROLNODES=3
 export WORKERNODES=3
-export PLATEFORMDEFS=${CURDIR}/vars.defs
-
-source ${CURDIR}/plateform.sh
-
 export NODEGROUP_NAME="${PLATEFORM}-ca-k8s"
 export MASTERKUBE=${NODEGROUP_NAME}-masterkube
 export DASHBOARD_HOSTNAME=masterkube-${PLATEFORM}-dashboard
+export PLATEFORMDEFS=${CURDIR}/plateform/${PLATEFORM}/vars.defs
+
+source ${CURDIR}/plateform/${PLATEFORM}/plateform.sh
 
 source ${PLATEFORMDEFS}
 

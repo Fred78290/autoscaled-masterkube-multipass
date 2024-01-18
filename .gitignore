@@ -18,11 +18,7 @@ kubernetes/*
 config/*
 etc/ssl/*
 
-guestinfos/*\.txt
-guestinfos/*\.json
-guestinfos/*\.yaml
-
-bin/*.defs
+bin/**/*.defs
 
 *.log
 

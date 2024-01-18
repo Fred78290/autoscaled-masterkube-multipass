@@ -6,7 +6,7 @@ pushd $CURDIR/../ &>/dev/null
 
 export K8NAMESPACE=ingress-nginx
 export ETC_DIR=${TARGET_DEPLOY_LOCATION}/ingress
-export KUBERNETES_TEMPLATE=./templates/ingress
+export KUBERNETES_TEMPLATE=./templates/ingress/${PLATEFORM}
 
 mkdir -p $ETC_DIR
 
@@ -24,4 +24,7 @@ done
 
 echo
 
-kubectl wait --kubeconfig=${TARGET_CLUSTER_LOCATION}/config --namespace $K8NAMESPACE --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=240s
+kubectl wait --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+	--namespace $K8NAMESPACE \
+	--for=condition=ready pod \
+	--selector=app.kubernetes.io/component=controller --timeout=240s

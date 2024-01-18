@@ -1,5 +1,4 @@
-PLATEFORM="multipass"
-CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl kubernetes-desktop-autoscaler-utility packer qemu-img"
+CMD_MANDATORIES="helm kubectl vmrun vmrest jq yq cfssl ovftool kubernetes-desktop-autoscaler-utility vmware-vdiskmanager"
 
 if [ "${OSDISTRO}" == "Darwin" ]; then
     VMWAREWM=".vmwarevm"
@@ -9,12 +8,21 @@ else
     PATH=${HOME}/.local/vmware:${PATH}
 fi
 
+if [ "${OSDISTRO}" == "Darwin" ] && [ -z "$(command -v vmware-vdiskmanager)" ]; then
+	sudo ln -s /Applications/VMware\ Fusion.app/Contents/Library/vmware-vdiskmanager /usr/local/bin/vmware-vdiskmanager
+fi
+
+source ${CURDIR}/vmrest-utility.sh
+
 function delete_vm_by_name() {
     local VMNAME=$1
+    local VMUUID=$(vmrest_get_vmuuid ${VMNAME})
 
-    if [ "$(multipass info ${VMNAME} 2>/dev/null)" ]; then
-        echo_blue_bold "Delete VM: $VMNAME"
-        multipass delete $VMNAME -p
+    if [ -n "${VMUUID}" ]; then
+		echo_blue_bold "Delete VM: $VMNAME"
+		vmrest_poweroff ${VMUUID} hard &> /dev/null
+		vmrest_wait_for_powerstate ${VMUUID} "poweredOff" &> /dev/null
+		vmrest_destroy ${VMUUID} &> /dev/null
 	fi
 
     delete_host "${VMNAME}"
@@ -35,11 +43,8 @@ export CLOUDPROVIDER_CONFIG=${CLOUDPROVIDER_CONFIG}
 export CLUSTER_NODES=${CLUSTER_NODES}
 export CNI_PLUGIN=${CNI_PLUGIN}
 export CNI_VERSION=${CNI_VERSION}
-export CONTROL_PLANE_MACHINE=${CONTROL_PLANE_MACHINE}
 export CONTROLNODES=${CONTROLNODES}
 export CORESTOTAL="${CORESTOTAL}"
-export DASHBOARD_HOSTNAME=${DASHBOARD_HOSTNAME}
-export DOMAIN_NAME=${DOMAIN_NAME}
 export EXTERNAL_ETCD=${EXTERNAL_ETCD}
 export FIRSTNODE=${FIRSTNODE}
 export GODADDY_API_KEY=${GODADDY_API_KEY}
@@ -52,14 +57,12 @@ export KUBERNETES_PASSWORD=${KUBERNETES_PASSWORD}
 export KUBERNETES_USER=${KUBERNETES_USER}
 export KUBERNETES_VERSION=${KUBERNETES_VERSION}
 export LAUNCH_CA=${LAUNCH_CA}
-export MASTERKUBE=${MASTERKUBE}
-export MAX_PODS=${MAX_PODS}
+export MASTERKUBE="${MASTERKUBE}"
 export MAXAUTOPROVISIONNEDNODEGROUPCOUNT=${MAXAUTOPROVISIONNEDNODEGROUPCOUNT}
 export MAXNODES=${MAXNODES}
 export MAXTOTALNODES=${MAXTOTALNODES}
 export MEMORYTOTAL="${MEMORYTOTAL}"
 export MINNODES=${MINNODES}
-export NGINX_MACHINE=${NGINX_MACHINE}
 export NET_DNS=${NET_DNS}
 export NET_DOMAIN=${NET_DOMAIN}
 export NET_GATEWAY=${NET_GATEWAY}
@@ -69,8 +72,9 @@ export NET_MASK=${NET_MASK}
 export NFS_SERVER_ADDRESS=${NFS_SERVER_ADDRESS}
 export NFS_SERVER_PATH=${NFS_SERVER_PATH}
 export NFS_STORAGE_CLASS=${NFS_STORAGE_CLASS}
-export NODEGROUP_NAME=${NODEGROUP_NAME}
+export NODEGROUP_NAME="${NODEGROUP_NAME}"
 export OSDISTRO=${OSDISTRO}
+export PLATEFORM="${PLATEFORM}"
 export PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
 export PUBLIC_IP="${PUBLIC_IP}"
 export REGISTRY=${REGISTRY}
@@ -81,7 +85,6 @@ export SCALEDOWNDELAYAFTERFAILURE=${SCALEDOWNDELAYAFTERFAILURE}
 export SCALEDOWNENABLED=${SCALEDOWNENABLED}
 export SCALEDOWNUNEEDEDTIME=${SCALEDOWNUNEEDEDTIME}
 export SCALEDOWNUNREADYTIME=${SCALEDOWNUNREADYTIME}
-export PLATEFORM="${PLATEFORM}"
 export SEED_IMAGE="${SEED_IMAGE}"
 export SEED_USER=${SEED_USER}
 export SSH_KEY_FNAME=${SSH_KEY_FNAME}
@@ -108,7 +111,7 @@ EOF
 }
 
 function update_provider_config() {
-    PROVIDER_AUTOSCALER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
+	PROVIDER_AUTOSCALER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
 
-    echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE "file://${TARGET_IMAGE}" '.template-name = ${TARGET_IMAGE}' > ${TARGET_CONFIG_LOCATION}/provider.json
+	echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE ${TARGET_IMAGE_UUID} "template-name = ${TARGET_IMAGE}" > ${TARGET_CONFIG_LOCATION}/provider.json
 }

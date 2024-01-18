@@ -1,0 +1,54 @@
+{
+	"url": "${GOVC_URL}",
+	"uid": "${GOVC_USERNAME}",
+	"password": "${GOVC_PASSWORD}",
+	"insecure": ${INSECURE},
+	"dc" : "${GOVC_DATACENTER}",
+	"datastore": "${GOVC_DATASTORE}",
+	"resource-pool": "${GOVC_RESOURCE_POOL}",
+	"vmFolder": "${GOVC_FOLDER}",
+	"timeout": 300,
+	"template-name": "${TARGET_IMAGE}",
+	"template": false,
+	"linked": false,
+	"allow-upgrade": false,
+	"customization": "${GOVC_CUSTOMIZATION}",
+	"network": {
+		"domain": "${NET_DOMAIN}",
+		"dns": {
+			"search": [
+				"${NET_DOMAIN}"
+			],
+			"nameserver": [
+				"${NET_DNS}"
+			]
+		},
+		"interfaces": [
+			{
+				"primary": false,
+				"exists": true,
+				"network": "${VC_NETWORK_PUBLIC}",
+				"adapter": "vmxnet3",
+				"mac-address": "generate",
+				"nic": "eth0",
+				"dhcp": true,
+				"use-dhcp-routes": ${USE_DHCP_ROUTES_PUBLIC},
+				"routes": ${PUBLIC_ROUTES_DEFS}
+			},
+			{
+				"primary": true,
+				"exists": true,
+				"network": "${VC_NETWORK_PRIVATE}",
+				"adapter": "vmxnet3",
+				"mac-address": "generate",
+				"nic": "eth1",
+				"dhcp": ${SCALEDNODES_DHCP},
+				"use-dhcp-routes": ${USE_DHCP_ROUTES_PRIVATE},
+				"address": "${NODE_IP}",
+				"gateway": "${NET_GATEWAY}",
+				"netmask": "${NET_MASK}",
+				"routes": ${PRIVATE_ROUTES_DEFS}
+			}
+		]
+	}
+}

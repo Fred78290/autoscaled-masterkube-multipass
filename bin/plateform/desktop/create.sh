@@ -1,6 +1,6 @@
 #/bin/bash
 
-# This script create every thing to deploy a simple kubernetes autoscaled cluster with multipass.
+# This script create every thing to deploy a simple kubernetes autoscaled cluster with vmware desktop.
 # It will generate:
 # Custom image with every thing for kubernetes
 # Config file to deploy the cluster autoscaler.
@@ -63,14 +63,14 @@ export UNREMOVABLENODERECHECKTIMEOUT="1m"
 export OSDISTRO=$(uname -s)
 export TRANSPORT="tcp"
 export NET_DOMAIN=home
-export NET_IP=192.168.1.20
+export NET_IP=192.168.172.20
 export NET_IF=eth1
 export NET_GATEWAY=10.0.0.1
 export NET_DNS=10.0.0.1
 export NET_MASK=255.255.255.0
 export NET_MASK_CIDR=24
-export VC_NETWORK_PRIVATE="bridged100"
-export VC_NETWORK_PUBLIC="en0"
+export VC_NETWORK_PRIVATE="vmnet8"
+export VC_NETWORK_PUBLIC="vmnet0"
 export USE_DHCP_ROUTES_PRIVATE=true
 export USE_DHCP_ROUTES_PUBLIC=true
 export NETWORK_PUBLIC_ROUTES=()
@@ -84,7 +84,7 @@ export SCALEDNODES_DHCP=true
 export RESUME=NO
 export CONTAINER_ENGINE=containerd
 export EXTERNAL_ETCD=false
-export TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${SEED_ARCH}-${CONTAINER_ENGINE}".img
+export TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${SEED_ARCH}-${CONTAINER_ENGINE}"
 export MAX_PODS=110
 export SILENT="&> /dev/null"
 export NFS_SERVER_ADDRESS=
@@ -637,6 +637,19 @@ if [ "$LAUNCH_CA" == YES ]; then
 	AUTOSCALER_DESKTOP_UTILITY_CACERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CACERT})"
 fi
 
+export VC_NETWORK_PRIVATE_TYPE=$(vmrest_get_net_type ${VC_NETWORK_PRIVATE})
+export VC_NETWORK_PUBLIC_TYPE=$(vmrest_get_net_type ${VC_NETWORK_PUBLIC})
+
+if [ -z "${VC_NETWORK_PUBLIC_TYPE}" ]; then
+	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PUBLIC}"
+	exit 1
+fi
+
+if [ -z "${VC_NETWORK_PRIVATE_TYPE}" ]; then
+	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PRIVATE}"
+	exit 1
+fi
+
 if [ "${UPGRADE_CLUSTER}" == "YES" ] && [ "${DELETE_CLUSTER}" = "YES" ]; then
 	echo_red_bold "Can't upgrade deleted cluster, exit"
 	exit
@@ -694,8 +707,6 @@ if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; 
 else
 	TARGET_IMAGE="${ROOT_IMG_NAME}-k8s-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 fi
-
-TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}".img
 
 export SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
 export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
@@ -802,7 +813,9 @@ if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
 fi
 
 # If the VM template doesn't exists, build it from scrash
-if [ ! -f "${TARGET_IMAGE}" ]; then
+TARGET_IMAGE_UUID=$(vmrest_get_vmuuid ${TARGET_IMAGE})
+
+if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 	echo_title "Create ${PLATEFORM} preconfigured image ${TARGET_IMAGE}"
 
 	./bin/create-image.sh \
@@ -819,7 +832,10 @@ if [ ! -f "${TARGET_IMAGE}" ]; then
 		--seed="${SEED_IMAGE}-${SEED_ARCH}" \
 		--user="${SEED_USER}" \
 		--ssh-key="${SSH_KEY}" \
-		--ssh-priv-key="${SSH_PRIVATE_KEY}"
+		--primary-network="${VC_NETWORK_PUBLIC}" \
+		--second-network="${VC_NETWORK_PRIVATE}"
+
+	TARGET_IMAGE_UUID=$(vmrest_get_vmuuid ${TARGET_IMAGE})
 fi
 
 if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
@@ -1070,27 +1086,29 @@ function create_vm() {
 		MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${NODEINDEX}"
 	fi
 
-	if [ -z "$(multipass info ${MASTERKUBE_NODE} 2>/dev/null)" ]; then
+	MASTERKUBE_NODE_UUID=$(vmrest_get_vmuuid ${MASTERKUBE_NODE})
+
+	if [ -z "${MASTERKUBE_NODE_UUID}" ]; then
 		if [ "${PUBLIC_NODE_IP}" = "DHCP" ]; then
 			NETWORK_DEFS=$(cat <<EOF
 			{
+				"instance-id": "$(uuidgen)",
+				"local-hostname": "${MASTERKUBE_NODE}",
+				"hostname": "${MASTERKUBE_NODE}.${NET_DOMAIN}",
 				"network": {
 					"version": 2,
 					"ethernets": {
 						"eth0": {
 							"dhcp4": true,
-							"gateway4": "${NET_GATEWAY}",
-							"addresses": [
-								"${NODE_IP}/${NET_MASK_CIDR}": {
-									"label": "eth0:1"
-								}
-							]
-						},
-						"eth1": {
-							"dhcp4": true,
 							"dhcp4-overrides": {
 								"use-routes": ${USE_DHCP_ROUTES_PUBLIC}
 							}
+						},
+						"eth1": {
+							"gateway4": "${NET_GATEWAY}",
+							"addresses": [
+								"${NODE_IP}/${NET_MASK_CIDR}"
+							]
 						}
 					}
 				}
@@ -1100,17 +1118,13 @@ EOF
 		else
 			NETWORK_DEFS=$(cat <<EOF
 			{
+				"instance-id": "$(uuidgen)",
+				"local-hostname": "${MASTERKUBE_NODE}",
+				"hostname": "${MASTERKUBE_NODE}.${NET_DOMAIN}",
 				"network": {
 					"version": 2,
 					"ethernets": {
 						"eth0": {
-							"addresses": [
-								"${NODE_IP}/${NET_MASK_CIDR}": {
-									"label": "eth0:1"
-								}
-							]
-						},
-						"eth1": {
 							"gateway4": "${NET_GATEWAY}",
 							"addresses": [
 								"${PUBLIC_NODE_IP}/${PUBLIC_MASK_CIDR}"
@@ -1120,6 +1134,11 @@ EOF
 									"${NET_DNS}"
 								]
 							}
+						},
+						"eth1": {
+							"addresses": [
+								"${NODE_IP}/${NET_MASK_CIDR}"
+							]
 						}
 					}
 				}
@@ -1139,8 +1158,8 @@ EOF
 		echo ${NETWORK_DEFS} | jq . > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.json
 
 		# Cloud init meta-data
-		echo ${NETWORK_DEFS} | yq -P - > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
-		export NETWORKCONFIG=$(cat ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml | base64 -w 0 | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64)
+		echo "#cloud-config" > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
+		echo ${NETWORK_DEFS} | yq -P - | tee > /dev/null > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
 
 		# Cloud init user-data
 		cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
@@ -1152,17 +1171,12 @@ growpart:
   mode: auto
   devices: ["/"]
   ignore_growroot_disabled: false
-write_files:
-- encoding: b64
-  content: ${NETWORKCONFIG}
-  owner: root:root
-  path: /etc/netplan/10-custom.yaml
-  permissions: '0644'
 runcmd:
-- hostnamectl set-hostname ${MASTERKUBE_NODE}
-- netplan apply
 - echo "Create ${MASTERKUBE_NODE}" > /var/log/masterkube.log
 EOF
+
+		gzip -c9 <${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.json | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64
+		gzip -c9 <${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.base64
 
 		read MEMSIZE NUM_VCPUS DISK_SIZE <<<"$(jq -r --arg MACHINE ${MACHINE_TYPE} '.[$MACHINE]|.memsize,.vcpus,.disksize' templates/setup/machines.json | tr '\n' ' ')"
 
@@ -1176,26 +1190,41 @@ EOF
 		echo_line
 
 		# Clone my template
-		echo_title "Launch ${MASTERKUBE_NODE}"
-		multipass launch \
-			-n ${MASTERKUBE_NODE} \
-			-c ${NUM_VCPUS} \
-			-m "${MEMSIZE}M" \
-			-d "${DISK_SIZE}M" \
-			--network name=${VC_NETWORK_PUBLIC},mode=manual \
-			--cloud-init ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml \
-			file://${TARGET_IMAGE}
+		MASTERKUBE_NODE_UUID=$(vmrest_create ${TARGET_IMAGE_UUID} ${NUM_VCPUS} ${MEMSIZE} ${MASTERKUBE_NODE} ${DISK_SIZE} "${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64" "${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.base64" "${TARGET_CONFIG_LOCATION}/vendordata.base64" false ${AUTOSTART})
 
-		IPADDR=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE}  '.info|.[$NAME].ipv4[0]')
+		if [ -z "${MASTERKUBE_NODE_UUID}" ]; then
+			echo_red_bold "Failed to clone ${TARGET_IMAGE} to ${MASTERKUBE_NODE}"
+			exit 1
+		else
+			echo_title "Power On ${MASTERKUBE_NODE}"
 
-		echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${IPADDR}"
-		eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin ${SILENT}
+			POWER_STATE=$(vmrest_wait_for_poweron "${MASTERKUBE_NODE_UUID}")
 
-		# Update /etc/hosts
-		delete_host "${MASTERKUBE_NODE}"
-		add_host ${NODE_IP} ${MASTERKUBE_NODE} ${MASTERKUBE_NODE}.${DOMAIN_NAME}
+			if [ "${POWER_STATE}" != "poweredOn" ]; then
+				echo_red_bold "Fail to start ${MASTERKUBE_NODE}: ${POWER_STATE}"
+				exit 1
+			else
+				echo_title "Wait for IP from ${MASTERKUBE_NODE}"
+
+				IPADDR=$(vmrest_waitip "${MASTERKUBE_NODE_UUID}")
+
+		if [ ${IPADDR} == "ERROR" ]; then
+			echo_red_bold "Failed to get ip for ${MASTERKUBE_NODE}"
+			exit 1
+		fi
+
+				echo_title "Wait ssh ready on ${IPADDR}"
+				wait_ssh_ready ${KUBERNETES_USER}@${IPADDR}
+				echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${IPADDR}"
+				eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin ${SILENT}
+
+				# Update /etc/hosts
+				delete_host "${MASTERKUBE_NODE}"
+				add_host ${NODE_IP} ${MASTERKUBE_NODE} ${MASTERKUBE_NODE}.${DOMAIN_NAME}
+			fi
+		fi
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
 	fi
@@ -1346,7 +1375,7 @@ do
 		echo_title "Already prepared VM ${MASTERKUBE_NODE}"
 	else
 		IPADDR="${IPADDRS[${INDEX}]}"
-		VMUUID=${MASTERKUBE_NODE}
+		VMUUID=$(vmrest_get_vmuuid ${MASTERKUBE_NODE})
 
 		echo_title "Prepare VM ${MASTERKUBE_NODE}, UUID=${VMUUID} with IP:${IPADDR}"
 

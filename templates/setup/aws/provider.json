@@ -1,0 +1,33 @@
+{
+	"accessKey": "${AWS_ACCESSKEY}",
+	"secretKey": "${AWS_SECRETKEY}",
+	"token": "${AWS_TOKEN}",
+	"profile": "${AWS_PROFILE}",
+	"region": "${AWS_REGION}",
+	"keyName": "${SSH_KEYNAME}",
+	"ami": "${TARGET_IMAGE_AMI}",
+	"iam-role-arn": "${WORKER_INSTANCE_PROFILE_ARN}",
+	"timeout": 120,
+	"tags": [
+		{
+			"key": "CustomTag",
+			"value": "CustomValue"
+		}
+	],
+	"network": {
+		"route53": "${AWS_ROUTE53_ZONE_ID}",
+		"privateZoneName": "${PRIVATE_DOMAIN_NAME}",
+		"accessKey": "${AWS_ROUTE53_ACCESSKEY}",
+		"secretKey": "${AWS_ROUTE53_SECRETKEY}",
+		"token": "${AWS_ROUTE53_TOKEN}",
+		"profile": "${AWS_PROFILE_ROUTE53}",
+		"region": "${AWS_REGION}",
+		"eni": [
+			{
+				"subnets": [],
+				"securityGroup": "${VPC_PRIVATE_SECURITY_GROUPID}",
+				"publicIP": ${WORKERNODE_USE_PUBLICIP}
+			}
+		]
+	}
+}

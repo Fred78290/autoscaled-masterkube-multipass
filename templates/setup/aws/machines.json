@@ -1,0 +1,1637 @@
+{
+    "c4.large": {
+        "price": 0.113,
+        "memsize": 3840,
+        "vcpus": 2
+    },
+    "c4.xlarge": {
+        "price": 0.226,
+        "memsize": 7680,
+        "vcpus": 4
+    },
+    "c4.2xlarge": {
+        "price": 0.453,
+        "memsize": 15360,
+        "vcpus": 8
+    },
+    "c4.4xlarge": {
+        "price": 0.905,
+        "memsize": 30720,
+        "vcpus": 16
+    },
+    "c4.8xlarge": {
+        "price": 1.811,
+        "memsize": 61440,
+        "vcpus": 36
+    },
+    "c5.large": {
+        "price": 0.096,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "c5.xlarge": {
+        "price": 0.192,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "c5.2xlarge": {
+        "price": 0.384,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "c5.4xlarge": {
+        "price": 0.768,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "c5.9xlarge": {
+        "price": 1.728,
+        "memsize": 73728,
+        "vcpus": 36
+    },
+    "c5.12xlarge": {
+        "price": 2.304,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "c5.18xlarge": {
+        "price": 3.456,
+        "memsize": 147456,
+        "vcpus": 72
+    },
+    "c5.24xlarge": {
+        "price": 4.608,
+        "memsize": 196608,
+        "vcpus": 96
+    },
+    "c5a.large": {
+        "price": 0.086,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "c5a.xlarge": {
+        "price": 0.172,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "c5a.2xlarge": {
+        "price": 0.344,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "c5a.4xlarge": {
+        "price": 0.688,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "c5a.8xlarge": {
+        "price": 1.376,
+        "memsize": 65536,
+        "vcpus": 32
+    },
+    "c5a.12xlarge": {
+        "price": 2.064,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "c5a.16xlarge": {
+        "price": 2.752,
+        "memsize": 131072,
+        "vcpus": 64
+    },
+    "c5a.24xlarge": {
+        "price": 4.128,
+        "memsize": 196608,
+        "vcpus": 96
+    },
+    "c5n.large": {
+        "price": 0.122,
+        "memsize": 5427,
+        "vcpus": 2
+    },
+    "c5n.xlarge": {
+        "price": 0.244,
+        "memsize": 10752,
+        "vcpus": 4
+    },
+    "c5n.2xlarge": {
+        "price": 0.488,
+        "memsize": 21504,
+        "vcpus": 8
+    },
+    "c5n.4xlarge": {
+        "price": 0.976,
+        "memsize": 43008,
+        "vcpus": 16
+    },
+    "c5n.9xlarge": {
+        "price": 2.196,
+        "memsize": 98304,
+        "vcpus": 36
+    },
+    "c5n.18xlarge": {
+        "price": 4.392,
+        "memsize": 196608,
+        "vcpus": 72
+    },
+    "c6a.large": {
+        "price": 0.08208,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "c6a.xlarge": {
+        "price": 0.16416,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "c6a.2xlarge": {
+        "price": 0.32832,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "c6a.4xlarge": {
+        "price": 0.65664,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "c6a.8xlarge": {
+        "price": 1.31328,
+        "memsize": 65536,
+        "vcpus": 32
+    },
+    "c6a.12xlarge": {
+        "price": 1.96992,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "c6a.16xlarge": {
+        "price": 2.62656,
+        "memsize": 131072,
+        "vcpus": 64
+    },
+    "c6a.24xlarge": {
+        "price": 3.93984,
+        "memsize": 196608,
+        "vcpus": 96
+    },
+    "c6a.32xlarge": {
+        "price": 5.25312,
+        "memsize": 262144,
+        "vcpus": 128
+    },
+    "c6a.48xlarge": {
+        "price": 7.87968,
+        "memsize": 393216,
+        "vcpus": 192
+    },
+    "c6i.large": {
+        "price": 0.0912,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "c6i.xlarge": {
+        "price": 0.1824,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "c6i.2xlarge": {
+        "price": 0.3648,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "c6i.4xlarge": {
+        "price": 0.7296,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "c6i.8xlarge": {
+        "price": 1.4592,
+        "memsize": 65536,
+        "vcpus": 32
+    },
+    "c6i.12xlarge": {
+        "price": 2.1888,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "c6i.16xlarge": {
+        "price": 2.9184,
+        "memsize": 131072,
+        "vcpus": 64
+    },
+    "c6i.24xlarge": {
+        "price": 4.3776,
+        "memsize": 196608,
+        "vcpus": 96
+    },
+    "c6i.32xlarge": {
+        "price": 5.8368,
+        "memsize": 262144,
+        "vcpus": 128
+    },
+    "c6in.large": {
+        "price": 0.1281,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "c6in.xlarge": {
+        "price": 0.2562,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "c6in.2xlarge": {
+        "price": 0.5124,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "c6in.4xlarge": {
+        "price": 1.0248,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "c6in.8xlarge": {
+        "price": 2.0496,
+        "memsize": 65536,
+        "vcpus": 32
+    },
+    "c6in.12xlarge": {
+        "price": 3.0744,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "c6in.16xlarge": {
+        "price": 4.0992,
+        "memsize": 131072,
+        "vcpus": 64
+    },
+    "c6in.24xlarge": {
+        "price": 6.1488,
+        "memsize": 196608,
+        "vcpus": 96
+    },
+    "c6in.32xlarge": {
+        "price": 8.1984,
+        "memsize": 262144,
+        "vcpus": 128
+    },
+    "c7a.large": {
+        "price": 0.11012,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "c7a.xlarge": {
+        "price": 0.22024,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "c7a.2xlarge": {
+        "price": 0.44048,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "c7a.4xlarge": {
+        "price": 0.88096,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "c7a.8xlarge": {
+        "price": 1.76192,
+        "memsize": 65536,
+        "vcpus": 32
+    },
+    "c7a.48xlarge": {
+        "price": 10.57152,
+        "memsize": 393216,
+        "vcpus": 192
+    },
+    "c7a.12xlarge": {
+        "price": 2.64288,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "c7a.16xlarge": {
+        "price": 3.52384,
+        "memsize": 131072,
+        "vcpus": 64
+    },
+    "c7a.24xlarge": {
+        "price": 5.28576,
+        "memsize": 196608,
+        "vcpus": 96
+    },
+    "c7a.32xlarge": {
+        "price": 7.04768,
+        "memsize": 262144,
+        "vcpus": 128
+    },
+    "c7i.large": {
+        "price": 0.09576,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "c7i.xlarge": {
+        "price": 0.19152,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "c7i.2xlarge": {
+        "price": 0.38304,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "c7i.4xlarge": {
+        "price": 0.76608,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "c7i.8xlarge": {
+        "price": 1.53216,
+        "memsize": 65536,
+        "vcpus": 32
+    },
+    "c7i.12xlarge": {
+        "price": 2.29824,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "c7i.16xlarge": {
+        "price": 3.06432,
+        "memsize": 131072,
+        "vcpus": 64
+    },
+    "c7i.24xlarge": {
+        "price": 4.59648,
+        "memsize": 196608,
+        "vcpus": 96
+    },
+    "c7i.48xlarge": {
+        "price": 9.19296,
+        "memsize": 393216,
+        "vcpus": 192
+    },
+    "g3.4xlarge": {
+        "price": 1.21,
+        "memsize": 124928,
+        "vcpus": 16
+    },
+    "g3.8xlarge": {
+        "price": 2.42,
+        "memsize": 249856,
+        "vcpus": 32
+    },
+    "g3.16xlarge": {
+        "price": 4.84,
+        "memsize": 499712,
+        "vcpus": 64
+    },
+    "g3s.xlarge": {
+        "price": 0.796,
+        "memsize": 31232,
+        "vcpus": 4
+    },
+    "m4.large": {
+        "price": 0.111,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m4.xlarge": {
+        "price": 0.222,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m4.2xlarge": {
+        "price": 0.444,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m4.4xlarge": {
+        "price": 0.888,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m4.10xlarge": {
+        "price": 2.22,
+        "memsize": 163840,
+        "vcpus": 40
+    },
+    "m4.16xlarge": {
+        "price": 3.552,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "m5.large": {
+        "price": 0.107,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m5.xlarge": {
+        "price": 0.214,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m5.2xlarge": {
+        "price": 0.428,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m5.4xlarge": {
+        "price": 0.856,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m5.8xlarge": {
+        "price": 1.712,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "m5.12xlarge": {
+        "price": 2.568,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "m5.16xlarge": {
+        "price": 3.424,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "m5.24xlarge": {
+        "price": 5.136,
+        "memsize": 393216,
+        "vcpus": 96
+    },
+    "m5a.large": {
+        "price": 0.096,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m5a.xlarge": {
+        "price": 0.192,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m5a.2xlarge": {
+        "price": 0.384,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m5a.4xlarge": {
+        "price": 0.768,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m5a.8xlarge": {
+        "price": 1.536,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "m5a.12xlarge": {
+        "price": 2.304,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "m5a.16xlarge": {
+        "price": 3.072,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "m5a.24xlarge": {
+        "price": 4.608,
+        "memsize": 393216,
+        "vcpus": 96
+    },
+    "m5n.large": {
+        "price": 0.133,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m5n.xlarge": {
+        "price": 0.266,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m5n.2xlarge": {
+        "price": 0.532,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m5n.4xlarge": {
+        "price": 1.064,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m5n.8xlarge": {
+        "price": 2.128,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "m5n.12xlarge": {
+        "price": 3.192,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "m5n.16xlarge": {
+        "price": 4.256,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "m5n.24xlarge": {
+        "price": 6.384,
+        "memsize": 393216,
+        "vcpus": 96
+    },
+    "m5zn.large": {
+        "price": 0.1841,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m5zn.xlarge": {
+        "price": 0.3682,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m5zn.2xlarge": {
+        "price": 0.7364,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m5zn.3xlarge": {
+        "price": 1.1046,
+        "memsize": 49152,
+        "vcpus": 12
+    },
+    "m5zn.6xlarge": {
+        "price": 2.2092,
+        "memsize": 98304,
+        "vcpus": 24
+    },
+    "m5zn.12xlarge": {
+        "price": 4.4184,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "m6a.large": {
+        "price": 0.0963,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m6a.xlarge": {
+        "price": 0.1926,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m6a.2xlarge": {
+        "price": 0.3852,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m6a.4xlarge": {
+        "price": 0.7704,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m6a.8xlarge": {
+        "price": 1.5408,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "m6a.12xlarge": {
+        "price": 2.3112,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "m6a.16xlarge": {
+        "price": 3.0816,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "m6a.24xlarge": {
+        "price": 4.6224,
+        "memsize": 393216,
+        "vcpus": 96
+    },
+    "m6a.32xlarge": {
+        "price": 6.1632,
+        "memsize": 524288,
+        "vcpus": 128
+    },
+    "m6a.48xlarge": {
+        "price": 9.2448,
+        "memsize": 786432,
+        "vcpus": 192
+    },
+    "m6i.large": {
+        "price": 0.107,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m6i.xlarge": {
+        "price": 0.214,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m6i.2xlarge": {
+        "price": 0.428,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m6i.4xlarge": {
+        "price": 0.856,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m6i.8xlarge": {
+        "price": 1.712,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "m6i.12xlarge": {
+        "price": 2.568,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "m6i.16xlarge": {
+        "price": 3.424,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "m6i.24xlarge": {
+        "price": 5.136,
+        "memsize": 393216,
+        "vcpus": 96
+    },
+    "m6i.32xlarge": {
+        "price": 6.848,
+        "memsize": 524288,
+        "vcpus": 128
+    },
+    "m6in.large": {
+        "price": 0.15561,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m6in.xlarge": {
+        "price": 0.31122,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m6in.2xlarge": {
+        "price": 0.62244,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m6in.4xlarge": {
+        "price": 1.24488,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m6in.8xlarge": {
+        "price": 2.48976,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "m6in.12xlarge": {
+        "price": 3.73464,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "m6in.16xlarge": {
+        "price": 4.97952,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "m6in.24xlarge": {
+        "price": 7.46928,
+        "memsize": 393216,
+        "vcpus": 96
+    },
+    "m6in.32xlarge": {
+        "price": 9.95904,
+        "memsize": 524288,
+        "vcpus": 128
+    },
+    "m7a.large": {
+        "price": 0.1292,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m7a.xlarge": {
+        "price": 0.2584,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m7a.2xlarge": {
+        "price": 0.5168,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m7a.4xlarge": {
+        "price": 1.0336,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m7a.48xlarge": {
+        "price": 12.4032,
+        "memsize": 786432,
+        "vcpus": 192
+    },
+    "m7a.8xlarge": {
+        "price": 2.0672,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "m7a.12xlarge": {
+        "price": 3.1008,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "m7a.16xlarge": {
+        "price": 4.1344,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "m7a.24xlarge": {
+        "price": 6.2016,
+        "memsize": 393216,
+        "vcpus": 96
+    },
+    "m7a.32xlarge": {
+        "price": 8.2688,
+        "memsize": 524288,
+        "vcpus": 128
+    },
+    "m7i.large": {
+        "price": 0.11235,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m7i.xlarge": {
+        "price": 0.2247,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m7i.2xlarge": {
+        "price": 0.4494,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m7i.4xlarge": {
+        "price": 0.8988,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m7i.8xlarge": {
+        "price": 1.7976,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "m7i.48xlarge": {
+        "price": 10.7856,
+        "memsize": 786432,
+        "vcpus": 192
+    },
+    "m7i.12xlarge": {
+        "price": 2.6964,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "m7i.16xlarge": {
+        "price": 3.5952,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "m7i.24xlarge": {
+        "price": 5.3928,
+        "memsize": 393216,
+        "vcpus": 96
+    },
+    "m7i-flex.large": {
+        "price": 0.10673,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m7i-flex.xlarge": {
+        "price": 0.21346,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m7i-flex.2xlarge": {
+        "price": 0.42692,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m7i-flex.4xlarge": {
+        "price": 0.85384,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m7i-flex.8xlarge": {
+        "price": 1.70768,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "p2.xlarge": {
+        "price": 0.972,
+        "memsize": 62464,
+        "vcpus": 4
+    },
+    "p2.16xlarge": {
+        "price": 15.552,
+        "memsize": 749568,
+        "vcpus": 64
+    },
+    "p2.8xlarge": {
+        "price": 7.776,
+        "memsize": 499712,
+        "vcpus": 32
+    },
+    "r4.large": {
+        "price": 0.1482,
+        "memsize": 15667,
+        "vcpus": 2
+    },
+    "r4.xlarge": {
+        "price": 0.2964,
+        "memsize": 31232,
+        "vcpus": 4
+    },
+    "r4.2xlarge": {
+        "price": 0.5928,
+        "memsize": 62464,
+        "vcpus": 8
+    },
+    "r4.4xlarge": {
+        "price": 1.1856,
+        "memsize": 124928,
+        "vcpus": 16
+    },
+    "r4.8xlarge": {
+        "price": 2.3712,
+        "memsize": 249856,
+        "vcpus": 32
+    },
+    "r4.16xlarge": {
+        "price": 4.7424,
+        "memsize": 499712,
+        "vcpus": 64
+    },
+    "r5.large": {
+        "price": 0.141,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "r5.xlarge": {
+        "price": 0.282,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "r5.2xlarge": {
+        "price": 0.564,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "r5.4xlarge": {
+        "price": 1.128,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "r5.8xlarge": {
+        "price": 2.256,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "r5.12xlarge": {
+        "price": 3.384,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "r5.16xlarge": {
+        "price": 4.512,
+        "memsize": 524288,
+        "vcpus": 64
+    },
+    "r5.24xlarge": {
+        "price": 6.768,
+        "memsize": 786432,
+        "vcpus": 96
+    },
+    "r5a.large": {
+        "price": 0.127,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "r5a.xlarge": {
+        "price": 0.254,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "r5a.2xlarge": {
+        "price": 0.508,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "r5a.4xlarge": {
+        "price": 1.016,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "r5a.8xlarge": {
+        "price": 2.032,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "r5a.12xlarge": {
+        "price": 3.048,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "r5a.16xlarge": {
+        "price": 4.064,
+        "memsize": 524288,
+        "vcpus": 64
+    },
+    "r5a.24xlarge": {
+        "price": 6.096,
+        "memsize": 786432,
+        "vcpus": 96
+    },
+    "r5b.large": {
+        "price": 0.167,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "r5b.xlarge": {
+        "price": 0.334,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "r5b.2xlarge": {
+        "price": 0.668,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "r5b.4xlarge": {
+        "price": 1.336,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "r5b.8xlarge": {
+        "price": 2.672,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "r5b.12xlarge": {
+        "price": 4.008,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "r5b.16xlarge": {
+        "price": 5.344,
+        "memsize": 524288,
+        "vcpus": 64
+    },
+    "r5b.24xlarge": {
+        "price": 8.016,
+        "memsize": 786432,
+        "vcpus": 96
+    },
+    "r5n.large": {
+        "price": 0.167,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "r5n.xlarge": {
+        "price": 0.334,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "r5n.2xlarge": {
+        "price": 0.668,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "r5n.4xlarge": {
+        "price": 1.336,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "r5n.8xlarge": {
+        "price": 2.672,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "r5n.12xlarge": {
+        "price": 4.008,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "r5n.16xlarge": {
+        "price": 5.344,
+        "memsize": 524288,
+        "vcpus": 64
+    },
+    "r5n.24xlarge": {
+        "price": 8.016,
+        "memsize": 786432,
+        "vcpus": 96
+    },
+    "r6a.large": {
+        "price": 0.1269,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "r6a.xlarge": {
+        "price": 0.2538,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "r6a.2xlarge": {
+        "price": 0.5076,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "r6a.4xlarge": {
+        "price": 1.0152,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "r6a.48xlarge": {
+        "price": 12.1824,
+        "memsize": 1572864,
+        "vcpus": 192
+    },
+    "r6a.8xlarge": {
+        "price": 2.0304,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "r6a.12xlarge": {
+        "price": 3.0456,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "r6a.16xlarge": {
+        "price": 4.0608,
+        "memsize": 524288,
+        "vcpus": 64
+    },
+    "r6a.24xlarge": {
+        "price": 6.0912,
+        "memsize": 786432,
+        "vcpus": 96
+    },
+    "r6a.32xlarge": {
+        "price": 8.1216,
+        "memsize": 1048576,
+        "vcpus": 128
+    },
+    "r6i.large": {
+        "price": 0.141,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "r6i.xlarge": {
+        "price": 0.282,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "r6i.2xlarge": {
+        "price": 0.564,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "r6i.4xlarge": {
+        "price": 1.128,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "r6i.8xlarge": {
+        "price": 2.256,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "r6i.12xlarge": {
+        "price": 3.384,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "r6i.16xlarge": {
+        "price": 4.512,
+        "memsize": 524288,
+        "vcpus": 64
+    },
+    "r6i.24xlarge": {
+        "price": 6.768,
+        "memsize": 786432,
+        "vcpus": 96
+    },
+    "r6i.32xlarge": {
+        "price": 9.024,
+        "memsize": 1048576,
+        "vcpus": 128
+    },
+    "r6in.large": {
+        "price": 0.19539,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "r6in.xlarge": {
+        "price": 0.39078,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "r6in.2xlarge": {
+        "price": 0.78156,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "r6in.4xlarge": {
+        "price": 1.56312,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "r6in.32xlarge": {
+        "price": 12.50496,
+        "memsize": 1048576,
+        "vcpus": 128
+    },
+    "r6in.8xlarge": {
+        "price": 3.12624,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "r6in.12xlarge": {
+        "price": 4.68936,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "r6in.16xlarge": {
+        "price": 6.25248,
+        "memsize": 524288,
+        "vcpus": 64
+    },
+    "r6in.24xlarge": {
+        "price": 9.37872,
+        "memsize": 786432,
+        "vcpus": 96
+    },
+    "r7a.large": {
+        "price": 0.17026,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "r7a.xlarge": {
+        "price": 0.34052,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "r7a.2xlarge": {
+        "price": 0.68104,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "r7a.4xlarge": {
+        "price": 1.36208,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "r7a.32xlarge": {
+        "price": 10.89664,
+        "memsize": 1048576,
+        "vcpus": 128
+    },
+    "r7a.48xlarge": {
+        "price": 16.34496,
+        "memsize": 1572864,
+        "vcpus": 192
+    },
+    "r7a.8xlarge": {
+        "price": 2.72416,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "r7a.12xlarge": {
+        "price": 4.08624,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "r7a.16xlarge": {
+        "price": 5.44832,
+        "memsize": 524288,
+        "vcpus": 64
+    },
+    "r7a.24xlarge": {
+        "price": 8.17248,
+        "memsize": 786432,
+        "vcpus": 96
+    },
+    "r7i.large": {
+        "price": 0.14805,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "r7i.xlarge": {
+        "price": 0.2961,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "r7i.2xlarge": {
+        "price": 0.5922,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "r7i.4xlarge": {
+        "price": 1.1844,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "r7i.48xlarge": {
+        "price": 14.2128,
+        "memsize": 1572864,
+        "vcpus": 192
+    },
+    "r7i.8xlarge": {
+        "price": 2.3688,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "r7i.12xlarge": {
+        "price": 3.5532,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "r7i.16xlarge": {
+        "price": 4.7376,
+        "memsize": 524288,
+        "vcpus": 64
+    },
+    "r7i.24xlarge": {
+        "price": 7.1064,
+        "memsize": 786432,
+        "vcpus": 96
+    },
+    "t2.medium": {
+        "price": 0.05,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "t2.large": {
+        "price": 0.1008,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "t2.xlarge": {
+        "price": 0.2016,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "t2.2xlarge": {
+        "price": 0.4032,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "t3.small": {
+        "price": 0.0228,
+        "memsize": 2048,
+        "vcpus": 2
+    },
+    "t3.medium": {
+        "price": 0.0456,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "t3.large": {
+        "price": 0.0912,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "t3.xlarge": {
+        "price": 0.1824,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "t3.2xlarge": {
+        "price": 0.3648,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "t3a.small": {
+        "price": 0.0204,
+        "memsize": 2048,
+        "vcpus": 2
+    },
+    "t3a.medium": {
+        "price": 0.0408,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "t3a.large": {
+        "price": 0.0816,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "t3a.xlarge": {
+        "price": 0.1632,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "t4g.small": {
+        "price": 0.0184,
+        "memsize": 2048,
+        "vcpus": 2
+    },
+    "t4g.medium": {
+        "price": 0.0368,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "c6g.large": {
+        "price": 0.073,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "t4g.large": {
+        "price": 0.0736,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "c7g.large": {
+        "price": 0.0775,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "m6g.large": {
+        "price": 0.086,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "m7g.large": {
+        "price": 0.091,
+        "memsize": 8192,
+        "vcpus": 2
+    },
+    "c6gn.large": {
+        "price": 0.0976,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "r6g.large": {
+        "price": 0.1128,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "r7g.large": {
+        "price": 0.1199,
+        "memsize": 16384,
+        "vcpus": 2
+    },
+    "c7gn.large": {
+        "price": 0.141,
+        "memsize": 4096,
+        "vcpus": 2
+    },
+    "c6g.xlarge": {
+        "price": 0.1459,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "t4g.xlarge": {
+        "price": 0.1472,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "c7g.xlarge": {
+        "price": 0.155,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "m6g.xlarge": {
+        "price": 0.172,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "m7g.xlarge": {
+        "price": 0.1819,
+        "memsize": 16384,
+        "vcpus": 4
+    },
+    "c6gn.xlarge": {
+        "price": 0.1952,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "r6g.xlarge": {
+        "price": 0.2256,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "r7g.xlarge": {
+        "price": 0.2397,
+        "memsize": 32768,
+        "vcpus": 4
+    },
+    "c7gn.xlarge": {
+        "price": 0.282,
+        "memsize": 8192,
+        "vcpus": 4
+    },
+    "c6g.2xlarge": {
+        "price": 0.2918,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "t4g.2xlarge": {
+        "price": 0.2944,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "c7g.2xlarge": {
+        "price": 0.3101,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "m6g.2xlarge": {
+        "price": 0.344,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "m7g.2xlarge": {
+        "price": 0.3638,
+        "memsize": 32768,
+        "vcpus": 8
+    },
+    "c6gn.2xlarge": {
+        "price": 0.3904,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "r6g.2xlarge": {
+        "price": 0.4512,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "r7g.2xlarge": {
+        "price": 0.4794,
+        "memsize": 65536,
+        "vcpus": 8
+    },
+    "c7gn.2xlarge": {
+        "price": 0.564,
+        "memsize": 16384,
+        "vcpus": 8
+    },
+    "c6g.4xlarge": {
+        "price": 0.5837,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "c7g.4xlarge": {
+        "price": 0.6202,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "m6g.4xlarge": {
+        "price": 0.688,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "m7g.4xlarge": {
+        "price": 0.7276,
+        "memsize": 65536,
+        "vcpus": 16
+    },
+    "c6gn.4xlarge": {
+        "price": 0.7808,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "r6g.4xlarge": {
+        "price": 0.9024,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "r7g.4xlarge": {
+        "price": 0.9588,
+        "memsize": 131072,
+        "vcpus": 16
+    },
+    "c7gn.4xlarge": {
+        "price": 1.128,
+        "memsize": 32768,
+        "vcpus": 16
+    },
+    "c6g.8xlarge": {
+        "price": 1.1674,
+        "memsize": 65536,
+        "vcpus": 32
+    },
+    "c7g.8xlarge": {
+        "price": 1.2403,
+        "memsize": 65536,
+        "vcpus": 32
+    },
+    "m6g.8xlarge": {
+        "price": 1.376,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "m7g.8xlarge": {
+        "price": 1.4552,
+        "memsize": 131072,
+        "vcpus": 32
+    },
+    "c6gn.8xlarge": {
+        "price": 1.5616,
+        "memsize": 65536,
+        "vcpus": 32
+    },
+    "r6g.8xlarge": {
+        "price": 1.8048,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "r7g.8xlarge": {
+        "price": 1.9176,
+        "memsize": 262144,
+        "vcpus": 32
+    },
+    "c7gn.8xlarge": {
+        "price": 2.256,
+        "memsize": 65536,
+        "vcpus": 32
+    },
+    "c6g.12xlarge": {
+        "price": 1.751,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "c7g.12xlarge": {
+        "price": 1.8605,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "m6g.12xlarge": {
+        "price": 2.064,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "m7g.12xlarge": {
+        "price": 2.1828,
+        "memsize": 196608,
+        "vcpus": 48
+    },
+    "c6gn.12xlarge": {
+        "price": 2.3424,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "r6g.12xlarge": {
+        "price": 2.7072,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "r7g.12xlarge": {
+        "price": 2.8764,
+        "memsize": 393216,
+        "vcpus": 48
+    },
+    "c7gn.12xlarge": {
+        "price": 3.384,
+        "memsize": 98304,
+        "vcpus": 48
+    },
+    "c6g.16xlarge": {
+        "price": 2.3347,
+        "memsize": 131072,
+        "vcpus": 64
+    },
+    "c7g.16xlarge": {
+        "price": 2.4806,
+        "memsize": 131072,
+        "vcpus": 64
+    },
+    "m6g.16xlarge": {
+        "price": 2.752,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "m7g.16xlarge": {
+        "price": 2.9104,
+        "memsize": 262144,
+        "vcpus": 64
+    },
+    "c6gn.16xlarge": {
+        "price": 3.1232,
+        "memsize": 131072,
+        "vcpus": 64
+    },
+    "r6g.16xlarge": {
+        "price": 3.6096,
+        "memsize": 524288,
+        "vcpus": 64
+    },
+    "r7g.16xlarge": {
+        "price": 3.8352,
+        "memsize": 524288,
+        "vcpus": 64
+    }
+}

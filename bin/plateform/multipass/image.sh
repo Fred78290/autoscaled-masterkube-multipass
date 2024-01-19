@@ -166,16 +166,15 @@ CREDENTIALS_CONFIG=$CREDENTIALS_CONFIG
 CREDENTIALS_BIN=$CREDENTIALS_BIN
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-EOF
 
-cat $CURDIR/prepare-image.sh >> "${CACHE}/prepare-image.sh"
-
-cat >> "${CACHE}/prepare-image.sh" << EOF
-
+apt update
 apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
 sed -i 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0\"/' /etc/default/grub
 update-grub
+
 EOF
+
+cat $CURDIR/prepare-image.sh >> "${CACHE}/prepare-image.sh"
 
 chmod +x "${CACHE}/prepare-image.sh"
 

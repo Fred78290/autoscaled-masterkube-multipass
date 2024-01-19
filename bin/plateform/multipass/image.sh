@@ -28,8 +28,6 @@ source $CURDIR/common.sh
 
 mkdir -p $CACHE
 
-echo $@
-
 TEMP=`getopt -o d:a:i:k:n:op:s:u:v: --long primary-network:,second-network:,aws-access-key:,aws-secret-key:,k8s-distribution:,distribution:,arch:,container-runtime:,user:,seed:,custom-image:,ssh-key:,ssh-priv-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 eval set -- "$TEMP"
 
@@ -116,6 +114,7 @@ cat >  ${CACHE}/packer/cloud-data/user-data <<EOF
 #cloud-config
 timezone: ${TZ}
 package_update: false
+package_upgrade: false
 ssh_pwauth: true
 users:
   - default
@@ -170,6 +169,13 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF
 
 cat $CURDIR/prepare-image.sh >> "${CACHE}/prepare-image.sh"
+
+cat >> "${CACHE}/prepare-image.sh" << EOF
+
+apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
+sed -i 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0\"/' /etc/default/grub
+update-grub
+EOF
 
 chmod +x "${CACHE}/prepare-image.sh"
 

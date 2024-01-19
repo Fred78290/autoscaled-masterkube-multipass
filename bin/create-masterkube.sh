@@ -4,7 +4,6 @@ export CURDIR=$(dirname $0)
 export OUTPUT=${CURDIR}/../config/deploy.log
 export TIMEFORMAT='It takes %R seconds to complete this task...'
 export ARGS=()
-export PLATEFORM=
 
 echo -n > ${OUTPUT}
 
@@ -25,20 +24,36 @@ time {
 			break
 		elif [[ "${ARG}" = --plateform* ]] || [[ "${ARG}" = -p* ]]; then
 			IFS== read IGNORE PLATEFORM <<<"${ARG}"
-			shift
 
 			if [ -z "${PLATEFORM}" ]; then
 				PLATEFORM=$1
 				shift
 			fi
+		elif [[ "${ARG}" =~ --[\w]* ]] || [[ "${ARG}" = -[\w* ]]; then
+			IFS== read ARGUMENT VALUE <<<"${ARG}"
+			if [ -n "${VALUE}" ]; then
+				if [[ "${VALUE}" = *" "* ]]; then
+					ARGS+=("${ARGUMENT}=\"${VALUE}\"")
+				else
+					ARGS+=("${ARGUMENT}=${VALUE}")
+				fi
+			else
+				ARGS+=("${ARG}" )
+			fi
+
+		elif [[ "${ARG}" = *" "* ]]; then
+			ARGS+=("\"${ARG}\"")
 		else
-			ARGS+=("${ARG}")
-			shift
+			ARGS+=("${ARG}'")
 		fi
+
+		shift
 	done
 
+	eval set -- "${ARGS[@]}"
+
 	if [ -n "${PLATEFORM}" ]; then
-		exec "${CURDIR}/plateform/${PLATEFORM}/create.sh" ${ARGS[@]}
+		source "${CURDIR}/plateform/${PLATEFORM}/create.sh"
 	else
 		echo "PLATEFORM not defined, exit"
 	fi

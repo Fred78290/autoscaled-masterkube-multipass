@@ -9,20 +9,36 @@ while true; do
 		break
 	elif [[ "${ARG}" = --plateform* ]] || [[ "${ARG}" = -p* ]]; then
 		IFS== read IGNORE PLATEFORM <<<"${ARG}"
-		shift
 
 		if [ -z "${PLATEFORM}" ]; then
 			PLATEFORM=$1
 			shift
 		fi
+	elif [[ "${ARG}" =~ --[\w]* ]] || [[ "${ARG}" = -[\w* ]]; then
+		IFS== read ARGUMENT VALUE <<<"${ARG}"
+		if [ -n "${VALUE}" ]; then
+			if [[ "${VALUE}" = *" "* ]]; then
+				ARGS+=("${ARGUMENT}=\"${VALUE}\"")
+			else
+				ARGS+=("${ARGUMENT}=${VALUE}")
+			fi
+		else
+			ARGS+=("${ARG}" )
+		fi
+
+	elif [[ "${ARG}" = *" "* ]]; then
+		ARGS+=("\"${ARG}\"")
 	else
-		ARGS+=("${ARG}")
-		shift
+		ARGS+=("${ARG}'")
 	fi
+
+	shift
 done
 
+eval set -- "${ARGS[@]}"
+
 if [ -n "${PLATEFORM}" ]; then
-	exec "${CURDIR}/plateform/${PLATEFORM}/image.sh" ${ARGS[@]}
+	source "${CURDIR}/plateform/${PLATEFORM}/image.sh"
 else
 	echo "PLATEFORM not defined, exit"
 	exit 1

@@ -131,7 +131,7 @@ users:
     groups: users, admin
     plain_text_passwd: packerpassword
     ssh_authorized_keys:
-      - ${SSH_KEY}x
+      - ${SSH_KEY}
 apt:
     preserve_sources_list: true
 EOF

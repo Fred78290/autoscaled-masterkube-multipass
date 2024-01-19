@@ -10,7 +10,7 @@ AWS_PRIVATE_SUBNETID=()
 AWS_PUBLIC_SUBNETID=()
 AWS_SECURITY_GROUP=
 AWS_CERT_ARN=
-AWS_TARGET_PORT=(80 443 6443)
+LOAD_BALANCER_PORT=(80 443 6443)
 AWS_NLB_NAME=
 AWS_USE_PUBLICIP=false
 PUBLIC_INSTANCES_ID=
@@ -74,7 +74,7 @@ while true ; do
 			shift 2
 			;;
 		--target-port)
-			IFS=, read -a AWS_TARGET_PORT <<< "$2"
+			IFS=, read -a LOAD_BALANCER_PORT <<< "$2"
 			shift 2
 			;;
 		--)
@@ -194,7 +194,7 @@ if [ $AWS_USE_PUBLICIP = "true" ]; then
 	create_nlb "p-${AWS_NLB_NAME}" internet-facing "${AWS_PUBLIC_SUBNETID[*]}" "80 443" network "${PUBLIC_INSTANCES_IP[*]}"
 fi
 
-NLB_ARN=$(create_nlb "c-${AWS_NLB_NAME}" internal "${AWS_PRIVATE_SUBNETID[*]}" "${AWS_TARGET_PORT[*]}" network "${CONTROLPLANE_INSTANCES_IP[*]}")
+NLB_ARN=$(create_nlb "c-${AWS_NLB_NAME}" internal "${AWS_PRIVATE_SUBNETID[*]}" "${LOAD_BALANCER_PORT[*]}" network "${CONTROLPLANE_INSTANCES_IP[*]}")
 
 echo_blue_dot_title -n "Wait NLB to start $NLB_ARN"
 

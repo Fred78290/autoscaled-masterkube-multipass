@@ -1,20 +1,21 @@
-#/bin/bash
+#!/bin/bash
 
 #set -e
 
 # This script will create a VM used as template
 # This step is done by importing https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-amd64.img
 # This VM will be used to create the kubernetes template VM 
+set -eu
 
-CURDIR=$(dirname $0)
 DISTRO=jammy
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 KUBERNETES_PASSWORD=$(uuidgen)
-CNI_PLUGIN_VERSION=v1.4.0
+CNI_VERSION=v1.4.0
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 SSH_PRIV_KEY="~/.ssh/id_rsa"
-CACHE=~/.local/multipass
+CACHE=~/.local/autoscaler/cache
 TARGET_IMAGE=
+KUBERNETES_PASSWORD=$(uuidgen)
 OSDISTRO=$(uname -s)
 SEEDIMAGE=${DISTRO}-server-cloudimg-seed
 USER=ubuntu
@@ -27,7 +28,9 @@ source $CURDIR/common.sh
 
 mkdir -p $CACHE
 
-TEMP=`getopt -o d:a:i:k:n:op:s:u:v: --long aws-access-key:,aws-secret-key:,k8s-distribution:,distribution:,arch:,container-runtime:,user:,seed:,custom-image:,ssh-key:,ssh-priv-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
+echo $@
+
+TEMP=`getopt -o d:a:i:k:n:op:s:u:v: --long primary-network:,second-network:,aws-access-key:,aws-secret-key:,k8s-distribution:,distribution:,arch:,container-runtime:,user:,seed:,custom-image:,ssh-key:,ssh-priv-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 eval set -- "$TEMP"
 
 # extract options and their arguments into variables.
@@ -43,12 +46,14 @@ while true ; do
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
 		-k|--ssh-key) SSH_KEY=$2 ; shift 2;;
 		-k|--ssh-priv-key) SSH_PRIV_KEY=$2 ; shift 2;;
-		-n|--cni-version) CNI_PLUGIN_VERSION=$2 ; shift 2;;
+		-n|--cni-version) CNI_VERSION=$2 ; shift 2;;
 		-p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
 		-s|--seed) SEEDIMAGE=$2 ; shift 2;;
 		-a|--arch) SEED_ARCH=$2 ; shift 2;;
 		-u|--user) USER=$2 ; shift 2;;
 		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
+		--primary-network) PRIMARY_NETWORK_NAME=$2 ; shift 2;;
+		--second-network) SECOND_NETWORK_NAME=$2 ; shift 2;;
 		--k8s-distribution) 
 			case "$2" in
 				kubeadm|k3s|rke2)
@@ -92,14 +97,17 @@ while true ; do
 	esac
 done
 
-if [ -z $TARGET_IMAGE ]; then
-	TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
+if [ -z "${TARGET_IMAGE}" ]; then
+	echo_red_bold "TARGET_IMAGE not defined"
+	exit 1
 fi
 
 if [ -f "${CACHE}/${TARGET_IMAGE}" ]; then
 	echo_blue_bold "${CACHE}/${TARGET_IMAGE} already exists!"
 	exit 0
 fi
+
+echo_blue_bold "Ubuntu password:$KUBERNETES_PASSWORD"
 
 mkdir -p ${CACHE}/packer/cloud-data
 
@@ -147,7 +155,7 @@ cat > "${CACHE}/prepare-image.sh" << EOF
 #!/bin/bash
 SEED_ARCH=${SEED_ARCH}
 CNI_PLUGIN=${CNI_PLUGIN}
-CNI_PLUGIN_VERSION=${CNI_PLUGIN_VERSION}
+CNI_VERSION=${CNI_VERSION}
 KUBERNETES_VERSION=${KUBERNETES_VERSION}
 KUBERNETES_MINOR_RELEASE=${KUBERNETES_MINOR_RELEASE}
 CRIO_VERSION=${CRIO_VERSION}

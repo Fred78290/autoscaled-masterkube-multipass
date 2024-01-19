@@ -1,6 +1,6 @@
-#/bin/bash
+#!/bin/bash
 
-set -e
+set -eu
 
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 CNI_VERSION=v1.4.0

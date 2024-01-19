@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 LAUNCH_CA=$1
 
 if [ "${LAUNCH_CA}" == "NO" ]; then
@@ -20,7 +20,7 @@ export KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | cut -d . -f 2)
 export CLUSTER_AUTOSCALER_VERSION=v1.29.
 export CLOUD_AUTOSCALER_VERSION=v1.29.0
 export AUTOSCALER_REGISTRY=$REGISTRY
-export CLOUDPROVIDER_CONFIG=/etc/cluster/grpc-config.json
+export CLOUD_PROVIDER_CONFIG=/etc/cluster/grpc-config.json
 export USE_VANILLA_GRPC_ARGS=--no-use-vanilla-grpc
 export USE_CONTROLER_MANAGER_ARGS="--use-controller-manager"
 export MAX_MEMORY=$(($(echo -n $MEMORYTOTAL | cut -d ':' -f 2) * 1024))
@@ -29,7 +29,7 @@ export MAX_VCPUS=$(echo -n ${CORESTOTAL} | cut -d ':' -f 2)
 if [ "${GRPC_PROVIDER}" = "externalgrpc" ]; then
 	USE_VANILLA_GRPC_ARGS=--use-vanilla-grpc
 	AUTOSCALER_REGISTRY=registry.k8s.io/autoscaling
-	CLOUDPROVIDER_CONFIG=/etc/cluster/grpc-config.yaml
+	CLOUD_PROVIDER_CONFIG=/etc/cluster/grpc-config.yaml
 fi
 
 if [ -z "${CLOUD_PROVIDER}" ]; then

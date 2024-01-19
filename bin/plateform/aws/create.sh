@@ -1,99 +1,100 @@
-#/bin/bash
+#!/bin/bash
 
 # This script create every thing to deploy a simple kubernetes autoscaled cluster with aws.
 # It will generate:
 # Custom AMI image with every thing for kubernetes
 # Config file to deploy the cluster autoscaler.
 
-set -e
+set -eu
 
-CURDIR=$(dirname $0)
-OUTPUT=${CURDIR}/../config/deploy.log
-TIMEFORMAT='It takes %R seconds to complete this task...'
-
-echo -n > ${OUTPUT}
-
-echo "==================================================================================" | tee -a ${OUTPUT}
-echo "Start at: " $(date) | tee -a ${OUTPUT}
-echo "==================================================================================" | tee -a ${OUTPUT}
-echo | tee -a ${OUTPUT}
-
-time {
-
-pushd ${CURDIR}/../ &>/dev/null
-
-export PATH=${PWD}/bin:${PATH}
 export CACHE=$HOME/.local/aws/cache
 
-export SSH_PRIVATE_KEY=~/.ssh/id_rsa
-export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+export ACM_CERTIFICATE_ARN=
+export ACM_DOMAIN_NAME=
+export AUTOSCALE_MACHINE="t3a.medium"
+export AUTOSCALER_DESKTOP_UTILITY_ADDR=
+export AUTOSCALER_DESKTOP_UTILITY_CACERT=
+export AUTOSCALER_DESKTOP_UTILITY_CERT=
+export AUTOSCALER_DESKTOP_UTILITY_KEY=
+export AUTOSCALER_DESKTOP_UTILITY_TLS=
+export CLOUD_PROVIDER_CONFIG=
+export CLOUD_PROVIDER=external
+export CNI_PLUGIN=aws
+export CNI_VERSION=v1.4.0
+export CONFIGURATION_LOCATION=${PWD}
+export CONTAINER_ENGINE=containerd
+export CONTROL_PLANE_MACHINE="t3a.medium"
+export CONTROLNODES=1
+export CORESTOTAL="0:16"
+export DELETE_CREDENTIALS_CONFIG=NO
+export DOMAIN_NAME=
+export ETCD_DST_DIR=
+export EXTERNAL_ETCD_ARGS=
+export EXTERNAL_ETCD=false
+export FIRSTNODE=0
+export GRPC_PROVIDER=externalgrpc
+export HA_CLUSTER=false
+export KUBECONFIG=${HOME}/.kube/config
 export KUBERNETES_DISTRO=kubeadm
 export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-export KUBECONFIG=${HOME}/.kube/config
-export NODEGROUP_SET=NO
-export CNI_VERSION=v1.4.0
-export CNI_PLUGIN=aws
-export USE_NLB=NO
-export USE_ZEROSSL=YES
-export HA_CLUSTER=false
-export FIRSTNODE=0
-export CONTROLNODES=1
-export WORKERNODES=3
-export MINNODES=0
+export MASTER_PROFILE_NAME="kubernetes-master-profile"
+export MAX_PODS=110
+export MAXAUTOPROVISIONNEDNODEGROUPCOUNT="1"
 export MAXNODES=9
 export MAXTOTALNODES=${MAXNODES}
-export GRPC_PROVIDER=externalgrpc
-export CORESTOTAL="0:16"
 export MEMORYTOTAL="0:48"
-export MAXAUTOPROVISIONNEDNODEGROUPCOUNT="1"
-export SCALEDOWNENABLED="true"
+export MINNODES=0
+export NGINX_MACHINE="t3a.small"
+export NODEGROUP_SET=NO
+export OSDISTRO=$(uname -s)
+export PREFER_SSH_PUBLICIP=NO
+export REGISTRY=fred78290
+export RESUME=NO
 export SCALEDOWNDELAYAFTERADD="1m"
 export SCALEDOWNDELAYAFTERDELETE="1m"
 export SCALEDOWNDELAYAFTERFAILURE="1m"
+export SCALEDOWNENABLED="true"
 export SCALEDOWNUNEEDEDTIME="1m"
 export SCALEDOWNUNREADYTIME="1m"
-export AUTOSCALE_MACHINE="t3a.medium"
-export CONTROL_PLANE_MACHINE="t3a.medium"
-export WORKER_NODE_MACHINE="t3a.medium"
-export NGINX_MACHINE="t3a.small"
-export UNREMOVABLENODERECHECKTIMEOUT="1m"
-export OSDISTRO=$(uname -s)
-export TRANSPORT="tcp"
-export SSH_KEYNAME="aws-k8s-key"
-export VOLUME_TYPE=gp3
-export VOLUME_SIZE=20
-export MAX_PODS=110
-export MASTER_PROFILE_NAME="kubernetes-master-profile"
-export WORKER_PROFILE_NAME="kubernetes-worker-profile"
-export REGISTRY=fred78290
-export RESUME=NO
-export EXTERNAL_ETCD=false
-export CONTAINER_ENGINE=containerd
-export USE_NGINX_GATEWAY=NO
-export PREFER_SSH_PUBLICIP=NO
 export SILENT="&> /dev/null"
-export VERBOSE=NO
-export DELETE_CREDENTIALS_CONFIG=NO
+export SSH_KEY_FNAME=
+export SSH_KEY=$(cat ~/.ssh/id_rsa)
+export SSH_KEYNAME="aws-k8s-key"
+export SSH_PRIVATE_KEY=~/.ssh/id_rsa
+export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+export TARGET_CLUSTER_LOCATION=
+export TARGET_CONFIG_LOCATION=
+export TARGET_DEPLOY_LOCATION=
+export TARGET_IMAGE_AMI=
+export TRANSPORT="tcp"
+export UNREMOVABLENODERECHECKTIMEOUT="1m"
+export USE_NGINX_GATEWAY=NO
+export USE_NLB=NO
+export USE_ZEROSSL=YES
+export VOLUME_SIZE=20
+export VOLUME_TYPE=gp3
+export WORKER_NODE_MACHINE="t3a.medium"
+export WORKER_PROFILE_NAME="kubernetes-worker-profile"
+export WORKERNODES=3
 
 # aws region eu-west1
 export SEED_ARCH=amd64
 export KUBERNETES_USER=ubuntu
 export SEED_IMAGE_AMD64="ami-0333305f9719618c7"
 export SEED_IMAGE_ARM64="ami-03d568a0c334477dd"
-export SSL_LOCATION=${PWD}/etc/ssl
 export CONFIGURATION_LOCATION=${PWD}
-export AWS_TARGET_PORT=80,443,6443
-export PLATEFORMDEFS=${PWD}/bin/vars.defs
+export SSL_LOCATION=${CONFIGURATION_LOCATION}/etc/ssl
+export LOAD_BALANCER_PORT=80,443,6443
 
 # defined in private vars.defs
 export CERT_EMAIL=
+export CERT_DOMAIN=
 export MASTER_INSTANCE_PROFILE_ARN= #"<to be filled>"
 export WORKER_INSTANCE_PROFILE_ARN= #"<to be filled>"
 export VPC_PUBLIC_SUBNET_ID= #"<to be filled>"
 export VPC_PUBLIC_SECURITY_GROUPID= #"<to be filled>"
 export VPC_PRIVATE_SUBNET_ID= #"<to be filled>"
 export VPC_PRIVATE_SECURITY_GROUPID= #"<to be filled>"
-export AWS_ROUTE53_ZONE_ID= #"<to be filled>"
 
 # optional defined in private vars.defs for debug aws-autoscaler locally
 export AWS_ACCESSKEY= #"<to be filled>"
@@ -103,6 +104,8 @@ export AWS_TOKEN= #"<to be filled>"
 export AWS_ROUTE53_ACCESSKEY= #"<to be filled>"
 export AWS_ROUTE53_SECRETKEY= #"<to be filled>"
 export AWS_ROUTE53_TOKEN= #"<to be filled>"
+export AWS_ROUTE53_PRIVATE_ZONE_ID= #"<to be filled>"
+export AWS_ROUTE53_PUBLIC_ZONE_ID= #"<to be dtermined>"
 
 export EXPOSE_PUBLIC_CLUSTER=false
 export CONTROLPLANE_USE_PUBLICIP=false
@@ -150,7 +153,7 @@ Options are:
 --region | -r=<value>                            # Specify AWS region, default ${AWS_REGION}
 
 --route53-profile=<value>                        # Specify AWS profile for route53 if different, default ${AWS_PROFILE_ROUTE53}
---route53-zone-id=<value>                        # Specify Route53 for private DNS, default ${AWS_ROUTE53_ZONE_ID}
+--route53-zone-id=<value>                        # Specify Route53 for private DNS, default ${AWS_ROUTE53_PRIVATE_ZONE_ID}
 
 ### Design the kubernetes cluster
 
@@ -175,8 +178,8 @@ Options are:
 --cert-email=<value>                             # Specify the mail for lets encrypt, default ${CERT_EMAIL}
 --use-zerossl                                    # Specify cert-manager to use zerossl, default ${USE_ZEROSSL}
 --dont-use-zerossl                               # Specify cert-manager to use letsencrypt, default ${USE_ZEROSSL}
---zerossl-eab-kid=<value>                        # Specify zerossl eab kid, default ${ZEROSSL_EAB_KID}
---zerossl-eab-hmac-secret=<value>                # Specify zerossl eab hmac secret, default ${ZEROSSL_EAB_HMAC_SECRET}
+--zerossl-eab-kid=<value>                        # Specify zerossl eab kid, default ${CERT_ZEROSSL_EAB_KID}
+--zerossl-eab-hmac-secret=<value>                # Specify zerossl eab hmac secret, default ${CERT_ZEROSSL_EAB_HMAC_SECRET}
 --godaddy-key                                    # Specify godaddy api key
 --godaddy-secret                                 # Specify godaddy api secret
 
@@ -239,8 +242,6 @@ Options are:
 --unremovable-node-recheck-timeout=<value>       # autoscaler flag, default: ${UNREMOVABLENODERECHECKTIMEOUT}
 EOF
 }
-
-export PATH=${PWD}/bin:${PATH}
 
 TEMP=$(getopt -o hvxr --long upgrade,k8s-distribution:,cloudprovider:,use-zerossl,zerossl-eab-kid:,zerossl-eab-hmac-secret:,godaddy-key:,godaddy-secret:,route53-profile:,route53-zone-id:,cache:,cert-email:,public-domain:,private-domain:,dashboard-hostname:,delete,dont-prefer-ssh-publicip,prefer-ssh-publicip,dont-create-nginx-apigateway,create-nginx-apigateway,configuration-location:,ssl-location:,control-plane-machine:,worker-node-machine:,autoscale-machine:,internet-facing,no-internet-facing,control-plane-public,no-control-plane-public,create-image-only,nginx-machine:,volume-type:,volume-size:,aws-defs:,container-runtime:,cni-plugin:,trace,help,verbose,resume,ha-cluster,create-external-etcd,dont-use-nlb,use-nlb,worker-nodes:,arch:,max-pods:,profile:,region:,node-group:,target-image:,seed-image:,seed-user:,vpc-id:,public-subnet-id:,public-sg-id:,private-subnet-id:,private-sg-id:,transport:,ssh-private-key:,cni-plugin-version:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
 
@@ -378,23 +379,23 @@ while true; do
         shift 1
         ;;
     --zerossl-eab-kid)
-        ZEROSSL_EAB_KID=$2
+        CERT_ZEROSSL_EAB_KID=$2
         shift 2
         ;;
     --zerossl-eab-hmac-secret)
-        ZEROSSL_EAB_HMAC_SECRET=$2
+        CERT_ZEROSSL_EAB_HMAC_SECRET=$2
         shift 2
         ;;
     --godaddy-key)
-        GODADDY_API_KEY=$2
+        CERT_GODADDY_API_KEY=$2
         shift 2
         ;;
     --godaddy-secret)
-        GODADDY_API_SECRET=$2
+        CERT_GODADDY_API_SECRET=$2
         shift 2
         ;;
     --route53-zone-id)
-        AWS_ROUTE53_ZONE_ID=$2
+        AWS_ROUTE53_PRIVATE_ZONE_ID=$2
         shift 2
         ;;
     --route53-access-key)
@@ -646,8 +647,8 @@ if [ "${GRPC_PROVIDER}" != "grpc" ] && [ "${GRPC_PROVIDER}" != "externalgrpc" ];
 fi
 
 if [ "${USE_ZEROSSL}" = "YES" ]; then
-    if [ -z "${ZEROSSL_EAB_KID}" ] || [ -z "${ZEROSSL_EAB_HMAC_SECRET}" ]; then
-        echo_red_bold "ZEROSSL_EAB_KID or ZEROSSL_EAB_HMAC_SECRET is empty, exit"
+    if [ -z "${CERT_ZEROSSL_EAB_KID}" ] || [ -z "${CERT_ZEROSSL_EAB_HMAC_SECRET}" ]; then
+        echo_red_bold "CERT_ZEROSSL_EAB_KID or CERT_ZEROSSL_EAB_HMAC_SECRET is empty, exit"
         exit 1
     fi
 fi
@@ -748,7 +749,7 @@ if [ "${GRPC_PROVIDER}" != "grpc" ] && [ "${GRPC_PROVIDER}" != "externalgrpc" ];
 fi
 
 if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-    AWS_TARGET_PORT="${AWS_TARGET_PORT},9345"
+    LOAD_BALANCER_PORT="${LOAD_BALANCER_PORT},9345"
     EXTERNAL_ETCD=false
 fi
 
@@ -806,18 +807,18 @@ else
 fi
 MACHINES_TYPES=$(jq --argjson VOLUME_SIZE ${VOLUME_SIZE} --arg VOLUME_TYPE ${VOLUME_TYPE} 'with_entries(.value += {"diskType": $VOLUME_TYPE, "diskSize": $VOLUME_SIZE})' templates/machines/${SEED_ARCH}.json)
 
-export SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
-export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
+SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
 
-export TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
-export TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
-export TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
+TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
+TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
 if [ "${EXTERNAL_ETCD}" = "true" ]; then
-    export EXTERNAL_ETCD_ARGS="--use-external-etcd"
+    EXTERNAL_ETCD_ARGS="--use-external-etcd"
     ETCD_DST_DIR="/etc/etcd/ssl"
 else
-    export EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
+    EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
     ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
 fi
 
@@ -842,7 +843,7 @@ if [ ! -f ${SSH_PUBLIC_KEY} ]; then
     exit -1
 fi
 
-export SSH_KEY=$(cat "${SSH_PUBLIC_KEY}")
+SSH_KEY=$(cat "${SSH_PUBLIC_KEY}")
 
 # If we use AWS CNI, install eni-max-pods.txt definition file
 if [ ${CNI_PLUGIN} = "aws" ]; then
@@ -884,11 +885,11 @@ if [ -z ${WORKER_INSTANCE_PROFILE_ARN} ]; then
 fi
 
 # Grab domain name from route53
-if [ -n "${AWS_ROUTE53_ZONE_ID}" ]; then
-    ROUTE53_ZONE_NAME=$(aws route53 get-hosted-zone --id  ${AWS_ROUTE53_ZONE_ID} --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} 2>/dev/null| jq -r '.HostedZone.Name // ""')
+if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+    ROUTE53_ZONE_NAME=$(aws route53 get-hosted-zone --id  ${AWS_ROUTE53_PRIVATE_ZONE_ID} --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} 2>/dev/null| jq -r '.HostedZone.Name // ""')
 
     if [ -z "${ROUTE53_ZONE_NAME}" ]; then
-        echo_red_bold "The zone: ${AWS_ROUTE53_ZONE_ID} does not exist, exit"
+        echo_red_bold "The zone: ${AWS_ROUTE53_PRIVATE_ZONE_ID} does not exist, exit"
         exit 1
     fi
 
@@ -970,14 +971,6 @@ else
     echo_grey "SSH Public key already exists"
 fi
 
-if [ "${OSDISTRO}" == "Linux" ]; then
-	TRANSPORT_IF=$(ip route get 1 | awk '{print $5;exit}')
-	LOCAL_IPADDR=$(ip addr show ${TRANSPORT_IF} | grep -m 1 "inet\s" | tr '/' ' ' | awk '{print $2}')
-else
-	TRANSPORT_IF=$(route get 1 | grep -m 1 interface | awk '{print $2}')
-	LOCAL_IPADDR=$(ifconfig ${TRANSPORT_IF} | grep -m 1 "inet\s" | sed -n 1p | awk '{print $2}')
-fi
-
 # GRPC network endpoint
 if [ "${LAUNCH_CA}" != "YES" ]; then
     SSH_PRIVATE_KEY_LOCAL="${SSH_PRIVATE_KEY}"
@@ -1023,14 +1016,14 @@ if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
     exit 1
 fi
 
-export TARGET_IMAGE_AMI=$(aws ec2 describe-images --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=name,Values=${TARGET_IMAGE}" | jq -r '.Images[0].ImageId // ""')
+TARGET_IMAGE_AMI=$(aws ec2 describe-images --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=name,Values=${TARGET_IMAGE}" | jq -r '.Images[0].ImageId // ""')
 
 # Extract the domain name from CERT
-export ACM_DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
+ACM_DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
 
 # Drop wildcard
-export DOMAIN_NAME=$(echo -n $ACM_DOMAIN_NAME | sed 's/\*\.//g')
-export CERT_DOMAIN=${DOMAIN_NAME}
+DOMAIN_NAME=$(echo -n $ACM_DOMAIN_NAME | sed 's/\*\.//g')
+CERT_DOMAIN=${DOMAIN_NAME}
 
 if [ "${DOMAIN_NAME}" != "${PRIVATE_DOMAIN_NAME}" ] && [ "${DOMAIN_NAME}" != "${PUBLIC_DOMAIN_NAME}" ]; then
     echo_red "Warning: The provided domain ${CERT_DOMAIN} from certificat does not target domain ${PRIVATE_DOMAIN_NAME} or ${PUBLIC_DOMAIN_NAME}"
@@ -1043,7 +1036,7 @@ if [ "${DOMAIN_NAME}" != "${PRIVATE_DOMAIN_NAME}" ] && [ "${DOMAIN_NAME}" != "${
 fi
 
 # ACM Keep the wildcard
-export ACM_CERTIFICATE_ARN=$(aws acm list-certificates --profile ${AWS_PROFILE} --region ${AWS_REGION} --include keyTypes=RSA_1024,RSA_2048,EC_secp384r1,EC_prime256v1,EC_secp521r1,RSA_3072,RSA_4096 \
+ACM_CERTIFICATE_ARN=$(aws acm list-certificates --profile ${AWS_PROFILE} --region ${AWS_REGION} --include keyTypes=RSA_1024,RSA_2048,EC_secp384r1,EC_prime256v1,EC_secp521r1,RSA_3072,RSA_4096 \
     | jq -r --arg DOMAIN_NAME "${ACM_DOMAIN_NAME}" '.CertificateSummaryList[]|select(.DomainName == $DOMAIN_NAME)|.CertificateArn // ""')
 
 if [ -n "${ACM_CERTIFICATE_ARN}" ]; then
@@ -1075,6 +1068,7 @@ if [ -z "${TARGET_IMAGE_AMI}" ]; then
     fi
 
     ./bin/create-image.sh \
+		--plateform=${PLATEFORM} \
         --k8s-distribution=${KUBERNETES_DISTRO} \
         --profile="${AWS_PROFILE}" \
         --region="${AWS_REGION}" \
@@ -1099,12 +1093,12 @@ if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
     exit 0
 fi
 
-export TARGET_IMAGE_AMI=$(aws ec2 describe-images --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=name,Values=${TARGET_IMAGE}" | jq -r '.Images[0].ImageId // ""')
+TARGET_IMAGE_AMI=$(aws ec2 describe-images --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=name,Values=${TARGET_IMAGE}" | jq -r '.Images[0].ImageId // ""')
 
 if [ ${GRPC_PROVIDER} = "grpc" ]; then
-    export CLOUDPROVIDER_CONFIG=grpc-config.json
+    CLOUD_PROVIDER_CONFIG=grpc-config.json
 else
-    export CLOUDPROVIDER_CONFIG=grpc-config.yaml
+    CLOUD_PROVIDER_CONFIG=grpc-config.yaml
 fi
 
 if [ -z "${TARGET_IMAGE_AMI}" ]; then
@@ -1130,93 +1124,19 @@ mkdir -p ${TARGET_CLUSTER_LOCATION}
 
 if [ "${RESUME}" = "NO" ]; then
     if [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
-        export AWS_ROUTE53_PUBLIC_ZONE_ID=$(aws route53 list-hosted-zones-by-name --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --dns-name ${PUBLIC_DOMAIN_NAME} | jq --arg DNSNAME "${PUBLIC_DOMAIN_NAME}." -r '.HostedZones[]|select(.Name == $DNSNAME)|.Id//""' | sed -E 's/\/hostedzone\/(\w+)/\1/')
+        AWS_ROUTE53_PUBLIC_ZONE_ID=$(aws route53 list-hosted-zones-by-name --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --dns-name ${PUBLIC_DOMAIN_NAME} | jq --arg DNSNAME "${PUBLIC_DOMAIN_NAME}." -r '.HostedZones[]|select(.Name == $DNSNAME)|.Id//""' | sed -E 's/\/hostedzone\/(\w+)/\1/')
         if [ -z "${AWS_ROUTE53_PUBLIC_ZONE_ID}" ]; then
             echo_red_bold "No Route53 for PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}"
         else
             echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} AWS_ROUTE53_PUBLIC_ZONE_ID=$AWS_ROUTE53_PUBLIC_ZONE_ID"
             echo_red_bold "Route53 will be used to register public domain hosts"
             # Disable GoDaddy registration
-            GODADDY_API_KEY=
-            GODADDY_API_SECRET=
+            CERT_GODADDY_API_KEY=
+            CERT_GODADDY_API_SECRET=
         fi
     fi
 
-    EVAL=$(cat ${PLATEFORMDEFS} | sed -e '/MASTER_INSTANCE_PROFILE_ARN/d' -e '/WORKER_INSTANCE_PROFILE_ARN/d' > ${TARGET_CONFIG_LOCATION}/buildenv)
-
-    cat >> ${TARGET_CONFIG_LOCATION}/buildenv <<EOF
-### Env to build cluster
-export AUTOSCALE_MACHINE=${AUTOSCALE_MACHINE}
-export AWS_ROUTE53_PUBLIC_ZONE_ID=${AWS_ROUTE53_PUBLIC_ZONE_ID}
-export CNI_VERSION=${CNI_VERSION}
-export CNI_PLUGIN=${CNI_PLUGIN}
-export CONTROL_PLANE_MACHINE=${CONTROL_PLANE_MACHINE}
-export CONTROLNODES=${CONTROLNODES}
-export CONTROLPLANE_USE_PUBLICIP=${CONTROLPLANE_USE_PUBLICIP}
-export CORESTOTAL="${CORESTOTAL}"
-export DASHBOARD_HOSTNAME=${DASHBOARD_HOSTNAME}
-export DELETE_CREDENTIALS_CONFIG=${DELETE_CREDENTIALS_CONFIG}
-export DOMAIN_NAME=${DOMAIN_NAME}
-export EXPOSE_PUBLIC_CLUSTER=${EXPOSE_PUBLIC_CLUSTER}
-export EXTERNAL_ETCD=${EXTERNAL_ETCD}
-export FIRSTNODE=${FIRSTNODE}
-export GODADDY_API_KEY=${GODADDY_API_KEY}
-export GODADDY_API_SECRET=${GODADDY_API_SECRET}
-export GRPC_PROVIDER=${GRPC_PROVIDER}
-export HA_CLUSTER=${HA_CLUSTER}
-export KUBECONFIG=${KUBECONFIG}
-export KUBERNETES_DISTRO=${KUBERNETES_DISTRO}
-export KUBERNETES_VERSION=${KUBERNETES_VERSION}
-export MASTER_INSTANCE_PROFILE_ARN=${MASTER_INSTANCE_PROFILE_ARN}
-export MASTER_PROFILE_NAME=${MASTER_PROFILE_NAME}
-export MASTERKUBE=${MASTERKUBE}
-export MAX_PODS=${MAX_PODS}
-export MAXAUTOPROVISIONNEDNODEGROUPCOUNT=${MAXAUTOPROVISIONNEDNODEGROUPCOUNT}
-export MAXNODES=${MAXNODES}
-export MAXTOTALNODES=${MAXTOTALNODES}
-export MEMORYTOTAL="${MEMORYTOTAL}"
-export MINNODES=${MINNODES}
-export NGINX_MACHINE=${NGINX_MACHINE}
-export NODEGROUP_NAME=${NODEGROUP_NAME}
-export OSDISTRO=${OSDISTRO}
-export PREFER_SSH_PUBLICIP=${PREFER_SSH_PUBLICIP}
-export PRIVATE_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
-export PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
-export REGISTRY=${REGISTRY}
-export SCALEDOWNDELAYAFTERADD=${SCALEDOWNDELAYAFTERADD}
-export SCALEDOWNDELAYAFTERDELETE=${SCALEDOWNDELAYAFTERDELETE}
-export SCALEDOWNDELAYAFTERFAILURE=${SCALEDOWNDELAYAFTERFAILURE}
-export SCALEDOWNENABLED=${SCALEDOWNENABLED}
-export SCALEDOWNUNEEDEDTIME=${SCALEDOWNUNEEDEDTIME}
-export SCALEDOWNUNREADYTIME=${SCALEDOWNUNREADYTIME}
-export PLATEFORM=${PLATEFORM}
-export SEED_ARCH=${SEED_ARCH}
-export SEED_IMAGE_AMD64=${SEED_IMAGE_AMD64}
-export SEED_IMAGE_ARM64=${SEED_IMAGE_ARM64}
-export KUBERNETES_USER=${KUBERNETES_USER}
-export SSH_KEYNAME=${SSH_KEYNAME}
-export SSH_PRIVATE_KEY=${SSH_PRIVATE_KEY}
-export SSH_PRIVATE_KEY=${SSH_PRIVATE_KEY}
-export SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY}
-export TARGET_CLUSTER_LOCATION=${TARGET_CLUSTER_LOCATION}
-export TARGET_CONFIG_LOCATION=${TARGET_CONFIG_LOCATION}
-export TARGET_DEPLOY_LOCATION=${TARGET_DEPLOY_LOCATION}
-export TARGET_IMAGE=${TARGET_IMAGE}
-export TRANSPORT=${TRANSPORT}
-export UNREMOVABLENODERECHECKTIMEOUT=${UNREMOVABLENODERECHECKTIMEOUT}
-export USE_NGINX_GATEWAY=${USE_NGINX_GATEWAY}
-export USE_NLB=${USE_NLB}
-export USE_ZEROSSL=${USE_ZEROSSL}
-export VOLUME_SIZE=${VOLUME_SIZE}
-export VOLUME_TYPE=${VOLUME_TYPE}
-export WORKER_INSTANCE_PROFILE_ARN=${WORKER_INSTANCE_PROFILE_ARN}
-export WORKER_NODE_MACHINE=${WORKER_NODE_MACHINE}
-export WORKER_PROFILE_NAME=${WORKER_PROFILE_NAME}
-export WORKERNODE_USE_PUBLICIP=${WORKERNODE_USE_PUBLICIP}
-export WORKERNODES=${WORKERNODES}
-export ZEROSSL_EAB_HMAC_SECRET=${ZEROSSL_EAB_HMAC_SECRET}
-export ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID}
-EOF
+    update_build_env
 else
     source ${TARGET_CONFIG_LOCATION}/buildenv
 fi
@@ -1271,49 +1191,6 @@ echo "export FIRSTNODE=$FIRSTNODE" >> ${TARGET_CONFIG_LOCATION}/buildenv
 echo "export LASTNODE_INDEX=$LASTNODE_INDEX" >> ${TARGET_CONFIG_LOCATION}/buildenv
 echo "export CONTROLNODE_INDEX=$CONTROLNODE_INDEX" >> ${TARGET_CONFIG_LOCATION}/buildenv
 echo "export WORKERNODE_INDEX=$WORKERNODE_INDEX" >> ${TARGET_CONFIG_LOCATION}/buildenv
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function collect_cert_sans() {
-    local LOAD_BALANCER_IP=$1
-    local CLUSTER_NODES=$2
-    local CERT_EXTRA_SANS=$3
-
-    local LB_IP=
-    local CERT_EXTRA=
-    local CLUSTER_NODE=
-    local CLUSTER_IP=
-    local CLUSTER_HOST=
-    local TLS_SNA=(
-        "${LOAD_BALANCER_IP}"
-    )
-
-    for CERT_EXTRA in $(echo ${CERT_EXTRA_SANS} | tr ',' ' ')
-    do
-        if [[ ! ${TLS_SNA[*]} =~ "${CERT_EXTRA}" ]]; then
-            TLS_SNA+=("${CERT_EXTRA}")
-        fi
-    done
-
-    for CLUSTER_NODE in $(echo ${CLUSTER_NODES} | tr ',' ' ')
-    do
-        IFS=: read CLUSTER_HOST CLUSTER_IP <<< "$CLUSTER_NODE"
-
-        if [ -n ${CLUSTER_IP} ] && [[ ! ${TLS_SNA[*]} =~ "${CLUSTER_IP}" ]]; then
-            TLS_SNA+=("${CLUSTER_IP}")
-        fi
-
-        if [ -n "${CLUSTER_HOST}" ]; then
-            if [[ ! ${TLS_SNA[*]} =~ "${CLUSTER_HOST}" ]]; then
-                TLS_SNA+=("${CLUSTER_HOST}")
-                TLS_SNA+=("${CLUSTER_HOST%%.*}")
-            fi
-        fi
-    done
-
-    echo -n "${TLS_SNA[*]}" | tr ' ' ','
-}
 
 #===========================================================================================================================================
 #
@@ -1583,11 +1460,11 @@ EOF
         add_host "${IPADDR} ${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}"
 
         # Record kubernetes node in Route53 DNS
-        if [ -n "${AWS_ROUTE53_ZONE_ID}" ]; then
+        if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 
             echo ${ROUTE53_ENTRY} | jq --arg HOSTNAME "${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}" '.Changes[0].ResourceRecordSet.Name = $HOSTNAME' >  ${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json
 
-            aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --hosted-zone-id ${AWS_ROUTE53_ZONE_ID} \
+            aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
                 --change-batch file://${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json > /dev/null
 
         elif [ ${INDEX} -ge ${CONTROLNODE_INDEX} ] && [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
@@ -1602,11 +1479,11 @@ EOF
                     --hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
                     --change-batch file://${TARGET_CONFIG_LOCATION}/dns-public-${SUFFIX}.json > /dev/null
 
-            elif [ -n ${GODADDY_API_KEY} ]; then
+            elif [ -n ${CERT_GODADDY_API_KEY} ]; then
 
                 # Register kubernetes nodes in godaddy if we don't use route53
                 curl -s -X PUT "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/A/${MASTERKUBE_NODE}" \
-                    -H "Authorization: sso-key ${GODADDY_API_KEY}:${GODADDY_API_SECRET}" \
+                    -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
                     -H "Content-Type: application/json" -d "[{\"data\": \"${IPADDR}\"}]"
 
             fi
@@ -1666,8 +1543,8 @@ function register_nlb_dns() {
     local PRIVATE_NLB_DNS=$1
     local PUBLIC_NLB_DNS=$2
 
-    if [ -n ${AWS_ROUTE53_ZONE_ID} ]; then
-        echo_title "Register dns ${MASTERKUBE} in route53: ${AWS_ROUTE53_ZONE_ID}"
+    if [ -n ${AWS_ROUTE53_PRIVATE_ZONE_ID} ]; then
+        echo_title "Register dns ${MASTERKUBE} in route53: ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
 
         cat > ${TARGET_CONFIG_LOCATION}/dns-nlb.json <<EOF
 {
@@ -1690,7 +1567,7 @@ function register_nlb_dns() {
 }
 EOF
 
-        aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --hosted-zone-id ${AWS_ROUTE53_ZONE_ID} \
+        aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
             --change-batch file://${TARGET_CONFIG_LOCATION}/dns-nlb.json > /dev/null
 
         add_host "${PRIVATE_NLB_DNS} ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}"
@@ -1724,9 +1601,9 @@ EOF
             aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
                 --change-batch file://${TARGET_CONFIG_LOCATION}/dns-public.json > /dev/null
 
-        elif [ -n "${GODADDY_API_KEY}" ]; then
+        elif [ -n "${CERT_GODADDY_API_KEY}" ]; then
             curl -s -X PUT "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/CNAME/${MASTERKUBE}" \
-                -H "Authorization: sso-key ${GODADDY_API_KEY}:${GODADDY_API_SECRET}" \
+                -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
                 -H "Content-Type: application/json" \
                 -d "[{\"data\": \"${PUBLIC_NLB_DNS}\"}]"
         fi
@@ -1751,7 +1628,7 @@ function create_load_balancer() {
             --public-subnet-id="${PUBLIC_SUBNET_NLB_TARGET}" \
             --private-subnet-id="${PRIVATE_SUBNET_NLB_TARGET}" \
             --target-vpc-id=${TARGET_VPC} \
-            --target-port="${AWS_TARGET_PORT}" \
+            --target-port="${LOAD_BALANCER_PORT}" \
             --security-group=${VPC_PRIVATE_SECURITY_GROUPID} \
             --controlplane-instances-id="${CONTROLPLANE_INSTANCEID_NLB_TARGET}" \
             --public-instances-id="${PUBLIC_INSTANCEID_NLB_TARGET}" \
@@ -1841,7 +1718,7 @@ function start_kubernes_on_instances() {
                     eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-load-balancer.sh \
                         --master-nodes="${MASTER_NODES}" \
                         --control-plane-endpoint=${CONTROL_PLANE_ENDPOINT} \
-                        --listen-port=${AWS_TARGET_PORT} \
+                        --listen-port=${LOAD_BALANCER_PORT} \
                         --listen-ip="0.0.0.0" ${SILENT}
 
                     echo_blue_bold "Done configuring load balancer ${MASTERKUBE_NODE} instance in cluster mode"
@@ -1877,7 +1754,7 @@ function start_kubernes_on_instances() {
                         --max-pods=${MAX_PODS} \
                         --ecr-password=${ECR_PASSWORD} \
                         --allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
-                        --private-zone-id="${AWS_ROUTE53_ZONE_ID}" \
+                        --private-zone-id="${AWS_ROUTE53_PRIVATE_ZONE_ID}" \
                         --private-zone-name="${PRIVATE_DOMAIN_NAME}" \
                         --use-external-etcd=${EXTERNAL_ETCD} \
                         --node-group=${NODEGROUP_NAME} \
@@ -1944,7 +1821,7 @@ function start_kubernes_on_instances() {
                         --max-pods=${MAX_PODS} \
                         --ecr-password=${ECR_PASSWORD} \
                         --allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
-                        --private-zone-id="${AWS_ROUTE53_ZONE_ID}" \
+                        --private-zone-id="${AWS_ROUTE53_PRIVATE_ZONE_ID}" \
                         --private-zone-name="${PRIVATE_DOMAIN_NAME}" \
                         --tls-san="${CERT_SANS}" \
                         --container-runtime=${CONTAINER_ENGINE} \
@@ -2214,10 +2091,10 @@ done
 
 if [ "${USE_NLB}" = "NO" ] || [ "${HA_CLUSTER}" = "false" ]; then
     # Register in Route53 IP addresses point in private IP
-    if [ -n ${AWS_ROUTE53_ZONE_ID} ]; then
+    if [ -n ${AWS_ROUTE53_PRIVATE_ZONE_ID} ]; then
         echo ${PRIVATE_ROUTE53_REGISTER} | jq . > ${TARGET_CONFIG_LOCATION}/dns-nlb.json
         aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} \
-            --hosted-zone-id ${AWS_ROUTE53_ZONE_ID} \
+            --hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
             --change-batch file://${TARGET_CONFIG_LOCATION}/dns-nlb.json > /dev/null
 
         for IPADDR in $(echo ${LOAD_BALANCER_IP} | tr ',' ' ')
@@ -2235,11 +2112,11 @@ if [ "${USE_NLB}" = "NO" ] || [ "${HA_CLUSTER}" = "false" ]; then
                 --hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
                 --change-batch file://${TARGET_CONFIG_LOCATION}/dns-public.json > /dev/null
 
-        elif [ -n ${GODADDY_API_KEY} ]; then
+        elif [ -n ${CERT_GODADDY_API_KEY} ]; then
 
             # Register in godaddy IP addresses point in public IP
             curl -s -X PUT "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/A/${MASTERKUBE}" \
-                -H "Authorization: sso-key ${GODADDY_API_KEY}:${GODADDY_API_SECRET}" \
+                -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
                 -H "Content-Type: application/json" \
                 -d "${GODADDY_REGISTER}"
 
@@ -2365,7 +2242,7 @@ kubectl create secret generic autoscaler-ssh-keys -n kube-system --dry-run=clien
 echo_title "Write ${PLATEFORM} autoscaler provider config"
 
 if [ ${GRPC_PROVIDER} = "grpc" ]; then
-    cat > ${TARGET_CONFIG_LOCATION}/${CLOUDPROVIDER_CONFIG} <<EOF
+    cat > ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} <<EOF
     {
         "address": "${CONNECTTO}",
         "secret": "${PLATEFORM}",
@@ -2373,7 +2250,7 @@ if [ ${GRPC_PROVIDER} = "grpc" ]; then
     }
 EOF
 else
-    echo "address: ${CONNECTTO}" > ${TARGET_CONFIG_LOCATION}/${CLOUDPROVIDER_CONFIG}
+    echo "address: ${CONNECTTO}" > ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG}
 fi
 
 if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
@@ -2404,10 +2281,3 @@ done
 echo "${PROVIDER_CONFIG}" | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
 
 source ./bin/create-deployment.sh
-
-popd &>/dev/null
-
-} 2>&1 | tee -a ${OUTPUT}
-echo "==================================================================================" | tee -a ${OUTPUT}
-echo "= End at: " $(date) | tee -a ${OUTPUT}
-echo "==================================================================================" | tee -a ${OUTPUT}

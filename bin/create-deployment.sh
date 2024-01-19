@@ -1,7 +1,7 @@
 # Recopy config file on master node
 kubectl create configmap config-cluster-autoscaler -n kube-system --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--from-file ${TARGET_CONFIG_LOCATION}/${CLOUDPROVIDER_CONFIG} \
+	--from-file ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} \
 	--from-file ${TARGET_CONFIG_LOCATION}/provider.json \
 	--from-file ${TARGET_CONFIG_LOCATION}/machines.json \
 	--from-file ${TARGET_CONFIG_LOCATION}/autoscaler.json | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -

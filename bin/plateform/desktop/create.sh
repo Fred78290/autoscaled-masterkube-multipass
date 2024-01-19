@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 # This script create every thing to deploy a simple kubernetes autoscaled cluster with vmware desktop.
 # It will generate:
@@ -6,155 +6,116 @@
 # Config file to deploy the cluster autoscaler.
 # kubectl run busybox --rm -ti --image=busybox -n kube-public /bin/sh
 
-set -e
+set -eu
 
-CURDIR=$(dirname $0)
-OUTPUT=${CURDIR}/../config/deploy.log
-TIMEFORMAT='It takes %R seconds to complete this task...'
-
-echo -n > ${OUTPUT}
-
-echo "==================================================================================" | tee -a ${OUTPUT}
-echo "Start at: " $(date) | tee -a ${OUTPUT}
-echo "==================================================================================" | tee -a ${OUTPUT}
-echo | tee -a ${OUTPUT}
-
-time {
-
-pushd ${CURDIR}/../ &>/dev/null
-
-export PATH=${PWD}/bin:${PATH}
-export DISTRO=jammy
-export SSH_PRIVATE_KEY="${HOME}/.ssh/id_rsa"
-export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
-export KUBERNETES_DISTRO=kubeadm
-export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-export KUBERNETES_USER=kubernetes
-export KUBERNETES_PASSWORD=
-export KUBECONFIG=${HOME}/.kube/config
-export SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
-export SEED_USER=ubuntu
-export SEED_IMAGE="${DISTRO}-server-cloudimg-seed"
-export ROOT_IMG_NAME=${DISTRO}-kubernetes
+export AUTOSCALE_MACHINE="medium"
+export AUTOSCALER_DESKTOP_UTILITY_ADDR=
+export AUTOSCALER_DESKTOP_UTILITY_CACERT=
+export AUTOSCALER_DESKTOP_UTILITY_CERT=
+export AUTOSCALER_DESKTOP_UTILITY_KEY=
+export AUTOSCALER_DESKTOP_UTILITY_TLS=
+export AWS_ACCESSKEY=
+export AWS_ROUTE53_ACCESSKEY=
+export AWS_ROUTE53_PUBLIC_ZONE_ID=
+export AWS_ROUTE53_SECRETKEY=
+export AWS_SECRETKEY=
+export CERT_GODADDY_API_KEY=${GODADDY_API_KEY}
+export CERT_GODADDY_API_SECRET=${GODADDY_API_SECRET}
+export CERT_ZEROSSL_EAB_HMAC_SECRET=${ZEROSSL_EAB_HMAC_SECRET}
+export CERT_ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID}
+export CLOUD_PROVIDER_CONFIG=
+export CLOUD_PROVIDER=
 export CNI_PLUGIN=flannel
-export CNI_PLUGIN_VERSION="v1.4.0"
-export USE_ZEROSSL=YES
-export USE_KEEPALIVED=NO
-export HA_CLUSTER=false
+export CNI_VERSION="v1.4.0"
+export CONFIGURATION_LOCATION=${PWD}
+export CONTAINER_ENGINE=containerd
+export CONTROL_PLANE_MACHINE="small"
+export CONTROLNODES=1
+export CORESTOTAL="0:16"
+export DELETE_CREDENTIALS_CONFIG=NO
+export DISTRO=jammy
+export EXTERNAL_ETCD=false
 export FIRSTNODE=0
-export MINNODES=0
+export GRPC_PROVIDER=externalgrpc
+export HA_CLUSTER=false
+export KUBECONFIG=${HOME}/.kube/config
+export KUBERNETES_DISTRO=kubeadm
+export KUBERNETES_PASSWORD=
+export KUBERNETES_USER=kubernetes
+export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
+export LAUNCH_CA=YES
+export LOAD_BALANCER_PORT=6443
+export MASTER_NODE_ALLOW_DEPLOYMENT=NO
+export MAX_PODS=110
+export MAXAUTOPROVISIONNEDNODEGROUPCOUNT="1"
 export MAXNODES=9
 export MAXTOTALNODES=${MAXNODES}
-export GRPC_PROVIDER=externalgrpc
-export CORESTOTAL="0:16"
 export MEMORYTOTAL="0:48"
-export MAXAUTOPROVISIONNEDNODEGROUPCOUNT="1"
-export SCALEDOWNENABLED="true"
-export SCALEDOWNDELAYAFTERADD="1m"
-export SCALEDOWNDELAYAFTERDELETE="1m"
-export SCALEDOWNDELAYAFTERFAILURE="1m"
-export SCALEDOWNUNEEDEDTIME="1m"
-export SCALEDOWNUNREADYTIME="1m"
-export AUTOSCALE_MACHINE="medium"
-export NGINX_MACHINE="tiny"
-export CONTROL_PLANE_MACHINE="small"
-export WORKER_NODE_MACHINE="medium"
-export UNREMOVABLENODERECHECKTIMEOUT="1m"
-export OSDISTRO=$(uname -s)
-export TRANSPORT="tcp"
-export NET_DOMAIN=home
-export NET_IP=192.168.172.20
-export NET_IF=eth1
-export NET_GATEWAY=10.0.0.1
-export NET_DNS=10.0.0.1
-export NET_MASK=255.255.255.0
-export NET_MASK_CIDR=24
-export VC_NETWORK_PRIVATE="vmnet8"
-export VC_NETWORK_PUBLIC="vmnet0"
-export USE_DHCP_ROUTES_PRIVATE=true
-export USE_DHCP_ROUTES_PUBLIC=true
-export NETWORK_PUBLIC_ROUTES=()
-export NETWORK_PRIVATE_ROUTES=()
 export METALLB_IP_RANGE=10.0.0.100-10.0.0.127
-export REGISTRY=fred78290
-export LOAD_BALANCER_PORT=6443
-export LAUNCH_CA=YES
-export PUBLIC_IP=DHCP
-export SCALEDNODES_DHCP=true
-export RESUME=NO
-export CONTAINER_ENGINE=containerd
-export EXTERNAL_ETCD=false
-export TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${SEED_ARCH}-${CONTAINER_ENGINE}"
-export MAX_PODS=110
-export SILENT="&> /dev/null"
+export MINNODES=0
+export NET_DNS=10.0.0.1
+export NET_DOMAIN=home
+export NET_GATEWAY=10.0.0.1
+export NET_IF=eth1
+export NET_IP=192.168.1.20
+export NET_MASK_CIDR=24
+export NET_MASK=255.255.255.0
+export NETWORK_PRIVATE_ROUTES=()
+export NETWORK_PUBLIC_ROUTES=()
 export NFS_SERVER_ADDRESS=
 export NFS_SERVER_PATH=
 export NFS_STORAGE_CLASS=nfs-client
-export CONFIGURATION_LOCATION=${PWD}
-export SSL_LOCATION=${CONFIGURATION_LOCATION}/etc/ssl
-export AWS_ROUTE53_PUBLIC_ZONE_ID=
-export AWS_ROUTE53_ACCESSKEY=
-export AWS_ROUTE53_SECRETKEY=
-export UPGRADE_CLUSTER=NO
-export MASTER_NODE_ALLOW_DEPLOYMENT=NO
-export DELETE_CREDENTIALS_CONFIG=NO
+export NGINX_MACHINE="tiny"
+export NODEGROUP_NAME=
+export OSDISTRO=$(uname -s)
+export PUBLIC_DOMAIN_NAME=
+export PUBLIC_IP=DHCP
 export REGION=home
+export REGISTRY=fred78290
+export RESUME=NO
+export ROOT_IMG_NAME=${DISTRO}-kubernetes
+export SCALEDNODES_DHCP=true
+export SCALEDOWNDELAYAFTERADD="1m"
+export SCALEDOWNDELAYAFTERDELETE="1m"
+export SCALEDOWNDELAYAFTERFAILURE="1m"
+export SCALEDOWNENABLED="true"
+export SCALEDOWNUNEEDEDTIME="1m"
+export SCALEDOWNUNREADYTIME="1m"
+export SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
+export SEED_IMAGE="${DISTRO}-server-cloudimg-seed"
+export SEED_USER=ubuntu
+export SILENT="&> /dev/null"
+export SSH_KEY_FNAME=
+export SSH_KEY=
+export SSH_PRIVATE_KEY="${HOME}/.ssh/id_rsa"
+export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+export SSL_LOCATION=${CONFIGURATION_LOCATION}/etc/ssl
+export TARGET_CLUSTER_LOCATION=
+export TARGET_CONFIG_LOCATION=
+export TARGET_DEPLOY_LOCATION=
+export TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${SEED_ARCH}-${CONTAINER_ENGINE}"
+export TRANSPORT="tcp"
+export UNREMOVABLENODERECHECKTIMEOUT="1m"
+export UPGRADE_CLUSTER=NO
+export USE_DHCP_ROUTES_PRIVATE=true
+export USE_DHCP_ROUTES_PUBLIC=true
+export USE_KEEPALIVED=NO
+export USE_ZEROSSL=YES
+export VC_NETWORK_PRIVATE="vmnet8"
+export VC_NETWORK_PUBLIC="vmnet0"
+export WORKER_NODE_MACHINE="medium"
+export WORKERNODES=3
 export ZONEID=office
 
 export CERT_EMAIL=
 export PUBLIC_DOMAIN_NAME=
 
 # Sample machine definition
-MACHINE_DEFS=$(cat ${PWD}/templates/setup/machines.json)
+MACHINE_DEFS=$(cat ${PWD}/templates/setup/${PLATEFORM}/machines.json)
 
 DELETE_CLUSTER=NO
 
 source ${PWD}/bin/common.sh
-
-function nextip()
-{
-	IP=$1
-	IP_HEX=$(printf '%.2X%.2X%.2X%.2X\n' `echo ${IP} | tr '.' ' '`)
-	NEXT_IP_HEX=$(printf %.8X `echo $(( 0x${IP_HEX} + 1 ))`)
-	NEXT_IP=$(printf '%d.%d.%d.%d\n' `echo ${NEXT_IP_HEX} | sed -r 's/(..)/0x\1\ /g'`)
-	echo "${NEXT_IP}"
-}
-
-function build_routes() {
-	local ROUTES="[]"
-	local ROUTE=
-
-	for ROUTE in $@
-	do
-		local TO=
-		local VIA=
-		local METRIC=500
-
-		IFS=, read -a DEFS <<< "${ROUTE}"
-
-		for DEF in ${DEFS[@]}
-		do
-			IFS== read KEY VALUE <<< "${DEF}"
-			case ${KEY} in
-				to)
-					TO=${VALUE}
-					;;
-				via)
-					VIA=${VALUE}
-					;;
-				metric)
-					METRIC=${VALUE}
-					;;
-			esac
-		done
-
-		if [ -n "${TO}" ] && [ -n "${VIA}" ]; then
-			ROUTES=$(echo ${ROUTES} | jq --arg TO ${TO} --arg VIA ${VIA} --argjson METRIC ${METRIC} '. += [{ "to": $TO, "via": $VIA, "metric": $METRIC }]')
-		fi
-	done
-
-	echo -n ${ROUTES}
-}
 
 function usage() {
 cat <<EOF
@@ -185,8 +146,8 @@ Options are:
 --cert-email=<value>                           # Specify the mail for lets encrypt, default ${CERT_EMAIL}
 --use-zerossl                                  # Specify cert-manager to use zerossl, default ${USE_ZEROSSL}
 --dont-use-zerossl                             # Specify cert-manager to use letsencrypt, default ${USE_ZEROSSL}
---zerossl-eab-kid=<value>                      # Specify zerossl eab kid, default ${ZEROSSL_EAB_KID}
---zerossl-eab-hmac-secret=<value>              # Specify zerossl eab hmac secret, default ${ZEROSSL_EAB_HMAC_SECRET}
+--zerossl-eab-kid=<value>                      # Specify zerossl eab kid, default ${CERT_ZEROSSL_EAB_KID}
+--zerossl-eab-hmac-secret=<value>              # Specify zerossl eab hmac secret, default ${CERT_ZEROSSL_EAB_HMAC_SECRET}
 --godaddy-key                                  # Specify godaddy api key
 --godaddy-secret                               # Specify godaddy api secret
 
@@ -211,7 +172,7 @@ Options are:
 --transport | -t=<value>                       # Override the transport to be used between autoscaler and kubernetes-cloud-autoscaler, default ${TRANSPORT}
 --node-group=<value>                           # Override the node group name, default ${NODEGROUP_NAME}
 --cni-plugin=<value>                           # Override CNI plugin, default: ${CNI_PLUGIN}
---cni-version | -n=<value>                     # Override CNI plugin version, default: ${CNI_PLUGIN_VERSION}
+--cni-version | -n=<value>                     # Override CNI plugin version, default: ${CNI_VERSION}
 --kubernetes-version | -k=<value>              # Override the kubernetes version, default ${KUBERNETES_VERSION}
 
 ### Flags in ha mode only
@@ -263,8 +224,6 @@ Options are:
 --unremovable-node-recheck-timeout=<value>     # autoscaler flag, default: ${UNREMOVABLENODERECHECKTIMEOUT}
 EOF
 }
-
-export PATH=${PWD}/bin:${PATH}
 
 TEMP=$(getopt -o xvheucrk:n:p:s:t: --long upgrade,autoscale-machine:,distribution:,k8s-distribution:,cloudprovider:,route53-zone-id:,route53-access-key:,route53-secret-key:,use-zerossl,dont-use-zerossl,zerossl-eab-kid:,zerossl-eab-hmac-secret:,godaddy-key:,godaddy-secret:,nfs-server-adress:,nfs-server-mount:,nfs-storage-class:,add-route-private:,add-route-public:,dont-use-dhcp-routes-private,dont-use-dhcp-routes-public,nginx-machine:,control-plane-machine:,worker-node-machine:,delete,configuration-location:,ssl-location:,cert-email:,public-domain:,dashboard-hostname:,create-image-only,no-dhcp-autoscaled-node,metallb-ip-range:,trace,container-runtime:,verbose,help,create-external-etcd,use-keepalived,defs:,worker-nodes:,ha-cluster,public-address:,resume,node-group:,target-image:,seed-image:,seed-user:,vm-public-network:,vm-private-network:,net-address:,net-gateway:,net-dns:,net-domain:,transport:,ssh-private-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
 
@@ -349,19 +308,19 @@ while true; do
 		shift 1
 		;;
 	--zerossl-eab-kid)
-		ZEROSSL_EAB_KID=$2
+		CERT_ZEROSSL_EAB_KID=$2
 		shift 2
 		;;
 	--zerossl-eab-hmac-secret)
-		ZEROSSL_EAB_HMAC_SECRET=$2
+		CERT_ZEROSSL_EAB_HMAC_SECRET=$2
 		shift 2
 		;;
 	--godaddy-key)
-		GODADDY_API_KEY=$2
+		CERT_GODADDY_API_KEY=$2
 		shift 2
 		;;
 	--godaddy-secret)
-		GODADDY_API_SECRET=$2
+		CERT_GODADDY_API_SECRET=$2
 		shift 2
 		;;
 	--route53-zone-id)
@@ -544,7 +503,7 @@ while true; do
 		shift 2
 		;;
 	-n | --cni-version)
-		CNI_PLUGIN_VERSION="$2"
+		CNI_VERSION="$2"
 		shift 2
 		;;
 	-t | --transport)
@@ -624,21 +583,8 @@ while true; do
 	esac
 done
 
-export AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)
-
-AUTOSCALER_DESKTOP_UTILITY_KEY="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientKey)"
-AUTOSCALER_DESKTOP_UTILITY_CERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientCertificate)"
-AUTOSCALER_DESKTOP_UTILITY_CACERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .Certificate)"
-AUTOSCALER_DESKTOP_UTILITY_ADDR=${LOCAL_IPADDR}:5700
-
-if [ "$LAUNCH_CA" == YES ]; then
-	AUTOSCALER_DESKTOP_UTILITY_CERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CERT})"
-	AUTOSCALER_DESKTOP_UTILITY_KEY="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_KEY})"
-	AUTOSCALER_DESKTOP_UTILITY_CACERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CACERT})"
-fi
-
-export VC_NETWORK_PRIVATE_TYPE=$(vmrest_get_net_type ${VC_NETWORK_PRIVATE})
-export VC_NETWORK_PUBLIC_TYPE=$(vmrest_get_net_type ${VC_NETWORK_PUBLIC})
+export VC_NETWORK_PRIVATE_TYPE=$(get_net_type ${VC_NETWORK_PRIVATE})
+export VC_NETWORK_PUBLIC_TYPE=$(get_net_type ${VC_NETWORK_PUBLIC})
 
 if [ -z "${VC_NETWORK_PUBLIC_TYPE}" ]; then
 	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PUBLIC}"
@@ -715,6 +661,14 @@ export TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}
 export TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
 export TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
+if [ "${EXTERNAL_ETCD}" = "true" ]; then
+	export EXTERNAL_ETCD_ARGS="--use-external-etcd"
+	ETCD_DST_DIR="/etc/etcd/ssl"
+else
+	export EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
+	ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
+fi
+
 # Check if we can resume the creation process
 if [ "${DELETE_CLUSTER}" = "YES" ]; then
 	delete-masterkube.sh --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
@@ -759,14 +713,6 @@ if [ -z ${KUBERNETES_PASSWORD} ]; then
 fi
 
 export SSH_KEY="$(cat ${SSH_PUBLIC_KEY})"
-
-if [ "${OSDISTRO}" == "Linux" ]; then
-	TRANSPORT_IF=$(ip route get 1 | awk '{print $5;exit}')
-	LOCAL_IPADDR=$(ip addr show ${TRANSPORT_IF} | grep -m 1 "inet\s" | tr '/' ' ' | awk '{print $2}')
-else
-	TRANSPORT_IF=$(route get 1 | grep -m 1 interface | awk '{print $2}')
-	LOCAL_IPADDR=$(ifconfig ${TRANSPORT_IF} | grep -m 1 "inet\s" | sed -n 1p | awk '{print $2}')
-fi
 
 # GRPC network endpoint
 if [ "${LAUNCH_CA}" != "YES" ]; then
@@ -813,18 +759,19 @@ if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
 fi
 
 # If the VM template doesn't exists, build it from scrash
-TARGET_IMAGE_UUID=$(vmrest_get_vmuuid ${TARGET_IMAGE})
+TARGET_IMAGE_UUID=$(get_vmuuid ${TARGET_IMAGE})
 
 if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 	echo_title "Create ${PLATEFORM} preconfigured image ${TARGET_IMAGE}"
 
 	./bin/create-image.sh \
+		--plateform=${PLATEFORM} \
 		--k8s-distribution=${KUBERNETES_DISTRO} \
 		--aws-access-key=${AWS_ACCESSKEY} \
 		--aws-secret-key=${AWS_SECRETKEY} \
 		--password="${KUBERNETES_PASSWORD}" \
 		--distribution="${DISTRO}" \
-		--cni-version="${CNI_PLUGIN_VERSION}" \
+		--cni-version="${CNI_VERSION}" \
 		--custom-image="${TARGET_IMAGE}" \
 		--kubernetes-version="${KUBERNETES_VERSION}" \
 		--container-runtime=${CONTAINER_ENGINE} \
@@ -832,10 +779,11 @@ if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 		--seed="${SEED_IMAGE}-${SEED_ARCH}" \
 		--user="${SEED_USER}" \
 		--ssh-key="${SSH_KEY}" \
+		--ssh-priv-key="${SSH_PRIVATE_KEY}" \
 		--primary-network="${VC_NETWORK_PUBLIC}" \
 		--second-network="${VC_NETWORK_PRIVATE}"
 
-	TARGET_IMAGE_UUID=$(vmrest_get_vmuuid ${TARGET_IMAGE})
+	TARGET_IMAGE_UUID=$(get_vmuuid ${TARGET_IMAGE})
 fi
 
 if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
@@ -844,18 +792,9 @@ if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
 fi
 
 if [ ${GRPC_PROVIDER} = "grpc" ]; then
-	export CLOUDPROVIDER_CONFIG=grpc-config.json
+	export CLOUD_PROVIDER_CONFIG=grpc-config.json
 else
-	export CLOUDPROVIDER_CONFIG=grpc-config.yaml
-fi
-
-# For autoscaler
-if [ "${EXTERNAL_ETCD}" = "true" ]; then
-	export EXTERNAL_ETCD_ARGS="--use-external-etcd"
-	export ETCD_DST_DIR="/etc/etcd/ssl"
-else
-	export EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
-	export ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
+	export CLOUD_PROVIDER_CONFIG=grpc-config.yaml
 fi
 
 # Extract the domain name from CERT
@@ -878,84 +817,7 @@ mkdir -p ${TARGET_DEPLOY_LOCATION}
 mkdir -p ${TARGET_CLUSTER_LOCATION}
 
 if [ "${RESUME}" = "NO" ]; then
-	cat ${PLATEFORMDEFS} > ${TARGET_CONFIG_LOCATION}/buildenv
-	cat > ${TARGET_CONFIG_LOCATION}/buildenv <<EOF
-export AWS_ROUTE53_ACCESSKEY=${AWS_ROUTE53_ACCESSKEY}
-export AWS_ROUTE53_PUBLIC_ZONE_ID=${AWS_ROUTE53_PUBLIC_ZONE_ID}
-export AWS_ROUTE53_SECRETKEY=${AWS_ROUTE53_SECRETKEY}
-export CLOUDPROVIDER_CONFIG=${CLOUDPROVIDER_CONFIG}
-export CNI_PLUGIN_VERSION=${CNI_PLUGIN_VERSION}
-export CNI_PLUGIN=${CNI_PLUGIN}
-export CONTROLNODES=${CONTROLNODES}
-export CORESTOTAL="${CORESTOTAL}"
-export AUTOSCALE_MACHINE=${AUTOSCALE_MACHINE}
-export DELETE_CREDENTIALS_CONFIG=${DELETE_CREDENTIALS_CONFIG}
-export DOMAIN_NAME=${DOMAIN_NAME}
-export EXTERNAL_ETCD=${EXTERNAL_ETCD}
-export FIRSTNODE=${FIRSTNODE}
-export GODADDY_API_KEY=${GODADDY_API_KEY}
-export GODADDY_API_SECRET=${GODADDY_API_SECRET}
-export GRPC_PROVIDER=${GRPC_PROVIDER}
-export HA_CLUSTER=${HA_CLUSTER}
-export KUBECONFIG=${KUBECONFIG}
-export KUBERNETES_DISTRO=${KUBERNETES_DISTRO}
-export KUBERNETES_PASSWORD=${KUBERNETES_PASSWORD}
-export KUBERNETES_USER=${KUBERNETES_USER}
-export KUBERNETES_VERSION=${KUBERNETES_VERSION}
-export LAUNCH_CA=${LAUNCH_CA}
-export LOAD_BALANCER_PORT=${LOAD_BALANCER_PORT}
-export MASTERKUBE="${MASTERKUBE}"
-export MAXAUTOPROVISIONNEDNODEGROUPCOUNT=${MAXAUTOPROVISIONNEDNODEGROUPCOUNT}
-export MAXNODES=${MAXNODES}
-export MAXTOTALNODES=${MAXTOTALNODES}
-export MEMORYTOTAL="${MEMORYTOTAL}"
-export METALLB_IP_RANGE=${METALLB_IP_RANGE}
-export MINNODES=${MINNODES}
-export NET_DNS=${NET_DNS}
-export NET_DOMAIN=${NET_DOMAIN}
-export NET_GATEWAY=${NET_GATEWAY}
-export NET_IP=${NET_IP}
-export NET_MASK_CIDR=${NET_MASK_CIDR}
-export NET_MASK=${NET_MASK}
-export NFS_SERVER_ADDRESS=${NFS_SERVER_ADDRESS}
-export NFS_SERVER_PATH=${NFS_SERVER_PATH}
-export NFS_STORAGE_CLASS=${NFS_STORAGE_CLASS}
-export NODEGROUP_NAME="${NODEGROUP_NAME}"
-export OSDISTRO=${OSDISTRO}
-export PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
-export PUBLIC_IP="${PUBLIC_IP}"
-export REGISTRY=${REGISTRY}
-export ROOT_IMG_NAME=${ROOT_IMG_NAME}
-export SCALEDOWNDELAYAFTERADD=${SCALEDOWNDELAYAFTERADD}
-export SCALEDOWNDELAYAFTERDELETE=${SCALEDOWNDELAYAFTERDELETE}
-export SCALEDOWNDELAYAFTERFAILURE=${SCALEDOWNDELAYAFTERFAILURE}
-export SCALEDOWNENABLED=${SCALEDOWNENABLED}
-export SCALEDOWNUNEEDEDTIME=${SCALEDOWNUNEEDEDTIME}
-export SCALEDOWNUNREADYTIME=${SCALEDOWNUNREADYTIME}
-export PLATEFORM="${PLATEFORM}"
-export SEED_IMAGE="${SEED_IMAGE}"
-export SEED_USER=${SEED_USER}
-export SSH_KEY_FNAME=${SSH_KEY_FNAME}
-export SSH_KEY="${SSH_KEY}"
-export SSH_PRIVATE_KEY=${SSH_PRIVATE_KEY}
-export SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY}
-export SSL_LOCATION=${SSL_LOCATION}
-export TARGET_CLUSTER_LOCATION=${TARGET_CLUSTER_LOCATION}
-export TARGET_CONFIG_LOCATION=${TARGET_CONFIG_LOCATION}
-export TARGET_DEPLOY_LOCATION=${TARGET_DEPLOY_LOCATION}
-export TARGET_IMAGE=${TARGET_IMAGE}
-export TRANSPORT=${TRANSPORT}
-export UNREMOVABLENODERECHECKTIMEOUT=${UNREMOVABLENODERECHECKTIMEOUT}
-export USE_DHCP_ROUTES_PRIVATE=${USE_DHCP_ROUTES_PRIVATE}
-export USE_DHCP_ROUTES_PUBLIC=${USE_DHCP_ROUTES_PUBLIC}
-export USE_KEEPALIVED=${USE_KEEPALIVED}
-export USE_ZEROSSL=${USE_ZEROSSL}
-export VC_NETWORK_PRIVATE=${VC_NETWORK_PRIVATE}
-export VC_NETWORK_PUBLIC=${VC_NETWORK_PUBLIC}
-export WORKERNODES=${WORKERNODES}
-export ZEROSSL_EAB_HMAC_SECRET=${ZEROSSL_EAB_HMAC_SECRET}
-export ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID}
-EOF
+	update_build_env
 else
 	source ${TARGET_CONFIG_LOCATION}/buildenv
 fi
@@ -1014,49 +876,6 @@ PRIVATE_ROUTES_DEFS=$(build_routes ${NETWORK_PRIVATE_ROUTES[@]})
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-function collect_cert_sans() {
-	local LOAD_BALANCER_IP=$1
-	local CLUSTER_NODES=$2
-	local CERT_EXTRA_SANS=$3
-
-	local LB_IP=
-	local CERT_EXTRA=
-	local CLUSTER_NODE=
-	local CLUSTER_IP=
-	local CLUSTER_HOST=
-	local TLS_SNA=(
-		"${LOAD_BALANCER_IP}"
-	)
-
-	for CERT_EXTRA in $(echo ${CERT_EXTRA_SANS} | tr ',' ' ')
-	do
-		if [[ ! ${TLS_SNA[*]} =~ "${CERT_EXTRA}" ]]; then
-			TLS_SNA+=("${CERT_EXTRA}")
-		fi
-	done
-
-	for CLUSTER_NODE in $(echo ${CLUSTER_NODES} | tr ',' ' ')
-	do
-		IFS=: read CLUSTER_HOST CLUSTER_IP <<< "$CLUSTER_NODE"
-
-		if [ -n ${CLUSTER_IP} ] && [[ ! ${TLS_SNA[*]} =~ "${CLUSTER_IP}" ]]; then
-			TLS_SNA+=("${CLUSTER_IP}")
-		fi
-
-		if [ -n "${CLUSTER_HOST}" ]; then
-			if [[ ! ${TLS_SNA[*]} =~ "${CLUSTER_HOST}" ]]; then
-				TLS_SNA+=("${CLUSTER_HOST}")
-				TLS_SNA+=("${CLUSTER_HOST%%.*}")
-			fi
-		fi
-	done
-
-	echo -n "${TLS_SNA[*]}" | tr ' ' ','
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
 function create_vm() {
 	local INDEX=$1
 	local PUBLIC_NODE_IP=$2
@@ -1086,7 +905,7 @@ function create_vm() {
 		MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${NODEINDEX}"
 	fi
 
-	MASTERKUBE_NODE_UUID=$(vmrest_get_vmuuid ${MASTERKUBE_NODE})
+	MASTERKUBE_NODE_UUID=$(get_vmuuid ${MASTERKUBE_NODE})
 
 	if [ -z "${MASTERKUBE_NODE_UUID}" ]; then
 		if [ "${PUBLIC_NODE_IP}" = "DHCP" ]; then
@@ -1178,7 +997,7 @@ EOF
 		gzip -c9 <${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.json | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64
 		gzip -c9 <${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.base64
 
-		read MEMSIZE NUM_VCPUS DISK_SIZE <<<"$(jq -r --arg MACHINE ${MACHINE_TYPE} '.[$MACHINE]|.memsize,.vcpus,.disksize' templates/setup/machines.json | tr '\n' ' ')"
+		read MEMSIZE NUM_VCPUS DISK_SIZE <<<"$(jq -r --arg MACHINE ${MACHINE_TYPE} '.[$MACHINE]|.memsize,.vcpus,.disksize' templates/setup/${PLATEFORM}/machines.json | tr '\n' ' ')"
 
 		if [ -z "${MEMSIZE}" ] || [ -z "${NUM_VCPUS}" ] || [ -z "${DISK_SIZE}" ]; then
 			echo_red_bold "MACHINE_TYPE=${MACHINE_TYPE} MEMSIZE=${MEMSIZE} NUM_VCPUS=${NUM_VCPUS} DISK_SIZE=${DISK_SIZE} not correctly defined"
@@ -1375,7 +1194,7 @@ do
 		echo_title "Already prepared VM ${MASTERKUBE_NODE}"
 	else
 		IPADDR="${IPADDRS[${INDEX}]}"
-		VMUUID=$(vmrest_get_vmuuid ${MASTERKUBE_NODE})
+		VMUUID=$(get_vmuuid ${MASTERKUBE_NODE})
 
 		echo_title "Prepare VM ${MASTERKUBE_NODE}, UUID=${VMUUID} with IP:${IPADDR}"
 
@@ -1396,7 +1215,7 @@ do
 
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
 					--plateform=${PLATEFORM} \
-					--cloud-provider= \
+					--cloud-provider=${CLOUD_PROVIDER} \
 					--k8s-distribution=${KUBERNETES_DISTRO} \
 					--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 					--vm-uuid=${VMUUID} \
@@ -1428,7 +1247,7 @@ do
 
 				ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
 					--plateform=${PLATEFORM} \
-					--cloud-provider= \
+					--cloud-provider=${CLOUD_PROVIDER} \
 					--k8s-distribution=${KUBERNETES_DISTRO} \
 					--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 					--vm-uuid=${VMUUID} \
@@ -1470,7 +1289,7 @@ do
 
 					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
 						--plateform=${PLATEFORM} \
-						--cloud-provider= \
+						--cloud-provider=${CLOUD_PROVIDER} \
 						--k8s-distribution=${KUBERNETES_DISTRO} \
 						--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 						--csi-region=${REGION} \
@@ -1492,7 +1311,7 @@ do
 
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
 					--plateform=${PLATEFORM} \
-					--cloud-provider= \
+					--cloud-provider=${CLOUD_PROVIDER} \
 					--k8s-distribution=${KUBERNETES_DISTRO} \
 					--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 					--csi-region=${REGION} \
@@ -1534,7 +1353,7 @@ kubectl create secret generic autoscaler-ssh-keys -n kube-system --dry-run=clien
 echo_title "Write ${PLATEFORM} autoscaler provider config"
 
 if [ ${GRPC_PROVIDER} = "grpc" ]; then
-	cat > ${TARGET_CONFIG_LOCATION}/${CLOUDPROVIDER_CONFIG} <<EOF
+	cat > ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} <<EOF
 	{
 		"address": "${CONNECTTO}",
 		"secret": "${PLATEFORM}",
@@ -1542,7 +1361,7 @@ if [ ${GRPC_PROVIDER} = "grpc" ]; then
 	}
 EOF
 else
-	echo "address: ${CONNECTTO}" > ${TARGET_CONFIG_LOCATION}/${CLOUDPROVIDER_CONFIG}
+	echo "address: ${CONNECTTO}" > ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG}
 fi
 
 if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
@@ -1560,18 +1379,12 @@ fi
 echo ${MACHINE_DEFS} | jq . > ${TARGET_CONFIG_LOCATION}/machines.json
 
 echo $(eval "cat <<EOF
-$(<${PWD}/templates/setup/autoscaler.json)
+$(<${PWD}/templates/setup/${PLATEFORM}/autoscaler.json)
 EOF") | jq . > ${TARGET_CONFIG_LOCATION}/autoscaler.json
 
 echo $(eval "cat <<EOF
-$(<${PWD}/templates/setup/provider.json)
+$(<${PWD}/templates/setup/${PLATEFORM}/provider.json)
 EOF") | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
 
 source ./bin/create-deployment.sh
 
-popd &>/dev/null
-
-} 2>&1 | tee -a ${OUTPUT}
-echo "==================================================================================" | tee -a ${OUTPUT}
-echo "= End at: " $(date) | tee -a ${OUTPUT}
-echo "==================================================================================" | tee -a ${OUTPUT}

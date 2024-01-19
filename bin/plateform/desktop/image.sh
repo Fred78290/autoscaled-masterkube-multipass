@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 #set -e
 
@@ -10,18 +10,18 @@
 # This VM will be used to create the kubernetes template VM 
 
 # The second VM will contains everything to run kubernetes
+set -eu
 
-CURDIR=$(dirname $0)
 DISTRO=jammy
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-CNI_PLUGIN_VERSION=v1.4.0
+CNI_VERSION=v1.4.0
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
-CACHE=~/.local/vmware/cache
-TARGET_IMAGE=${DISTRO}-kubernetes-$KUBERNETES_VERSION
+SSH_PRIV_KEY="~/.ssh/id_rsa"
+CACHE=~/.local/autoscaler/cache
+TARGET_IMAGE=
 KUBERNETES_PASSWORD=$(uuidgen)
 OSDISTRO=$(uname -s)
 SEEDIMAGE=${DISTRO}-server-cloudimg-seed
-CURDIR=$(dirname $0)
 USER=ubuntu
 PRIMARY_NETWORK_NAME=vmnet0
 SECOND_NETWORK_NAME=vmnet8
@@ -49,7 +49,8 @@ while true ; do
 			;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
 		-k|--ssh-key) SSH_KEY=$2 ; shift 2;;
-		-n|--cni-version) CNI_PLUGIN_VERSION=$2 ; shift 2;;
+		-k|--ssh-priv-key) SSH_PRIV_KEY=$2 ; shift 2;;
+		-n|--cni-version) CNI_VERSION=$2 ; shift 2;;
 		-p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
 		-s|--seed) SEEDIMAGE=$2 ; shift 2;;
 		-a|--arch) SEED_ARCH=$2 ; shift 2;;
@@ -99,6 +100,11 @@ while true ; do
 		*) echo_red_bold "$1 - Internal error!" ; exit 1 ;;
 	esac
 done
+
+if [ -z "$TARGET_IMAGE" ]; then
+	echo_red_bold "TARGET_IMAGE not defined"
+	exit 1
+fi
 
 TARGET_IMAGE_UUID=$(vmrest_get_vmuuid ${TARGET_IMAGE})
 
@@ -384,7 +390,7 @@ cat > "${CACHE}/prepare-image.sh" << EOF
 #!/bin/bash
 SEED_ARCH=${SEED_ARCH}
 CNI_PLUGIN=${CNI_PLUGIN}
-CNI_PLUGIN_VERSION=${CNI_PLUGIN_VERSION}
+CNI_VERSION=${CNI_VERSION}
 KUBERNETES_VERSION=${KUBERNETES_VERSION}
 KUBERNETES_MINOR_RELEASE=${KUBERNETES_MINOR_RELEASE}
 CRIO_VERSION=${CRIO_VERSION}

@@ -15,8 +15,8 @@ EOF")
 	elif [ "${USE_ZEROSSL}" = "YES" ]; then
 		echo $CONFIG | jq \
 			--arg SERVER "https://acme.zerossl.com/v2/DV90" \
-			--arg ZEROSSL_EAB_KID $ZEROSSL_EAB_KID \
-			'.spec.acme.server = $SERVER | .spec.acme.externalAccountBinding = {"keyID": $ZEROSSL_EAB_KID, "keyAlgorithm": "HS256", "keySecretRef": { "name": "zero-ssl-eabsecret", "key": "secret"}}' > $ETC_DIR/cluster-issuer.json
+			--arg CERT_ZEROSSL_EAB_KID $CERT_ZEROSSL_EAB_KID \
+			'.spec.acme.server = $SERVER | .spec.acme.externalAccountBinding = {"keyID": $CERT_ZEROSSL_EAB_KID, "keyAlgorithm": "HS256", "keySecretRef": { "name": "zero-ssl-eabsecret", "key": "secret"}}' > $ETC_DIR/cluster-issuer.json
 	else
 		echo $CONFIG | jq \
 			--arg SERVER "https://acme-v02.api.letsencrypt.org/directory" \
@@ -82,7 +82,7 @@ else
 	if [ "${USE_ZEROSSL}" = "YES" ]; then
 		kubectl create secret generic zero-ssl-eabsecret -n $K8NAMESPACE --dry-run=client -o yaml \
 			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-			--from-literal secret="${ZEROSSL_EAB_HMAC_SECRET}" | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+			--from-literal secret="${CERT_ZEROSSL_EAB_HMAC_SECRET}" | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 	fi
 
 	if [ -n "${AWS_ROUTE53_PUBLIC_ZONE_ID}" ]; then
@@ -92,7 +92,7 @@ else
 			--from-literal=secret=${AWS_ROUTE53_SECRETKEY} | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 		deploy cluster-issuer-route53
-	elif [ -n ${GODADDY_API_KEY} ]; then
+	elif [ -n ${CERT_GODADDY_API_KEY} ]; then
 		echo_blue_bold "Register godaddy issuer"
 		helm upgrade -i godaddy-webhook godaddy-webhook/godaddy-webhook \
 			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
@@ -103,8 +103,8 @@ else
 
 		kubectl create secret generic godaddy-api-key-prod -n $K8NAMESPACE --dry-run=client -o yaml \
 			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-			--from-literal=key=${GODADDY_API_KEY} \
-			--from-literal=secret=${GODADDY_API_SECRET} | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+			--from-literal=key=${CERT_GODADDY_API_KEY} \
+			--from-literal=secret=${CERT_GODADDY_API_SECRET} | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 		deploy cluster-issuer-godaddy
 	fi

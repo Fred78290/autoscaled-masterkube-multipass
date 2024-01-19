@@ -41,14 +41,9 @@ ingress:
     "cert-manager.io/cluster-issuer": cert-issuer-prod
     "external-dns.alpha.kubernetes.io/register": 'true'
     "external-dns.alpha.kubernetes.io/ttl": '600'
-EOF
-
-if [ ${PLATEFORM} == "aws" ]; then
-cat >> ${TARGET_DEPLOY_LOCATION}/rancher/rancher.yaml <<EOF
     "external-dns.alpha.kubernetes.io/target": "${MASTERKUBE}.${DOMAIN_NAME}"
     "external-dns.alpha.kubernetes.io/hostname": "rancher-${PLATEFORM}.${DOMAIN_NAME}"
 EOF
-fi
 
 helm upgrade -i rancher "${REPO}" \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \

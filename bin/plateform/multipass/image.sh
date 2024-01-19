@@ -114,25 +114,26 @@ mkdir -p ${CACHE}/packer/cloud-data
 echo -n > ${CACHE}/packer/cloud-data/meta-data
 cat >  ${CACHE}/packer/cloud-data/user-data <<EOF
 #cloud-config
-timezone: $TZ
+timezone: ${TZ}
 package_update: false
 ssh_pwauth: true
 users:
   - default
   - name: kubernetes
-	groups: users, admin
-	lock_passwd: false
-	shell: /bin/bash
-	plain_text_passwd: ${KUBERNETES_PASSWORD}
-	ssh_authorized_keys:
-	  - ${SSH_KEY}
+    groups: users, admin
+    lock_passwd: false
+    shell: /bin/bash
+    plain_text_passwd: ${KUBERNETES_PASSWORD}
+    ssh_authorized_keys:
+      - ${SSH_KEY}
   - name: packer
-	sudo: ALL=(ALL) NOPASSWD:ALL
-	groups: users, admin
-	ssh_authorized_keys:
-	  - ${SSH_KEY}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    plain_text_passwd: packerpassword
+    ssh_authorized_keys:
+      - ${SSH_KEY}x
 apt:
-	preserve_sources_list: true
+    preserve_sources_list: true
 EOF
 
 case "${KUBERNETES_DISTRO}" in

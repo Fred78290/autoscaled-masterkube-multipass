@@ -3,11 +3,11 @@
 	"kind": "Ingress",
 	"metadata": {
 		"name": "helloworld-ingress",
-		"namespace": "$K8NAMESPACE",
+		"namespace": "${NAMESPACE}",
 		"annotations": {
 			"nginx.ingress.kubernetes.io/ssl-redirect": "true",
 			"nginx.ingress.kubernetes.io/use-regex": "true",
-			"nginx.ingress.kubernetes.io/rewrite-target": "$REWRITE_TARGET",
+			"nginx.ingress.kubernetes.io/rewrite-target": "${REWRITE_TARGET}",
 			"nginx.ingress.kubernetes.io/backend-protocol": "HTTP",
 			"cert-manager.io/cluster-issuer": "cert-issuer-prod",
 			"external-dns.alpha.kubernetes.io/register": "true",
@@ -19,14 +19,14 @@
 		"tls": [
 			{
 				"hosts": [
-					"helloworld-$PLATEFORM.$DOMAIN_NAME"
+					"helloworld-${PLATEFORM}.${DOMAIN_NAME}"
 				],
 				"secretName": "helloworld-ingress-tls"
 			}
 		],
 		"rules": [
 			{
-				"host": "helloworld-$PLATEFORM.$DOMAIN_NAME",
+				"host": "helloworld-${PLATEFORM}.${DOMAIN_NAME}",
 				"http": {
 					"paths": [
 						{

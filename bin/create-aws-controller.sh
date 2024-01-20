@@ -6,9 +6,9 @@ mkdir -p ${ETC_DIR}
 helm repo add aws-cloud-controller-manager https://kubernetes.github.io/cloud-provider-aws
 helm repo update aws-cloud-controller-manager
 
-KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | awk -F. '{ print $2 }')
+KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | awk -F. '{ print $2 }')
 
-case $KUBERNETES_MINOR_RELEASE in
+case ${KUBERNETES_MINOR_RELEASE} in
 		26)
 				AWS_CONTROLLER_VERSION=v1.26.0
 				;;

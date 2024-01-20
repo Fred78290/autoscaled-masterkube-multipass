@@ -26,7 +26,7 @@ SEEDIMAGE=${DISTRO}-server-cloudimg-seed
 IMPORTMODE="govc"
 USER=ubuntu
 PRIMARY_NETWORK_ADAPTER=vmxnet3
-PRIMARY_NETWORK_NAME="$GOVC_NETWORK"
+PRIMARY_NETWORK_NAME="${GOVC_NETWORK}"
 SECOND_NETWORK_ADAPTER=vmxnet3
 SECOND_NETWORK_NAME=
 SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
@@ -34,12 +34,12 @@ CONTAINER_ENGINE=docker
 CONTAINER_CTL=docker
 KUBERNETES_DISTRO=kubeadm
 
-source $CURDIR/common.sh
+source ${CURDIR}/common.sh
 
-mkdir -p $CACHE
+mkdir -p ${CACHE}
 
 TEMP=`getopt -o d:a:i:k:n:op:s:u:v: --long k8s-distribution:,aws-access-key:,aws-secret-key:,distribution:,arch:,container-runtime:,user:,adapter:,primary-adapter:,primary-network:,second-adapter:,second-network:,ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
-eval set -- "$TEMP"
+eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true ; do
@@ -108,30 +108,30 @@ while true ; do
 	esac
 done
 
-if [ -z "$TARGET_IMAGE" ]; then
+if [ -z "${TARGET_IMAGE}" ]; then
 	echo_red_bold "TARGET_IMAGE not defined"
 	exit 1
 fi
 
-if [ -n "$(govc vm.info $TARGET_IMAGE 2>&1)" ]; then
-	echo_blue_bold "$TARGET_IMAGE already exists!"
+if [ -n "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
+	echo_blue_bold "${TARGET_IMAGE} already exists!"
 	exit 0
 fi
 
-echo_blue_bold "Ubuntu password:$KUBERNETES_PASSWORD"
+echo_blue_bold "Ubuntu password:${KUBERNETES_PASSWORD}"
 
 BOOTSTRAP_PASSWORD=$(uuidgen)
-read -a VCENTER <<< "$(echo $GOVC_URL | awk -F/ '{print $3}' | tr '@' ' ')"
+read -a VCENTER <<< "$(echo ${GOVC_URL} | awk -F/ '{print $3}' | tr '@' ' ')"
 VCENTER=${VCENTER[${#VCENTER[@]} - 1]}
 
 USERDATA=$(base64 <<EOF
 #cloud-config
-password: $BOOTSTRAP_PASSWORD
+password: ${BOOTSTRAP_PASSWORD}
 chpasswd: 
   expire: false
   users:
 	- name: ubuntu
-	  password: $KUBERNETES_PASSWORD
+	  password: ${KUBERNETES_PASSWORD}
 	  type: text
 ssh_pwauth: true
 EOF
@@ -141,14 +141,14 @@ EOF
 # If you don't have the access right to import with govc (firewall rules blocking https traffic to esxi),
 # you can try with ovftool to import the ova.
 # If you have the bug "unsupported server", you must do it manually!
-if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
+if [ -z "$(govc vm.info ${SEEDIMAGE} 2>&1)" ]; then
 	[ -f ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova ] || curl -Ls https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova -o ${CACHE}/${DISTRO}-server-cloudimg-amd64.ova
 
 	if [ "${IMPORTMODE}" == "govc" ]; then
 		govc import.spec ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova \
 			| jq \
 				--arg GOVC_NETWORK "${PRIMARY_NETWORK_NAME}" \
-				'.NetworkMapping = [ { Name: $GOVC_NETWORK, Network: $GOVC_NETWORK } ]' \
+				'.NetworkMapping = [ { Name: ${GOVC_NETWORK}, Network: $GOVC_NETWORK } ]' \
 			> ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.spec
 		
 		cat ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.spec \
@@ -158,7 +158,7 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
 				--arg KUBERNETES_PASSWORD "${BOOTSTRAP_PASSWORD}" \
 				--arg NAME "${SEEDIMAGE}" \
 				--arg INSTANCEID $(uuidgen) \
-				--arg TARGET_IMAGE "$TARGET_IMAGE" \
+				--arg TARGET_IMAGE "${TARGET_IMAGE}" \
 				'.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $KUBERNETES_PASSWORD } ]' \
 				> ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.txt
 
@@ -211,7 +211,7 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
 		govc vm.upgrade -version=17 -vm ${SEEDIMAGE}
 		govc vm.power -on "${SEEDIMAGE}"
 
-		echo_blue_bold "Wait for IP from $SEEDIMAGE"
+		echo_blue_bold "Wait for IP from ${SEEDIMAGE}"
 		IPADDR=$(govc vm.ip -wait 5m "${SEEDIMAGE}")
 
 		if [ -z "${IPADDR}" ]; then
@@ -270,10 +270,10 @@ case "${KUBERNETES_DISTRO}" in
 		;;
 esac
 
-KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | tr '.' ' ' | awk '{ print $2 }')
-CRIO_VERSION=$(echo -n $KUBERNETES_VERSION | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
+KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | tr '.' ' ' | awk '{ print $2 }')
+CRIO_VERSION=$(echo -n ${KUBERNETES_VERSION} | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
 
-echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: $CRIO_VERSION and kubernetes: $KUBERNETES_VERSION"
+echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: ${CRIO_VERSION} and kubernetes: ${KUBERNETES_VERSION}"
 
 cat > "${CACHE}/user-data" <<EOF
 #cloud-config
@@ -290,9 +290,9 @@ EOF
 
 cat > "${CACHE}/vendor-data" <<EOF
 #cloud-config
-timezone: $TZ
+timezone: ${TZ}
 ssh_authorized_keys:
-  - $SSH_KEY
+  - ${SSH_KEY}
 users:
   - default
 system_info:
@@ -302,7 +302,7 @@ EOF
 
 cat > "${CACHE}/meta-data" <<EOF
 {
-	"local-hostname": "$TARGET_IMAGE",
+	"local-hostname": "${TARGET_IMAGE}",
 	"instance-id": "$(uuidgen)"
 }
 EOF
@@ -318,8 +318,8 @@ CRIO_VERSION=${CRIO_VERSION}
 CONTAINER_ENGINE=${CONTAINER_ENGINE}
 CONTAINER_CTL=${CONTAINER_CTL}
 KUBERNETES_DISTRO=${KUBERNETES_DISTRO}
-CREDENTIALS_CONFIG=$CREDENTIALS_CONFIG
-CREDENTIALS_BIN=$CREDENTIALS_BIN
+CREDENTIALS_CONFIG=${CREDENTIALS_CONFIG}
+CREDENTIALS_BIN=${CREDENTIALS_BIN}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF

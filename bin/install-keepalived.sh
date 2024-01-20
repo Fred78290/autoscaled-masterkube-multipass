@@ -52,22 +52,22 @@ vrrp_script check_apiserver {
 }
 
 vrrp_instance VI_1 {
-	state $KEEPALIVED_STATUS
+	state ${KEEPALIVED_STATUS}
 	interface eth1
 	virtual_router_id 151
-	priority $KEEPALIVED_PRIORITY
+	priority ${KEEPALIVED_PRIORITY}
 	advert_int 1
-	unicast_src_ip $KEEPALIVED_MCAST
+	unicast_src_ip ${KEEPALIVED_MCAST}
 	authentication {
 		auth_type PASS
-		auth_pass $KEEPALIVED_PASSWORD
+		auth_pass ${KEEPALIVED_PASSWORD}
 	}
 	unicast_peer {
-		$KEEPALIVED_PEER1
-		$KEEPALIVED_PEER2
+		${KEEPALIVED_PEER1}
+		${KEEPALIVED_PEER2}
 	}
 	virtual_ipaddress {
-		$APISERVER_VIP/24
+		${APISERVER_VIP}/24
 	}
 	track_script {
 		check_apiserver

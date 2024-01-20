@@ -138,10 +138,10 @@ else
 			fi
 		fi
 
-		for DOCKER_IMAGE in $DOCKER_IMAGES
+		for DOCKER_IMAGE in ${DOCKER_IMAGES}
 		do
-			echo "Pull image $DOCKER_IMAGE"
-			${CONTAINER_CTL} pull ${AUTHENT} $DOCKER_IMAGE
+			echo "Pull image ${DOCKER_IMAGE}"
+			${CONTAINER_CTL} pull ${AUTHENT} ${DOCKER_IMAGE}
 		done
 	}
 
@@ -221,8 +221,8 @@ EOF
 		echo "Install CRI-O repositories"
 		echo "==============================================================================================================================="
 
-		echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$CRIO_VERSION/$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION.list
-		curl -sL https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers-cri-o.gpg add -
+		echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/${CRIO_VERSION}/${OS}/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:${CRIO_VERSION}.list
+		curl -sL https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:${CRIO_VERSION}/${OS}/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers-cri-o.gpg add -
 
 		apt update
 		apt install cri-o cri-o-runc -y
@@ -293,7 +293,7 @@ ExecStart=
 ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
 EOF
 
-	if [ $CNI_PLUGIN = "aws" ]; then
+	if [ ${CNI_PLUGIN} = "aws" ]; then
 		# Add some EKS init 
 		UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2 | cut -d '.' -f 1)
 		
@@ -316,7 +316,7 @@ EOF
 		sudo systemctl enable iptables-restore
 
 		# https://github.com/aws/amazon-vpc-cni-k8s/issues/2103#issuecomment-1321698870
-		if [ $UBUNTU_VERSION_ID -ge 22 ]; then
+		if [ ${UBUNTU_VERSION_ID} -ge 22 ]; then
 			echo -e "\x1B[90m= \x1B[31m\x1B[1m\x1B[31mWARNING: Patch network for aws with ubuntu 22.x, see issue: https://github.com/aws/amazon-vpc-cni-k8s/issues/2103\x1B[0m\x1B[39m"
 			mkdir -p /etc/systemd/network/99-default.link.d/
 			cat << EOF > /etc/systemd/network/99-default.link.d/aws-cni-workaround.conf
@@ -333,7 +333,7 @@ EOF
 
 	echo "KUBELET_EXTRA_ARGS='${KUBELET_CREDS_ARGS} --fail-swap-on=false --read-only-port=10255'" > /etc/default/kubelet
 
-	echo 'export PATH=/opt/cni/bin:$PATH' >> /etc/profile.d/apps-bin-path.sh
+	echo 'export PATH=/opt/cni/bin:${PATH}' >> /etc/profile.d/apps-bin-path.sh
 
 	echo "==============================================================================================================================="
 	echo "= Restart kubelet"
@@ -352,30 +352,32 @@ EOF
 	echo "= Pull cni image"
 	echo "==============================================================================================================================="
 
-	if [ "$CNI_PLUGIN" = "aws" ]; then
+	if [ "${CNI_PLUGIN}" = "aws" ]; then
 		AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.16.0/config/master/aws-k8s-cni.yaml
 		pull_image ${AWS_CNI_URL} AWS ${ECR_PASSWORD}
-	elif [ "$CNI_PLUGIN" = "calico" ]; then
+	elif [ "${CNI_PLUGIN}" = "calico" ]; then
 		curl -s -O -L "https://github.com/projectcalico/calico/releases/download/v3.27.0/calicoctl-linux-${SEED_ARCH}"
 		chmod +x calicoctl-linux-${SEED_ARCH}
 		mv calicoctl-linux-${SEED_ARCH} /usr/local/bin/calicoctl
 		pull_image https://docs.projectcalico.org/manifests/calico-vxlan.yaml
-	elif [ "$CNI_PLUGIN" = "flannel" ]; then
+	elif [ "${CNI_PLUGIN}" = "flannel" ]; then
 		pull_image https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
-	elif [ "$CNI_PLUGIN" = "weave" ]; then
+	elif [ "${CNI_PLUGIN}" = "weave" ]; then
 		pull_image "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
-	elif [ "$CNI_PLUGIN" = "canal" ]; then
+	elif [ "${CNI_PLUGIN}" = "canal" ]; then
 		pull_image https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/canal.yaml
-	elif [ "$CNI_PLUGIN" = "kube" ]; then
+	elif [ "${CNI_PLUGIN}" = "kube" ]; then
 		pull_image https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
 		pull_image https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter-all-features.yaml
-	elif [ "$CNI_PLUGIN" = "romana" ]; then
+	elif [ "${CNI_PLUGIN}" = "romana" ]; then
 		pull_image https://raw.githubusercontent.com/romana/romana/master/containerize/specs/romana-kubeadm.yml
 	fi
 fi
 
 apt upgrade -y
 apt autoremove -y
+
+mkdir -p /etc/vmware-tools
 
 cat >> /etc/vmware-tools/tools.conf <<EOF
 [guestinfo]

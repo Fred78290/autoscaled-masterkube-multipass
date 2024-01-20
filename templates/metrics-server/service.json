@@ -3,7 +3,7 @@
 	"kind": "Service",
 	"metadata": {
 		"name": "metrics-server",
-		"namespace": "$K8NAMESPACE",
+		"namespace": "${NAMESPACE}",
 		"labels": {
 			"kubernetes.io/name": "Metrics-server",
 			"kubernetes.io/cluster-service": "true"

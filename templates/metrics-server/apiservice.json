@@ -7,7 +7,7 @@
 	"spec": {
 		"service": {
 			"name": "metrics-server",
-			"namespace": "$K8NAMESPACE"
+			"namespace": "${NAMESPACE}"
 		},
 		"group": "metrics.k8s.io",
 		"version": "v1beta1",

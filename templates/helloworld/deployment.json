@@ -3,7 +3,7 @@
 	"kind": "Deployment",
 	"metadata": {
 		"name": "helloworld",
-		"namespace": "$K8NAMESPACE",
+		"namespace": "${NAMESPACE}",
 		"labels": {
 			"app": "helloworld"
 		}

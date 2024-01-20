@@ -136,15 +136,15 @@ cat > csr.json <<EOF
 EOF
 
 CACERT=$(cfssl gencert -initca ca-csr.json)
-echo $CACERT | jq -r '.cert' > ca.pem
-echo $CACERT | jq -r '.csr' > ca.csr
-echo $CACERT | jq -r '.key' > ca.key
+echo ${CACERT} | jq -r '.cert' > ca.pem
+echo ${CACERT} | jq -r '.csr' > ca.csr
+echo ${CACERT} | jq -r '.key' > ca.key
 
 CERT=$(cfssl gencert -ca=ca.pem -ca-key=ca.key -config=ca-config.json -profile=${ACM_DOMAIN_NAME} csr.json)
 
-echo $CERT | jq -r '.cert' > cert.pem
-echo $CERT | jq -r '.csr' > cert.csr
-echo $CERT | jq -r '.key' > privkey.pem
+echo ${CERT} | jq -r '.cert' > cert.pem
+echo ${CERT} | jq -r '.csr' > cert.csr
+echo ${CERT} | jq -r '.key' > privkey.pem
 
 cat cert.pem ca.pem > chain.pem
 cat cert.pem ca.pem privkey.pem > fullchain.pem

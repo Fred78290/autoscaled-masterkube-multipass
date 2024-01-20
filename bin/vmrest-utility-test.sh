@@ -23,7 +23,7 @@ echo "test"
 do_get "/vm/byname/ERROR"
 exit
 
-echo_blue_bold TEMPLATE_NAME=$TEMPLATE_UUID
+echo_blue_bold TEMPLATE_NAME=${TEMPLATE_UUID}
 
 if [ -z "${TEMPLATE_UUID}" ] || [ "${TEMPLATE_UUID}" = "ERROR" ]; then
 	echo_red_bold "${TEMPLATE_NAME} not found"
@@ -36,9 +36,9 @@ EOF
 
 cat > "${CACHE}/vendor-data" <<EOF
 #cloud-config
-timezone: $TZ
+timezone: ${TZ}
 ssh_authorized_keys:
-    - $SSH_KEY
+    - ${SSH_KEY}
 users:
     - default
 system_info:
@@ -48,7 +48,7 @@ EOF
 
 cat > "${CACHE}/meta-data" <<EOF
 #cloud-config
-local-hostname: "$TARGET_IMAGE",
+local-hostname: "${TARGET_IMAGE}",
 instance-id: "$(uuidgen)"
 network:
     version: 2

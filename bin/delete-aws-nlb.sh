@@ -11,7 +11,7 @@ AWS_REGION=
 source ${CURDIR}/common.sh
 
 TEMP=`getopt -o n:p:r: --long name:,profile:,region: -n "$0" -- "$@"`
-eval set -- "$TEMP"
+eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true ; do
@@ -40,7 +40,7 @@ while true ; do
 	esac
 done
 
-if [ -z $AWS_NLB_NAME ]; then
+if [ -z ${AWS_NLB_NAME} ]; then
 	echo_red "subnet is not defined"
 	exit -1
 fi
@@ -52,13 +52,13 @@ function delete_nlb() {
 	if [ "x${NLB_ARN}" != "x" ]; then
 		NLB_LISTENERS=$(aws elbv2 describe-listeners --profile=${AWS_PROFILE} --region=${AWS_REGION} --load-balancer-arn ${NLB_ARN} | jq -r '.Listeners[].ListenerArn // ""')
 
-		for NLB_LISTENER in $NLB_LISTENERS
+		for NLB_LISTENER in ${NLB_LISTENERS}
 		do
 			NLB_TARGETGROUPS=$(aws elbv2 describe-listeners --profile=${AWS_PROFILE} --region=${AWS_REGION} --listener-arns ${NLB_LISTENER} | jq -r '.Listeners[]|.DefaultActions[]|.TargetGroupArn // ""')
 		
 			aws elbv2 delete-listener --profile=${AWS_PROFILE} --region=${AWS_REGION} --listener-arn ${NLB_LISTENER}
 
-			for NLB_TARGETGROUP in $NLB_TARGETGROUPS
+			for NLB_TARGETGROUP in ${NLB_TARGETGROUPS}
 			do
 				aws elbv2 delete-target-group --profile=${AWS_PROFILE} --region=${AWS_REGION} --target-group-arn ${NLB_TARGETGROUP}
 			done

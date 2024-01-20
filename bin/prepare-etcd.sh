@@ -1,7 +1,7 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
 
-source $CURDIR/common.sh
+source ${CURDIR}/common.sh
 
 
 TEMP=$(getopt -o c:g: --long node-group:,cluster-nodes: -n "$0" -- "$@")
@@ -39,8 +39,8 @@ for CLUSTER_NODE in $(echo -n ${CLUSTER_NODES} | tr ',' ' ')
 do
 	IFS=: read HOST IP <<< "${CLUSTER_NODE}"
 
-	ETCDIPS+=($IP)
-	ETCDHOSTS+=($HOST)
+	ETCDIPS+=(${IP})
+	ETCDHOSTS+=(${HOST})
 	ETCDNAMES+=(${HOST%%.*})
 done
 
@@ -126,11 +126,11 @@ echo "Create etcd config files"
 
 for INDEX in ${!ETCDHOSTS[@]}
 do
-	echo "Generate etcd config index: $INDEX"
+	echo "Generate etcd config index: ${INDEX}"
 
-	IP=${ETCDIPS[$INDEX]}
-	HOST=${ETCDHOSTS[$INDEX]}
-	NAME=${ETCDNAMES[$INDEX]}
+	IP=${ETCDIPS[${INDEX}]}
+	HOST=${ETCDHOSTS[${INDEX}]}
+	NAME=${ETCDNAMES[${INDEX}]}
 	ETCINDEX="0$((INDEX+1))"
 	SERVICE=${TARGET_CLUSTER_LOCATION}/etcd/etcd-${ETCINDEX}.service
 

@@ -7,23 +7,23 @@ fi
 
 CURDIR=$(dirname $0)
 
-pushd $CURDIR/../ &>/dev/null
+pushd ${CURDIR}/../ &>/dev/null
 
 MASTER_IP=$(cat ${TARGET_CLUSTER_LOCATION}/manager-ip)
 TOKEN=$(cat ${TARGET_CLUSTER_LOCATION}/token)
 CACERT=$(cat ${TARGET_CLUSTER_LOCATION}/ca.cert)
 
-export K8NAMESPACE=kube-system
+export NAMESPACE=kube-system
 export ETC_DIR=${TARGET_DEPLOY_LOCATION}/autoscaler
 export KUBERNETES_TEMPLATE=./templates/autoscaler
-export KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | cut -d . -f 2)
+export KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | cut -d . -f 2)
 export CLUSTER_AUTOSCALER_VERSION=v1.29.
 export CLOUD_AUTOSCALER_VERSION=v1.29.0
-export AUTOSCALER_REGISTRY=$REGISTRY
+export AUTOSCALER_REGISTRY=${REGISTRY}
 export CLOUD_PROVIDER_CONFIG=/etc/cluster/grpc-config.json
 export USE_VANILLA_GRPC_ARGS=--no-use-vanilla-grpc
 export USE_CONTROLER_MANAGER_ARGS="--use-controller-manager"
-export MAX_MEMORY=$(($(echo -n $MEMORYTOTAL | cut -d ':' -f 2) * 1024))
+export MAX_MEMORY=$(($(echo -n ${MEMORYTOTAL} | cut -d ':' -f 2) * 1024))
 export MAX_VCPUS=$(echo -n ${CORESTOTAL} | cut -d ':' -f 2)
 
 if [ "${GRPC_PROVIDER}" = "externalgrpc" ]; then
@@ -36,7 +36,7 @@ if [ -z "${CLOUD_PROVIDER}" ]; then
 	USE_CONTROLER_MANAGER_ARGS="--no-use-controller-manager"
 fi
 
-case $KUBERNETES_MINOR_RELEASE in
+case ${KUBERNETES_MINOR_RELEASE} in
 	29)
 		CLUSTER_AUTOSCALER_VERSION=v1.29.0
 		CLOUD_AUTOSCALER_VERSION=v1.29.0
@@ -45,13 +45,13 @@ case $KUBERNETES_MINOR_RELEASE in
 		exit 1
 esac
 
-mkdir -p $ETC_DIR
+mkdir -p ${ETC_DIR}
 
 function deploy {
-	echo "Create $ETC_DIR/$1.json"
+	echo "Create ${ETC_DIR}/$1.json"
 echo $(eval "cat <<EOF
-$(<$KUBERNETES_TEMPLATE/$1.json)
-EOF") | jq . | tee $ETC_DIR/$1.json | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+$(<${KUBERNETES_TEMPLATE}/$1.json)
+EOF") | jq . | tee ${ETC_DIR}/$1.json | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 }
 
 deploy service-account-autoscaler
@@ -60,15 +60,15 @@ deploy role
 deploy cluster-role-binding
 deploy role-binding
 
-if [ "$LAUNCH_CA" == YES ]; then
+if [ "${LAUNCH_CA}" == YES ]; then
 	deploy deployment
-elif [ "$LAUNCH_CA" == "DEBUG" ]; then
+elif [ "${LAUNCH_CA}" == "DEBUG" ]; then
 	deploy autoscaler
-elif [ "$LAUNCH_CA" == "LOCAL" ]; then
+elif [ "${LAUNCH_CA}" == "LOCAL" ]; then
 	GOOS=$(go env GOOS)
 	GOARCH=$(go env GOARCH)
-	nohup ../out/$GOOS/$GOARCH/kubernetes-cloud-autoscaler \
-		--kubeconfig=$KUBECONFIG \
+	nohup ../out/${GOOS}/${GOARCH}/kubernetes-cloud-autoscaler \
+		--kubeconfig=${KUBECONFIG} \
 		--provider=${PLATEFORM} \
 		--config=${TARGET_CONFIG_LOCATION}/autoscaler.json \
 		--provider-config=${TARGET_CONFIG_LOCATION}/provider.json \

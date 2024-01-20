@@ -19,8 +19,8 @@
 					},
 					"dns01": {
 						"route53": {
-							"region": "$AWS_REGION",
-							"accessKeyID": "$AWS_ROUTE53_ACCESSKEY",
+							"region": "${AWS_REGION}",
+							"accessKeyID": "${AWS_ROUTE53_ACCESSKEY}",
 							"secretAccessKeySecretRef": {
 								"name": "route53-credentials-secret",
 								"key": "secret"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script create every thing to deploy a simple kubernetes autoscaled cluster with vmware.
+# This script create every thing to deploy a simple kubernetes autoscaled cluster with ${PLATEFORM}.
 # It will generate:
 # Custom image with every thing for kubernetes
 # Config file to deploy the cluster autoscaler.
@@ -8,198 +8,27 @@
 
 set -eu
 
-export AUTOSCALE_MACHINE="medium"
-export AUTOSCALER_DESKTOP_UTILITY_ADDR=
-export AUTOSCALER_DESKTOP_UTILITY_CACERT=
-export AUTOSCALER_DESKTOP_UTILITY_CERT=
-export AUTOSCALER_DESKTOP_UTILITY_KEY=
-export AUTOSCALER_DESKTOP_UTILITY_TLS=
-export AWS_ACCESSKEY=
-export AWS_ROUTE53_ACCESSKEY=
-export AWS_ROUTE53_PUBLIC_ZONE_ID=
-export AWS_ROUTE53_SECRETKEY=
-export AWS_SECRETKEY=
-export CERT_GODADDY_API_KEY=${GODADDY_API_KEY}
-export CERT_GODADDY_API_SECRET=${GODADDY_API_SECRET}
-export CERT_ZEROSSL_EAB_HMAC_SECRET=${ZEROSSL_EAB_HMAC_SECRET}
-export CERT_ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID}
-export CLOUD_PROVIDER_CONFIG=
-export CLOUD_PROVIDER=
-export CNI_PLUGIN=flannel
-export CNI_VERSION="v1.4.0"
-export CONFIGURATION_LOCATION=${PWD}
-export CONTAINER_ENGINE=containerd
-export CONTROL_PLANE_MACHINE="small"
-export CONTROLNODES=1
-export CORESTOTAL="0:16"
-export DELETE_CREDENTIALS_CONFIG=NO
-export DISTRO=jammy
-export EXTERNAL_ETCD=false
-export FIRSTNODE=0
-export GRPC_PROVIDER=externalgrpc
-export HA_CLUSTER=false
-export KUBECONFIG=${HOME}/.kube/config
-export KUBERNETES_DISTRO=kubeadm
-export KUBERNETES_PASSWORD=
-export KUBERNETES_USER=kubernetes
-export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-export LAUNCH_CA=YES
-export LOAD_BALANCER_PORT=6443
-export MASTER_NODE_ALLOW_DEPLOYMENT=NO
-export MAX_PODS=110
-export MAXAUTOPROVISIONNEDNODEGROUPCOUNT="1"
-export MAXNODES=9
-export MAXTOTALNODES=${MAXNODES}
-export MEMORYTOTAL="0:48"
-export METALLB_IP_RANGE=10.0.0.100-10.0.0.127
-export MINNODES=0
-export NET_DNS=10.0.0.1
-export NET_DOMAIN=home
-export NET_GATEWAY=10.0.0.1
-export NET_IF=eth1
-export NET_IP=192.168.1.20
-export NET_MASK_CIDR=24
-export NET_MASK=255.255.255.0
-export NETWORK_PRIVATE_ROUTES=()
-export NETWORK_PUBLIC_ROUTES=()
-export NFS_SERVER_ADDRESS=
-export NFS_SERVER_PATH=
-export NFS_STORAGE_CLASS=nfs-client
-export NGINX_MACHINE="tiny"
-export NODEGROUP_NAME=
-export OSDISTRO=$(uname -s)
-export PUBLIC_DOMAIN_NAME=
-export PUBLIC_IP=DHCP
-export REGION=home
-export REGISTRY=fred78290
-export RESUME=NO
-export ROOT_IMG_NAME=${DISTRO}-kubernetes
-export SCALEDNODES_DHCP=true
-export SCALEDOWNDELAYAFTERADD="1m"
-export SCALEDOWNDELAYAFTERDELETE="1m"
-export SCALEDOWNDELAYAFTERFAILURE="1m"
-export SCALEDOWNENABLED="true"
-export SCALEDOWNUNEEDEDTIME="1m"
-export SCALEDOWNUNREADYTIME="1m"
-export SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
-export SEED_IMAGE="${DISTRO}-server-cloudimg-seed"
-export SEED_USER=ubuntu
-export SILENT="&> /dev/null"
-export SSH_KEY_FNAME=
-export SSH_KEY=
-export SSH_PRIVATE_KEY="${HOME}/.ssh/id_rsa"
-export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
-export SSL_LOCATION=${CONFIGURATION_LOCATION}/etc/ssl
-export TARGET_CLUSTER_LOCATION=
-export TARGET_CONFIG_LOCATION=
-export TARGET_DEPLOY_LOCATION=
-export TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${SEED_ARCH}-${CONTAINER_ENGINE}"
-export TRANSPORT="tcp"
-export UNREMOVABLENODERECHECKTIMEOUT="1m"
-export UPGRADE_CLUSTER=NO
-export USE_DHCP_ROUTES_PRIVATE=true
-export USE_DHCP_ROUTES_PUBLIC=true
-export USE_KEEPALIVED=NO
-export USE_ZEROSSL=YES
-export VC_NETWORK_PRIVATE="Private Network"
-export VC_NETWORK_PUBLIC="Public Network"
-export WORKER_NODE_MACHINE="medium"
-export WORKERNODES=3
-export ZONEID=office
-
-export CERT_EMAIL=
-export PUBLIC_DOMAIN_NAME=
-export GOVC_DATACENTER=
-export GOVC_DATASTORE=
-export GOVC_FOLDER=
-export GOVC_HOST=
-export GOVC_INSECURE=
-export GOVC_NETWORK=
-export GOVC_USERNAME=
-export GOVC_PASSWORD=
-export GOVC_RESOURCE_POOL=
-export GOVC_URL=
-export GOVC_VIM_VERSION="6.0"
-
-# Sample machine definition
-MACHINE_DEFS=$(cat ${PWD}/templates/setup/${PLATEFORM}/machines.json)
-
-DELETE_CLUSTER=NO
-
-source ${PWD}/bin/common.sh
+source ${CURDIR}/common.sh
 
 function usage() {
-cat <<EOF
-$0 create a kubernetes simple cluster or HA cluster with 3 control planes
-Options are:
---help | -h                                    # Display usage
---verbose | -v                                 # Verbose
---trace | -x                                   # Trace execution
---resume | -r                                  # Allow to resume interrupted creation of cluster kubernetes
---delete                                       # Delete cluster and exit
---distribution                                 # Ubuntu distribution to use ${DISTRO}
---create-image-only                            # Create image only
---upgrade                                      # Upgrade existing cluster to upper version of kubernetes
-
-### Flags to set some location informations
-
---configuration-location                       # Specify where configuration will be stored, default ${CONFIGURATION_LOCATION}
---ssl-location=<path>                          # Specify where the etc/ssl dir is stored, default ${SSL_LOCATION}
---defs=<path>                                  # Specify the ${PLATEFORM} definitions, default ${PLATEFORMDEFS}
-
-### Design domain
-
---public-domain                                # Specify the public domain to use, default ${PUBLIC_DOMAIN_NAME}
---dashboard-hostname                           # Specify the hostname for kubernetes dashboard, default ${DASHBOARD_HOSTNAME}
-
-### Cert Manager
-
---cert-email=<value>                           # Specify the mail for lets encrypt, default ${CERT_EMAIL}
---use-zerossl                                  # Specify cert-manager to use zerossl, default ${USE_ZEROSSL}
---dont-use-zerossl                             # Specify cert-manager to use letsencrypt, default ${USE_ZEROSSL}
---zerossl-eab-kid=<value>                      # Specify zerossl eab kid, default ${CERT_ZEROSSL_EAB_KID}
---zerossl-eab-hmac-secret=<value>              # Specify zerossl eab hmac secret, default ${CERT_ZEROSSL_EAB_HMAC_SECRET}
---godaddy-key                                  # Specify godaddy api key
---godaddy-secret                               # Specify godaddy api secret
-
-### Route53
-
+	common_usage
+	cat <<EOF
+### Flags ${PLATEFORM} plateform specific
+  # Route53
 --route53-zone-id                              # Specify the route53 zone id, default ${AWS_ROUTE53_PUBLIC_ZONE_ID}
 --route53-access-key                           # Specify the route53 aws access key, default ${AWS_ROUTE53_ACCESSKEY}
 --route53-secret-key                           # Specify the route53 aws secret key, default ${AWS_ROUTE53_SECRETKEY}
 
-### Design the kubernetes cluster
+  # Flags to set the template vm
+--target-image=<value>                           # Override the prefix template VM image used for created VM, default ${ROOT_IMG_NAME}
+--seed-image=<value>                             # Override the seed image name used to create template, default ${SEED_IMAGE}
+--seed-user=<value>                              # Override the seed user in template, default ${SEED_USER}
+--password | -p=<value>                          # Override the password to ssh the cluster VM, default random word
 
---k8s-distribution=<kubeadm|k3s|rke2>          # Which kubernetes distribution to use: kubeadm, k3s, rke2, default ${KUBERNETES_DISTRO}
---ha-cluster | -c                              # Allow to create an HA cluster, default ${HA_CLUSTER}
---worker-nodes=<value>                         # Specify the number of worker node created in HA cluster, default ${WORKERNODES}
---container-runtime=<docker|containerd|cri-o>  # Specify which OCI runtime to use, default ${CONTAINER_ENGINE}
---max-pods                                     # Specify the max pods per created VM, default ${MAX_PODS}
---autoscale-machine | -d=<value>               # Override machine type used for auto scaling, default ${AUTOSCALE_MACHINE}
---nginx-machine                                # Override machine type used for nginx as ELB, default ${NGINX_MACHINE}
---control-plane-machine                        # Override machine type used for control plane, default ${CONTROL_PLANE_MACHINE}
---worker-node-machine                          # Override machine type used for worker node, default ${WORKER_NODE_MACHINE}
---ssh-private-key | -s=<value>                 # Override ssh key is used, default ${SSH_PRIVATE_KEY}
---transport | -t=<value>                       # Override the transport to be used between autoscaler and kubernetes-cloud-autoscaler, default ${TRANSPORT}
---node-group=<value>                           # Override the node group name, default ${NODEGROUP_NAME}
---cni-plugin=<value>                           # Override CNI plugin, default: ${CNI_PLUGIN}
---cni-version | -n=<value>                     # Override CNI plugin version, default: ${CNI_VERSION}
---kubernetes-version | -k=<value>              # Override the kubernetes version, default ${KUBERNETES_VERSION}
+  # Flags in ha mode only
+--use-keepalived | -u                            # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
 
-### Flags in ha mode only
-
---create-external-etcd | -e                    # Allow to create an external HA etcd cluster, default ${EXTERNAL_ETCD}
---use-keepalived | -u                          # Allow to use keepalived as load balancer else NGINX is used
-
-### Flags to set the template vm
-
---target-image=<value>                         # Override the prefix template VM image used for created VM, default ${ROOT_IMG_NAME}
---seed-image=<value>                           # Override the seed image name used to create template, default ${SEED_IMAGE}
---seed-user=<value>                            # Override the seed user in template, default ${SEED_USER}
---password | -p=<value>                        # Override the password to ssh the cluster VM, default random word
-
-### Flags to configure network in ${PLATEFORM}
-
+  # Flags to configure network in ${PLATEFORM}
 --public-address=<value>                       # The public address to expose kubernetes endpoint, default ${PUBLIC_IP}
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
 --vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
@@ -214,25 +43,10 @@ Options are:
 --add-route-private                            # Add route to private network syntax is --add-route-private=to=X.X.X.X/YY,via=X.X.X.X,metric=100 --add-route-private=to=Y.Y.Y.Y/ZZ,via=X.X.X.X,metric=100, default ${NETWORK_PRIVATE_ROUTES[@]}
 --add-route-public                             # Add route to public network syntax is --add-route-public=to=X.X.X.X/YY,via=X.X.X.X,metric=100 --add-route-public=to=Y.Y.Y.Y/ZZ,via=X.X.X.X,metric=100, default ${NETWORK_PUBLIC_ROUTES[@]}
 
-### Flags to configure nfs client provisionner
-
+  # Flags to configure nfs client provisionner
 --nfs-server-adress                            # The NFS server address, default ${NFS_SERVER_ADDRESS}
 --nfs-server-mount                             # The NFS server mount path, default ${NFS_SERVER_PATH}
 --nfs-storage-class                            # The storage class name to use, default ${NFS_STORAGE_CLASS}
-
-### Flags for autoscaler
---cloudprovider=<value>                        # autoscaler flag <grpc|externalgrpc>, default: ${GRPC_PROVIDER}
---max-nodes-total=<value>                      # autoscaler flag, default: ${MAXTOTALNODES}
---cores-total=<value>                          # autoscaler flag, default: ${CORESTOTAL}
---memory-total=<value>                         # autoscaler flag, default: ${MEMORYTOTAL}
---max-autoprovisioned-node-group-count=<value> # autoscaler flag, default: ${MAXAUTOPROVISIONNEDNODEGROUPCOUNT}
---scale-down-enabled=<value>                   # autoscaler flag, default: ${SCALEDOWNENABLED}
---scale-down-delay-after-add=<value>           # autoscaler flag, default: ${SCALEDOWNDELAYAFTERADD}
---scale-down-delay-after-delete=<value>        # autoscaler flag, default: ${SCALEDOWNDELAYAFTERDELETE}
---scale-down-delay-after-failure=<value>       # autoscaler flag, default: ${SCALEDOWNDELAYAFTERFAILURE}
---scale-down-unneeded-time=<value>             # autoscaler flag, default: ${SCALEDOWNUNEEDEDTIME}
---scale-down-unready-time=<value>              # autoscaler flag, default: ${SCALEDOWNUNREADYTIME}
---unremovable-node-recheck-timeout=<value>     # autoscaler flag, default: ${UNREMOVABLENODERECHECKTIMEOUT}
 EOF
 }
 
@@ -594,8 +408,8 @@ while true; do
 	esac
 done
 
-export VC_NETWORK_PRIVATE_TYPE=$(get_net_type ${VC_NETWORK_PRIVATE})
-export VC_NETWORK_PUBLIC_TYPE=$(get_net_type ${VC_NETWORK_PUBLIC})
+VC_NETWORK_PRIVATE_TYPE=$(get_net_type ${VC_NETWORK_PRIVATE})
+VC_NETWORK_PUBLIC_TYPE=$(get_net_type ${VC_NETWORK_PUBLIC})
 
 if [ -z "${VC_NETWORK_PUBLIC_TYPE}" ]; then
 	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PUBLIC}"
@@ -665,18 +479,18 @@ else
 	TARGET_IMAGE="${ROOT_IMG_NAME}-k8s-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 fi
 
-export SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
-export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
+SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
 
-export TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
-export TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
-export TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
+TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
+TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
 if [ "${EXTERNAL_ETCD}" = "true" ]; then
-	export EXTERNAL_ETCD_ARGS="--use-external-etcd"
+	EXTERNAL_ETCD_ARGS="--use-external-etcd"
 	ETCD_DST_DIR="/etc/etcd/ssl"
 else
-	export EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
+	EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
 	ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
 fi
 
@@ -723,7 +537,7 @@ if [ -z ${KUBERNETES_PASSWORD} ]; then
 	fi
 fi
 
-export SSH_KEY="$(cat ${SSH_PUBLIC_KEY})"
+SSH_KEY="$(cat ${SSH_PUBLIC_KEY})"
 
 # GRPC network endpoint
 if [ "${LAUNCH_CA}" != "YES" ]; then
@@ -803,13 +617,13 @@ if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
 fi
 
 if [ ${GRPC_PROVIDER} = "grpc" ]; then
-	export CLOUD_PROVIDER_CONFIG=grpc-config.json
+	CLOUD_PROVIDER_CONFIG=grpc-config.json
 else
-	export CLOUD_PROVIDER_CONFIG=grpc-config.yaml
+	CLOUD_PROVIDER_CONFIG=grpc-config.yaml
 fi
 
 # Extract the domain name from CERT
-export DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
+DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
 
 # Delete previous exixting version
 if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
@@ -1384,7 +1198,7 @@ else
 	DELETE_CREDENTIALS_CONFIG=false
 fi
 
-echo ${MACHINE_DEFS} | jq . > ${TARGET_CONFIG_LOCATION}/machines.json
+cp ${PWD}/templates/setup/${PLATEFORM}/machines.json ${TARGET_CONFIG_LOCATION}/machines.json
 
 echo $(eval "cat <<EOF
 $(<${PWD}/templates/setup/${PLATEFORM}/autoscaler.json)

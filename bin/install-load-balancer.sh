@@ -48,9 +48,9 @@ echo "127.0.0.1 ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 
 for CLUSTER_NODE in ${CLUSTER_NODES[*]}
 do
-	IFS=: read HOST IP <<< "$CLUSTER_NODE"
+	IFS=: read HOST IP <<< "${CLUSTER_NODE}"
 
-	echo "$IP   $HOST" >> /etc/hosts
+	echo "${IP}   ${HOST}" >> /etc/hosts
 done
 
 apt install nginx -y || echo "Need to reconfigure NGINX"
@@ -75,7 +75,7 @@ function create_tcp_stream() {
 	local TCP_PORT=$2
 	local NGINX_CONF=$3
 
-	TCP_PORT=$(echo -n $TCP_PORT | tr ',' ' ')
+	TCP_PORT=$(echo -n ${TCP_PORT} | tr ',' ' ')
 
 	touch ${NGINX_CONF}
 
@@ -86,7 +86,7 @@ function create_tcp_stream() {
 
 		for CLUSTER_NODE in ${CLUSTER_NODES[*]}
 		do
-			IFS=: read HOST IP <<< "$CLUSTER_NODE"
+			IFS=: read HOST IP <<< "${CLUSTER_NODE}"
 
 			if [ -n ${HOST} ]; then
 				echo "    server ${IP}:${PORT} max_fails=3 fail_timeout=30s;" >> ${NGINX_CONF}
@@ -96,7 +96,7 @@ function create_tcp_stream() {
 		echo "  }" >> ${NGINX_CONF}
 
 		echo "  server {" >> ${NGINX_CONF}
-		echo "    listen $NET_IP:${PORT};" >> ${NGINX_CONF}
+		echo "    listen ${NET_IP}:${PORT};" >> ${NGINX_CONF}
 		echo "    proxy_pass ${STREAM_NAME}_${PORT};" >> ${NGINX_CONF}
 		echo "  }" >> ${NGINX_CONF}
 	done

@@ -3,7 +3,7 @@
 	"kind": "RoleBinding",
 	"metadata": {
 		"name": "metrics-server-auth-reader",
-		"namespace": "$K8NAMESPACE"
+		"namespace": "${NAMESPACE}"
 	},
 	"roleRef": {
 		"apiGroup": "rbac.authorization.k8s.io",
@@ -14,7 +14,7 @@
 		{
 			"kind": "ServiceAccount",
 			"name": "metrics-server",
-			"namespace": "$K8NAMESPACE"
+			"namespace": "${NAMESPACE}"
 		}
 	]
 }

@@ -11,7 +11,7 @@ ETCD_ENDPOINT=
 EXTERNAL_ETCD=NO
 HA_CLUSTER=false
 INSTANCEID=
-INSTANCENAME=$HOSTNAME
+INSTANCENAME=${HOSTNAME}
 KUBERNETES_DISTRO=kubeadm
 MASTER_IP=$(cat ./cluster/manager-ip)
 MASTER_NODE_ALLOW_DEPLOYMENT=NO
@@ -19,7 +19,7 @@ MAX_PODS=110
 NET_IF=$(ip route get 1|awk '{print $5;exit}')
 NODEGROUP_NAME=
 NODEINDEX=0
-NODENAME=$HOSTNAME
+NODENAME=${HOSTNAME}
 REGION=home
 TOKEN=$(cat ./cluster/token)
 ZONEID=office
@@ -134,26 +134,26 @@ if [ ${PLATEFORM} == "aws" ]; then
 	INSTANCEID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 	ZONEID=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)
 	REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
-	INSTANCENAME=$(aws ec2  describe-instances --region $REGION --instance-ids $INSTANCEID | jq -r '.Reservations[0].Instances[0].Tags[]|select(.Key == "Name")|.Value')
+	INSTANCENAME=$(aws ec2  describe-instances --region ${REGION} --instance-ids ${INSTANCEID} | jq -r '.Reservations[0].Instances[0].Tags[]|select(.Key == "Name")|.Value')
 	APISERVER_ADVERTISE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 	PROVIDERID=aws://${ZONEID}/${INSTANCEID}
 else
-	ifconfig $NET_IF &> /dev/null || NET_IF=$(ip route get 1|awk '{print $5;exit}')
-	APISERVER_ADVERTISE_ADDRESS=$(ip addr show $NET_IF | grep "inet\s" | tr '/' ' ' | awk '{print $2}')
-	APISERVER_ADVERTISE_ADDRESS=$(echo $APISERVER_ADVERTISE_ADDRESS | awk '{print $1}')
+	ifconfig ${NET_IF} &> /dev/null || NET_IF=$(ip route get 1|awk '{print $5;exit}')
+	APISERVER_ADVERTISE_ADDRESS=$(ip addr show ${NET_IF} | grep "inet\s" | tr '/' ' ' | awk '{print $2}')
+	APISERVER_ADVERTISE_ADDRESS=$(echo ${APISERVER_ADVERTISE_ADDRESS} | awk '{print $1}')
 
 	if [ "${CLOUD_PROVIDER}" == "external" ]; then
 		PROVIDERID=${PLATEFORM}://${INSTANCEID}
 	fi
 
-	sed -i "/$CONTROL_PLANE_ENDPOINT/d" /etc/hosts
-	echo "$CONTROL_PLANE_ENDPOINT_ADDR   $CONTROL_PLANE_ENDPOINT" >> /etc/hosts
+	sed -i "/${CONTROL_PLANE_ENDPOINT}/d" /etc/hosts
+	echo "${CONTROL_PLANE_ENDPOINT_ADDR}   ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 
-	for CLUSTER_NODE in $(echo -n $CLUSTER_NODES | tr ',' ' ')
+	for CLUSTER_NODE in $(echo -n ${CLUSTER_NODES} | tr ',' ' ')
 	do
-		IFS=: read HOST IP <<< "$CLUSTER_NODE"
-		sed -i "/$HOST/d" /etc/hosts
-		echo "$IP   $HOST" >> /etc/hosts
+		IFS=: read HOST IP <<< "${CLUSTER_NODE}"
+		sed -i "/${HOST}/d" /etc/hosts
+		echo "${IP}   ${HOST}" >> /etc/hosts
 	done
 fi
 
@@ -200,7 +200,7 @@ token: ${TOKEN}
 EOF
 	fi
 
-	if [ "$HA_CLUSTER" = "true" ]; then
+	if [ "${HA_CLUSTER}" = "true" ]; then
 		RKE2_SERVICE=rke2-server
 
 		if [ $"{CLOUD_PROVIDER}" == "external" ]; then   
@@ -244,10 +244,10 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 		echo "K3S_ARGS='--kubelet-arg=provider-id=${PROVIDERID} --kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --server=https://${MASTER_IP} --token=${TOKEN}'" > /etc/systemd/system/k3s.service.env
 	fi
 
-	if [ "$HA_CLUSTER" = "true" ]; then
+	if [ "${HA_CLUSTER}" = "true" ]; then
 		echo "K3S_MODE=server" > /etc/default/k3s
 
-		if [ "$CLOUD_PROVIDER" == "external" ]; then
+		if [ "${CLOUD_PROVIDER}" == "external" ]; then
 			echo "K3S_DISABLE_ARGS='--disable-cloud-controller --disable=servicelb --disable=traefik --disable=metrics-server'" > /etc/systemd/system/k3s.disabled.env
 		else
 			echo "K3S_DISABLE_ARGS='--disable=servicelb --disable=traefik --disable=metrics-server'" > /etc/systemd/system/k3s.disabled.env
@@ -276,7 +276,7 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 else
 	CACERT=$(cat ./cluster/ca.cert)
 
-	if [ "$HA_CLUSTER" = "true" ]; then
+	if [ "${HA_CLUSTER}" = "true" ]; then
 		cp cluster/kubernetes/pki/ca.crt /etc/kubernetes/pki
 		cp cluster/kubernetes/pki/ca.key /etc/kubernetes/pki
 		cp cluster/kubernetes/pki/sa.key /etc/kubernetes/pki
@@ -325,7 +325,7 @@ EOF
 	fi
 fi
 
-if [ "$HA_CLUSTER" = "true" ]; then
+if [ "${HA_CLUSTER}" = "true" ]; then
 	kubectl label nodes ${NODENAME} \
 		"cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" \
 		"node-role.kubernetes.io/master=${ANNOTE_MASTER}" \

@@ -7,7 +7,7 @@
 	"timeout": 300,
 	"template-name": "${TARGET_IMAGE_UUID}",
 	"linked": false,
-	"autostart": $AUTOSTART,
+	"autostart": ${AUTOSTART},
 	"allow-upgrade": false,	"network": {
 		"domain": "${NET_DOMAIN}",
 		"dns": {
@@ -27,8 +27,8 @@
 				"mac-address": "generate",
 				"nic": "eth0",
 				"dhcp": true,
-				"use-dhcp-routes": $USE_DHCP_ROUTES_PUBLIC,
-				"routes": $PUBLIC_ROUTES_DEFS
+				"use-dhcp-routes": ${USE_DHCP_ROUTES_PUBLIC},
+				"routes": ${PUBLIC_ROUTES_DEFS}
 			},
 			{
 				"primary": true,
@@ -37,12 +37,12 @@
 				"device": "vmxnet3",
 				"mac-address": "generate",
 				"nic": "eth1",
-				"dhcp": $SCALEDNODES_DHCP,
-				"use-dhcp-routes": $USE_DHCP_ROUTES_PRIVATE,
+				"dhcp": ${SCALEDNODES_DHCP},
+				"use-dhcp-routes": ${USE_DHCP_ROUTES_PRIVATE},
 				"address": "${NODE_IP}",
 				"gateway": "${NET_GATEWAY}",
 				"netmask": "${NET_MASK}",
-				"routes": $PRIVATE_ROUTES_DEFS
+				"routes": ${PRIVATE_ROUTES_DEFS}
 			}
 		]
 	}

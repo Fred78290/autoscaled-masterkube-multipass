@@ -30,12 +30,12 @@ CONTAINER_ENGINE=docker
 CONTAINER_CTL=docker
 KUBERNETES_DISTRO=kubeadm
 
-source $CURDIR/common.sh
+source ${CURDIR}/common.sh
 
-mkdir -p $CACHE
+mkdir -p ${CACHE}
 
 TEMP=`getopt -o d:i:k:n:p:s:u:v: --long aws-access-key:,aws-secret-key:,k8s-distribution:,distribution:,container-runtime:,user:,adapter:,primary-network:,second-network:,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
-eval set -- "$TEMP"
+eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true ; do
@@ -101,7 +101,7 @@ while true ; do
 	esac
 done
 
-if [ -z "$TARGET_IMAGE" ]; then
+if [ -z "${TARGET_IMAGE}" ]; then
 	echo_red_bold "TARGET_IMAGE not defined"
 	exit 1
 fi
@@ -113,7 +113,7 @@ if [ -n "${TARGET_IMAGE_UUID}" ]; then
 	exit 0
 fi
 
-echo_blue_bold "Ubuntu password:$KUBERNETES_PASSWORD"
+echo_blue_bold "Ubuntu password:${KUBERNETES_PASSWORD}"
 
 cat > "${CACHE}/user-data" <<EOF
 #cloud-config
@@ -137,7 +137,7 @@ ssh_pwauth: true
 chpasswd:
   expire: false
 ssh_authorized_keys:
-  - $SSH_KEY
+  - ${SSH_KEY}
 users:
   - default
 system_info:
@@ -150,7 +150,7 @@ EOF
 
 cat > "${CACHE}/meta-data" <<EOF
 {
-	"local-hostname": "$SEEDIMAGE",
+	"local-hostname": "${SEEDIMAGE}",
 	"instance-id": "$(uuidgen)"
 }
 EOF
@@ -171,7 +171,7 @@ function update_vmx() {
 	local METADATA=$2
 	local USERDATA=$3
 	local VENDORDATA=$4
-	local BASENAME=$(basename "$VMX")
+	local BASENAME=$(basename "${VMX}")
 	local NAME=${BASENAME:0:${#BASENAME}-4}
 	local GUESTOS=
 
@@ -209,8 +209,8 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 
 		if [ ${SEED_ARCH} = "arm64" ]; then
 			if [ ! -f "${CACHE}/${CLOUDIMG_NAME}.img" ]; then
-				echo_blue_bold "Download https://$CLOUD_IMAGES_UBUNTU/${DISTRO}/current/${CLOUDIMG_NAME}.img"
-				curl -Ls "https://$CLOUD_IMAGES_UBUNTU/${DISTRO}/current/${CLOUDIMG_NAME}.img" -o "${CACHE}/${CLOUDIMG_NAME}.img"
+				echo_blue_bold "Download https://${CLOUD_IMAGES_UBUNTU}/${DISTRO}/current/${CLOUDIMG_NAME}.img"
+				curl -Ls "https://${CLOUD_IMAGES_UBUNTU}/${DISTRO}/current/${CLOUDIMG_NAME}.img" -o "${CACHE}/${CLOUDIMG_NAME}.img"
 			else
 				echo_blue_bold "Img already exists ${CACHE}/${CLOUDIMG_NAME}.img"
 			fi
@@ -224,7 +224,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 
 			SIZE_VMDK=$(stat "${CACHE}/${CLOUDIMG_NAME}.vmdk" | cut -d ' ' -f 8)
 
-			sed s/ovf:size=.*\ /ovf:size=\"$SIZE_VMDK\"\ / "$CURDIR/../templates/ubuntu-ovf/ubuntu-${DISTRO}-cloudimg.ovf" > "${CACHE}/${CLOUDIMG_NAME}.ovf"
+			sed s/ovf:size=.*\ /ovf:size=\"${SIZE_VMDK}\"\ / "${CURDIR}/../templates/ubuntu-ovf/ubuntu-${DISTRO}-cloudimg.ovf" > "${CACHE}/${CLOUDIMG_NAME}.ovf"
 			
 			SHA_OVF=$(sha256sum "${CACHE}/${CLOUDIMG_NAME}.ovf" | cut -d ' ' -f 1)
 			SHA_VMDK=$(sha256sum "${CACHE}/${CLOUDIMG_NAME}.vmdk" | cut -d ' ' -f 1)
@@ -236,7 +236,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 
 			ovftool --overwrite --allowExtraConfig --allowAllExtraConfig "${CACHE}/${CLOUDIMG_NAME}.ovf" "${CACHE}/${CLOUDIMG_NAME}.ova"
 		else
-			curl -Ls "https://$CLOUD_IMAGES_UBUNTU/${DISTRO}/current/${CLOUDIMG_NAME}.ova" -o "${CACHE}/${CLOUDIMG_NAME}.ova"
+			curl -Ls "https://${CLOUD_IMAGES_UBUNTU}/${DISTRO}/current/${CLOUDIMG_NAME}.ova" -o "${CACHE}/${CLOUDIMG_NAME}.ova"
 		fi
 
 	fi
@@ -258,7 +258,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 
 		echo_blue_bold "Register ${SEEDIMAGE} '${VMX}'"
 
-		update_vmx "${VMX}" $METADATA $USERDATA $VENDORDATA
+		update_vmx "${VMX}" ${METADATA} ${USERDATA} ${VENDORDATA}
 
 		SEEDIMAGE_UUID=$(vmrest_vm_register ${SEEDIMAGE} "${VMX}")
 
@@ -283,7 +283,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 		echo_blue_bold "Power On ${SEEDIMAGE}"
 		vmrest_poweron "${SEEDIMAGE_UUID}" > /dev/null
 
-		echo_blue_bold "Wait for IP from $SEEDIMAGE"
+		echo_blue_bold "Wait for IP from ${SEEDIMAGE}"
 		IPADDR=$(vmrest_waitip "${SEEDIMAGE_UUID}")
 
 		if [ -z "${IPADDR}" ] || [ "${IPADDR}" == "ERROR" ]; then
@@ -349,10 +349,10 @@ case "${KUBERNETES_DISTRO}" in
 		;;
 esac
 
-KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | tr '.' ' ' | awk '{ print $2 }')
-CRIO_VERSION=$(echo -n $KUBERNETES_VERSION | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
+KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | tr '.' ' ' | awk '{ print $2 }')
+CRIO_VERSION=$(echo -n ${KUBERNETES_VERSION} | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
 
-echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: $CRIO_VERSION and kubernetes: $KUBERNETES_VERSION"
+echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: ${CRIO_VERSION} and kubernetes: ${KUBERNETES_VERSION}"
 
 cat > "${CACHE}/user-data" <<EOF
 #cloud-config
@@ -369,9 +369,9 @@ EOF
 
 cat > "${CACHE}/vendor-data" <<EOF
 #cloud-config
-timezone: $TZ
+timezone: ${TZ}
 ssh_authorized_keys:
-  - $SSH_KEY
+  - ${SSH_KEY}
 users:
   - default
 system_info:
@@ -381,7 +381,7 @@ EOF
 
 cat > "${CACHE}/meta-data" <<EOF
 {
-	"local-hostname": "$TARGET_IMAGE",
+	"local-hostname": "${TARGET_IMAGE}",
 	"instance-id": "$(uuidgen)"
 }
 EOF
@@ -397,8 +397,8 @@ CRIO_VERSION=${CRIO_VERSION}
 CONTAINER_ENGINE=${CONTAINER_ENGINE}
 CONTAINER_CTL=${CONTAINER_CTL}
 KUBERNETES_DISTRO=${KUBERNETES_DISTRO}
-CREDENTIALS_CONFIG=$CREDENTIALS_CONFIG
-CREDENTIALS_BIN=$CREDENTIALS_BIN
+CREDENTIALS_CONFIG=${CREDENTIALS_CONFIG}
+CREDENTIALS_BIN=${CREDENTIALS_BIN}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF

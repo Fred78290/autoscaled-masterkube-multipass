@@ -179,7 +179,7 @@ function vmrest_poweron() {
 function vmrest_poweroff() {
 	local VMUUID=$1
 	local MODE=$2
-	local BODY=$(echo '{}' | jq --arg MODE $MODE '.mode = $MODE')
+	local BODY=$(echo '{}' | jq --arg MODE ${MODE} '.mode = $MODE')
 
 	do_put "/vm/poweroff/${VMUUID}" "${BODY}" | jq -r '.result.done // "ERROR"'
 }
@@ -202,12 +202,12 @@ function vmrest_power_state() {
 function vmrest_wait_for_powerstate() {
 	local VMUUID=$1
 	local STATE=$2
-	local POWER_STATE=$(vmrest_power_state $VMUUID)
+	local POWER_STATE=$(vmrest_power_state ${VMUUID})
 
 	while [ "${POWER_STATE}" != "${STATE}" ] && [ -n "${POWER_STATE}" ] && [ "${POWER_STATE}" != "ERROR" ];
 	do
 		sleep 1
-		POWER_STATE=$(vmrest_power_state $VMUUID)
+		POWER_STATE=$(vmrest_power_state ${VMUUID})
 	done
 
 	echo -n ${POWER_STATE}
@@ -217,16 +217,16 @@ function vmrest_wait_for_powerstate() {
 function vmrest_wait_for_poweron() {
 	local VMUUID=$1
 
-	vmrest_poweron $VMUUID &> /dev/null
-	vmrest_wait_for_powerstate $VMUUID poweredOn
+	vmrest_poweron ${VMUUID} &> /dev/null
+	vmrest_wait_for_powerstate ${VMUUID} poweredOn
 }
 
 # Wait for vm off
 function vmrest_wait_for_poweroff() {
 	local VMUUID=$1
 
-	vmrest_poweroff $VMUUID "soft" &> /dev/null
-	vmrest_wait_for_powerstate $VMUUID poweredOff
+	vmrest_poweroff ${VMUUID} "soft" &> /dev/null
+	vmrest_wait_for_powerstate ${VMUUID} poweredOff
 }
 
 # Wait for IP

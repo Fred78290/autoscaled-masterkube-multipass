@@ -6,7 +6,7 @@
 			"app": "helloworld"
 		},
 		"name": "helloworld",
-		"namespace": "$K8NAMESPACE"
+		"namespace": "${NAMESPACE}"
 	},
 	"spec": {
 		"type": "ClusterIP",

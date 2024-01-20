@@ -6,7 +6,7 @@
 			"k8s-app": "dashboard-metrics-scraper"
 		},
 		"name": "dashboard-metrics-scraper",
-		"namespace": "$K8NAMESPACE"
+		"namespace": "${NAMESPACE}"
 	},
 	"spec": {
 		"replicas": 1,

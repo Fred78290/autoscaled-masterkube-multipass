@@ -28,14 +28,8 @@ SSH_OPTIONS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
 source ${CURDIR}/common.sh
 
-if [ "$OSDISTRO" == "Linux" ]; then
-	TZ=$(cat /etc/timezone)
-else
-	TZ=$(sudo systemsetup -gettimezone | awk '{print $2}')
-fi
-
-TEMP=`getopt -o kfc:i:n:op:s:u:v: --long k8s-distribution:,aws-access-key:,aws-secret-key:,use-k3s:,cache-dir:,container-runtime:,arch:,ecr-password:,force,profile:,region:,subnet-id:,sg-id:,use-public-ip:,user:,ami:,custom-image:,ssh-key-name:,ssh-key-file:,ssh-key-private:,cni-plugin:,cni-plugin-version:,kubernetes-version: -n "$0" -- "$@"`
-eval set -- "$TEMP"
+TEMP=`getopt -o kfc:i:n:op:s:u:v: --long k8s-distribution:,aws-access-key:,aws-secret-key:,use-k3s:,cache-dir:,container-runtime:,arch:,ecr-password:,force,profile:,region:,subnet-id:,sg-id:,use-public-ip:,user:,ami:,custom-image:,ssh-key-name:,ssh-key-file:,ssh-key-private:,cni-plugin:,cni-version:,kubernetes-version: -n "$0" -- "$@"`
+eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true ; do
@@ -46,7 +40,7 @@ while true ; do
 		-p|--profile) AWS_PROFILE="${2}" ; shift 2;;
 		-r|--region) AWS_REGION="${2}" ; shift 2;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
-		-i|--cni-plugin-version) CNI_VERSION=$2 ; shift 2;;
+		-i|--cni-version) CNI_VERSION=$2 ; shift 2;;
 		-c|--cni-plugin) CNI_PLUGIN=$2 ; shift 2;;
 		-u|--user) KUBERNETES_USER=$2 ; shift 2;;
 		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
@@ -104,7 +98,7 @@ while true ; do
 	esac
 done
 
-mkdir -p $CACHE
+mkdir -p ${CACHE}
 
 if [ -z "${SEED_IMAGE}" ]; then
 	echo_red_bold "Seed image is not defined, exit"
@@ -114,7 +108,7 @@ fi
 SOURCE_IMAGE_ID=$(aws ec2 describe-images --profile ${AWS_PROFILE} --region ${AWS_REGION} --image-ids "${SEED_IMAGE}" 2>/dev/null | jq -r '.Images[0].ImageId//""')
 
 if [ -z "${SOURCE_IMAGE_ID}" ]; then
-	echo_red_bold "Source $SOURCE_IMAGE_ID not found!"
+	echo_red_bold "Source ${SOURCE_IMAGE_ID} not found!"
 	exit 1
 fi
 
@@ -139,12 +133,12 @@ if [ -z "${TARGET_IMAGE}" ]; then
 	TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 fi
 
-if [ "$SEED_ARCH" == "amd64" ]; then
+if [ "${SEED_ARCH}" == "amd64" ]; then
 	INSTANCE_TYPE=t3a.small
-elif [ "$SEED_ARCH" == "arm64" ]; then
+elif [ "${SEED_ARCH}" == "arm64" ]; then
 	INSTANCE_TYPE=t4g.small
 else
-	echo_red_bold "Unsupported architecture: $SEED_ARCH"
+	echo_red_bold "Unsupported architecture: ${SEED_ARCH}"
 	exit -1
 fi
 
@@ -152,8 +146,8 @@ TARGET_IMAGE_ID=$(aws ec2 describe-images --profile ${AWS_PROFILE} --region ${AW
 KEYEXISTS=$(aws ec2 describe-key-pairs --profile ${AWS_PROFILE} --region ${AWS_REGION} --key-names "${SSH_KEYNAME}" 2>/dev/null | jq  -r '.KeyPairs[].KeyName//""')
 
 if [ -n "${TARGET_IMAGE_ID}" ]; then
-	if [ $FORCE = NO ]; then
-		echo_blue_bold "$TARGET_IMAGE already exists!"
+	if [ ${FORCE} = NO ]; then
+		echo_blue_bold "${TARGET_IMAGE} already exists!"
 		exit 0
 	fi
 	aws ec2 deregister-image --profile ${AWS_PROFILE} --region ${AWS_REGION} --image-id "${TARGET_IMAGE_ID}" &>/dev/null
@@ -179,12 +173,12 @@ case "${KUBERNETES_DISTRO}" in
 		;;
 esac
 
-KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | awk -F. '{ print $2 }')
-CRIO_VERSION=$(echo -n $KUBERNETES_VERSION | tr -d 'v' | awk -F. '{ print $1"."$2 }')
+KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | awk -F. '{ print $2 }')
+CRIO_VERSION=$(echo -n ${KUBERNETES_VERSION} | tr -d 'v' | awk -F. '{ print $1"."$2 }')
 
-echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: $CRIO_VERSION and kubernetes: $KUBERNETES_VERSION"
+echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: ${CRIO_VERSION} and kubernetes: ${KUBERNETES_VERSION}"
 
-cat > $CACHE/mapping.json <<EOF
+cat > ${CACHE}/mapping.json <<EOF
 [
 	{
 		"DeviceName": "/dev/sda1",
@@ -210,8 +204,8 @@ CRIO_VERSION=${CRIO_VERSION}
 CONTAINER_ENGINE=${CONTAINER_ENGINE}
 CONTAINER_CTL=${CONTAINER_CTL}
 KUBERNETES_DISTRO=${KUBERNETES_DISTRO}
-CREDENTIALS_CONFIG=$CREDENTIALS_CONFIG
-CREDENTIALS_BIN=$CREDENTIALS_BIN
+CREDENTIALS_CONFIG=${CREDENTIALS_CONFIG}
+CREDENTIALS_BIN=${CREDENTIALS_BIN}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 EOF
@@ -297,7 +291,7 @@ echo_blue_bold "Created image ${TARGET_IMAGE} with kubernetes version ${KUBERNET
 
 IMAGEID=$(aws ec2 create-image --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-id "${LAUNCHED_ID}" --name "${TARGET_IMAGE}" --description "Kubernetes ${KUBERNETES_VERSION} image ready to use, based on AMI ${SEED_IMAGE}" | jq -r '.ImageId//""')
 
-if [ -z $IMAGEID ]; then
+if [ -z ${IMAGEID} ]; then
 	echo_red_bold "Something goes wrong when creating image from ${TARGET_IMAGE}"
 	exit -1
 fi

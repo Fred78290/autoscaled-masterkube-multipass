@@ -102,7 +102,7 @@ if [ "${KUBERNETES_VERSION}" == "$(kubectl version --kubeconfig=${TARGET_CLUSTER
 	exit
 fi
 
-if [ "$LAUNCH_CA" == YES ]; then
+if [ "${LAUNCH_CA}" == YES ]; then
 	kubectl delete po -l k8s-app=cluster-autoscaler -n kube-system --kubeconfig=${TARGET_CLUSTER_LOCATION}/config
 fi
 
@@ -125,7 +125,7 @@ if [ ${KUBERNETES_DISTRO} == "k3s" ] || [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 else
-	IFS=. read VERSION MAJOR MINOR <<< "$KUBERNETES_VERSION"
+	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
 
 	# Update tools
 	echo_title "Update kubernetes binaries"

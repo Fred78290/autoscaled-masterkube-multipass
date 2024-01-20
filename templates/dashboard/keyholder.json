@@ -6,7 +6,7 @@
 			"k8s-app": "kubernetes-dashboard"
 		},
 		"name": "kubernetes-dashboard-key-holder",
-		"namespace": "$K8NAMESPACE"
+		"namespace": "${NAMESPACE}"
 	},
 	"type": "Opaque"
 }

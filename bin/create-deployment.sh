@@ -1,4 +1,6 @@
 # Recopy config file on master node
+EXTERNAL_DNS_TARGET="${MASTERKUBE}.${DOMAIN_NAME}"
+
 kubectl create configmap config-cluster-autoscaler -n kube-system --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	--from-file ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} \

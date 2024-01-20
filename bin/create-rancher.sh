@@ -1,15 +1,15 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
-KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | awk -F. '{ print $2 }')
+KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | awk -F. '{ print $2 }')
 
 source ${CURDIR}/common.sh
 
 mkdir -p ${TARGET_DEPLOY_LOCATION}/rancher
 pushd ${TARGET_DEPLOY_LOCATION} &>/dev/null
 
-export K8NAMESPACE=cattle-system
+export NAMESPACE=cattle-system
 
-kubectl create ns ${K8NAMESPACE} --dry-run=client --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+kubectl create ns ${NAMESPACE} --dry-run=client --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 if [ ${KUBERNETES_MINOR_RELEASE} -lt 27 ]; then
 	REPO=rancher-latest/rancher
@@ -25,7 +25,7 @@ else
 fi
 
 cat > ${TARGET_DEPLOY_LOCATION}/rancher/rancher.yaml <<EOF
-hostname: rancher-${PLATEFORM}.$DOMAIN_NAME
+hostname: rancher-${PLATEFORM}.${DOMAIN_NAME}
 tls: ingress
 replicas: 1
 global:
@@ -41,22 +41,22 @@ ingress:
     "cert-manager.io/cluster-issuer": cert-issuer-prod
     "external-dns.alpha.kubernetes.io/register": 'true'
     "external-dns.alpha.kubernetes.io/ttl": '600'
-    "external-dns.alpha.kubernetes.io/target": "${MASTERKUBE}.${DOMAIN_NAME}"
+    "external-dns.alpha.kubernetes.io/target": "${EXTERNAL_DNS_TARGET}"
     "external-dns.alpha.kubernetes.io/hostname": "rancher-${PLATEFORM}.${DOMAIN_NAME}"
 EOF
 
 helm upgrade -i rancher "${REPO}" \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--namespace ${K8NAMESPACE} \
+	--namespace ${NAMESPACE} \
 	--values ${TARGET_DEPLOY_LOCATION}/rancher/rancher.yaml
 
 echo_blue_dot_title "Wait Rancher bootstrap"
 
 COUNT=0
 
-while [ -z ${BOOTSTRAP_SECRET} ] && [ $COUNT -lt 120 ];
+while [ -z ${BOOTSTRAP_SECRET} ] && [ ${COUNT} -lt 120 ];
 do
-	BOOTSTRAP_SECRET=$(kubectl get secret --namespace ${K8NAMESPACE} bootstrap-secret -o go-template='{{.data.bootstrapPassword|base64decode}}' --kubeconfig=${TARGET_CLUSTER_LOCATION}/config 2>/dev/null)
+	BOOTSTRAP_SECRET=$(kubectl get secret --namespace ${NAMESPACE} bootstrap-secret -o go-template='{{.data.bootstrapPassword|base64decode}}' --kubeconfig=${TARGET_CLUSTER_LOCATION}/config 2>/dev/null)
 	sleep 1
 	echo_blue_dot
 	COUNT=$((COUNT+1))

@@ -22,7 +22,7 @@ ETCD_ENDPOINT=
 EXTERNAL_ETCD=false
 HA_CLUSTER=false
 INSTANCEID=
-INSTANCENAME=$HOSTNAME
+INSTANCENAME=${HOSTNAME}
 K8_OPTIONS="--ignore-preflight-errors=All --config=/etc/kubernetes/kubeadm-config.yaml"
 KUBEADM_CONFIG=/etc/kubernetes/kubeadm-config.yaml
 KUBECONFIG=/etc/kubernetes/admin.conf
@@ -33,7 +33,7 @@ MAX_PODS=110
 NET_IF=$(ip route get 1|awk '{print $5;exit}')
 NODEGROUP_NAME=
 NODEINDEX=0
-NODENAME=$HOSTNAME
+NODENAME=${HOSTNAME}
 POD_NETWORK_CIDR="10.244.0.0/16"
 REGION=home
 PRIVATE_DOMAIN_NAME=
@@ -206,37 +206,37 @@ if [ ${PLATEFORM} == "aws" ]; then
 	LOCALHOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)
 	MAC_ADDRESS="$(curl -s http://169.254.169.254/latest/meta-data/mac)"
 	INSTANCEID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-	INSTANCENAME=$(aws ec2  describe-instances --region $REGION --instance-ids $INSTANCEID | jq -r '.Reservations[0].Instances[0].Tags[]|select(.Key == "Name")|.Value')
+	INSTANCENAME=$(aws ec2  describe-instances --region ${REGION} --instance-ids ${INSTANCEID} | jq -r '.Reservations[0].Instances[0].Tags[]|select(.Key == "Name")|.Value')
 	SUBNET_IPV4_CIDR_BLOCK=$(curl -s http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/subnet-ipv4-cidr-block)
 	VPC_IPV4_CIDR_BLOCK=$(curl -s http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/vpc-ipv4-cidr-block)
 	ZONEID=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
-	DNS_SERVER=$(echo $VPC_IPV4_CIDR_BLOCK | tr './' ' '| awk '{print $1"."$2"."$3".2"}')
+	DNS_SERVER=$(echo ${VPC_IPV4_CIDR_BLOCK} | tr './' ' '| awk '{print $1"."$2"."$3".2"}')
 	AWS_DOMAIN=${LOCALHOSTNAME#*.*}
 	AWS_ROUTE53_ZONE_ID=
 	APISERVER_ADVERTISE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 	PROVIDERID=aws://${ZONEID}/${INSTANCEID}
 else
 	# Check if interface exists, else take inet default gateway
-	ifconfig $NET_IF &> /dev/null || NET_IF=$(ip route get 1|awk '{print $5;exit}')
-	APISERVER_ADVERTISE_ADDRESS=$(ip addr show $NET_IF | grep "inet\s" | tr '/' ' ' | awk '{print $2}')
-	APISERVER_ADVERTISE_ADDRESS=$(echo $APISERVER_ADVERTISE_ADDRESS | awk '{print $1}')
+	ifconfig ${NET_IF} &> /dev/null || NET_IF=$(ip route get 1|awk '{print $5;exit}')
+	APISERVER_ADVERTISE_ADDRESS=$(ip addr show ${NET_IF} | grep "inet\s" | tr '/' ' ' | awk '{print $2}')
+	APISERVER_ADVERTISE_ADDRESS=$(echo ${APISERVER_ADVERTISE_ADDRESS} | awk '{print $1}')
 
 	if [ "${CLOUD_PROVIDER}" == "external" ]; then
 		PROVIDERID=${PLATEFORM}://${INSTANCEID}
 	fi
 
-	if [ "$HA_CLUSTER" = "true" ]; then
+	if [ "${HA_CLUSTER}" = "true" ]; then
 		for CLUSTER_NODE in ${CLUSTER_NODES[*]}
 		do
-			IFS=: read HOST IP <<< "$CLUSTER_NODE"
-			sed -i "/$HOST/d" /etc/hosts
+			IFS=: read HOST IP <<< "${CLUSTER_NODE}"
+			sed -i "/${HOST}/d" /etc/hosts
 			echo "${IP}   ${HOST} ${HOST%%.*}" >> /etc/hosts
 		done
 	fi
 fi
 
-if [ -z "$LOAD_BALANCER_IP" ]; then
-	LOAD_BALANCER_IP=($APISERVER_ADVERTISE_ADDRESS)
+if [ -z "${LOAD_BALANCER_IP}" ]; then
+	LOAD_BALANCER_IP=(${APISERVER_ADVERTISE_ADDRESS})
 fi
 
 if [ -z "${NODEGROUP_NAME}" ]; then
@@ -254,11 +254,11 @@ if [ "${DELETE_CREDENTIALS_CONFIG}" == "YES" ]; then
 fi
 
 mkdir -p /etc/kubernetes
-mkdir -p $CLUSTER_DIR/etcd
+mkdir -p ${CLUSTER_DIR}/etcd
 
 echo "${APISERVER_ADVERTISE_ADDRESS} $(hostname) ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 
-NODENAME=$HOSTNAME
+NODENAME=${HOSTNAME}
 
 if [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 	ANNOTE_MASTER=true
@@ -300,7 +300,7 @@ EOF
 		echo "  - ${CERT_SAN}" >> /etc/rancher/rke2/config.yaml
 	done
 
-	if [ "$HA_CLUSTER" = "true" ]; then
+	if [ "${HA_CLUSTER}" = "true" ]; then
 		echo "cluster-init: true" >> /etc/rancher/rke2/config.yaml
 	fi
 
@@ -317,21 +317,21 @@ EOF
 
 	echo
 
-	mkdir -p $CLUSTER_DIR/kubernetes/pki
+	mkdir -p ${CLUSTER_DIR}/kubernetes/pki
 
-	mkdir -p $HOME/.kube
-	cp -i /etc/rancher/rke2/rke2.yaml $HOME/.kube/config
-	chown $(id -u):$(id -g) $HOME/.kube/config
+	mkdir -p ${HOME}/.kube
+	cp -i /etc/rancher/rke2/rke2.yaml ${HOME}/.kube/config
+	chown $(id -u):$(id -g) ${HOME}/.kube/config
 
-	cp /etc/rancher/rke2/rke2.yaml $CLUSTER_DIR/config
-	cp /var/lib/rancher/rke2/server/token $CLUSTER_DIR/token
-	cp -r /var/lib/rancher/rke2/server/tls/* $CLUSTER_DIR/kubernetes/pki/
+	cp /etc/rancher/rke2/rke2.yaml ${CLUSTER_DIR}/config
+	cp /var/lib/rancher/rke2/server/token ${CLUSTER_DIR}/token
+	cp -r /var/lib/rancher/rke2/server/tls/* ${CLUSTER_DIR}/kubernetes/pki/
 
-	openssl x509 -pubkey -in /var/lib/rancher/rke2/server/tls/server-ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > $CLUSTER_DIR/ca.cert
+	openssl x509 -pubkey -in /var/lib/rancher/rke2/server/tls/server-ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > ${CLUSTER_DIR}/ca.cert
 
-	sed -i -e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" -e "s/default/k8s-${HOSTNAME}-admin@${NODEGROUP_NAME}/g" $CLUSTER_DIR/config
+	sed -i -e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" -e "s/default/k8s-${HOSTNAME}-admin@${NODEGROUP_NAME}/g" ${CLUSTER_DIR}/config
 
-	rm -rf $CLUSTER_DIR/kubernetes/pki/temporary-certs
+	rm -rf ${CLUSTER_DIR}/kubernetes/pki/temporary-certs
 
 	KUBECONFIG=/etc/rancher/rke2/rke2.yaml
 
@@ -351,13 +351,13 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 	echo "K3S_MODE=server" > /etc/default/k3s
 	echo "K3S_ARGS='--kubelet-arg=provider-id=${PROVIDERID} --kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --advertise-address=${APISERVER_ADVERTISE_ADDRESS} --advertise-port=${APISERVER_ADVERTISE_PORT} --tls-san=${CERT_SANS}'" > /etc/systemd/system/k3s.service.env
 
-	if [ "$CLOUD_PROVIDER" == "external" ]; then
+	if [ "${CLOUD_PROVIDER}" == "external" ]; then
 		echo "K3S_DISABLE_ARGS='--disable-cloud-controller --disable=servicelb --disable=traefik --disable=metrics-server'" > /etc/systemd/system/k3s.disabled.env
 	else
 		echo "K3S_DISABLE_ARGS='--disable=servicelb --disable=traefik --disable=metrics-server'" > /etc/systemd/system/k3s.disabled.env
 	fi
 
-	if [ "$HA_CLUSTER" = "true" ]; then
+	if [ "${HA_CLUSTER}" = "true" ]; then
 		if [ "${EXTERNAL_ETCD}" == "true" ] && [ -n "${ETCD_ENDPOINT}" ]; then
 			echo "K3S_SERVER_ARGS='--datastore-endpoint=${ETCD_ENDPOINT} --datastore-cafile /etc/etcd/ssl/ca.pem --datastore-certfile /etc/etcd/ssl/etcd.pem --datastore-keyfile /etc/etcd/ssl/etcd-key.pem'" > /etc/systemd/system/k3s.server.env
 		else
@@ -378,21 +378,21 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 
 	echo
 
-	mkdir -p $CLUSTER_DIR/kubernetes/pki
+	mkdir -p ${CLUSTER_DIR}/kubernetes/pki
 
-	mkdir -p $HOME/.kube
-	cp -i /etc/rancher/k3s/k3s.yaml $HOME/.kube/config
-	chown $(id -u):$(id -g) $HOME/.kube/config
+	mkdir -p ${HOME}/.kube
+	cp -i /etc/rancher/k3s/k3s.yaml ${HOME}/.kube/config
+	chown $(id -u):$(id -g) ${HOME}/.kube/config
 
-	cp /etc/rancher/k3s/k3s.yaml $CLUSTER_DIR/config
-	cp /var/lib/rancher/k3s/server/token $CLUSTER_DIR/token
-	cp -r /var/lib/rancher/k3s/server/tls/* $CLUSTER_DIR/kubernetes/pki/
+	cp /etc/rancher/k3s/k3s.yaml ${CLUSTER_DIR}/config
+	cp /var/lib/rancher/k3s/server/token ${CLUSTER_DIR}/token
+	cp -r /var/lib/rancher/k3s/server/tls/* ${CLUSTER_DIR}/kubernetes/pki/
 
-	openssl x509 -pubkey -in /var/lib/rancher/k3s/server/tls/server-ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > $CLUSTER_DIR/ca.cert
+	openssl x509 -pubkey -in /var/lib/rancher/k3s/server/tls/server-ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > ${CLUSTER_DIR}/ca.cert
 
-	sed -i -e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" -e "s/default/k8s-${HOSTNAME}-admin@${NODEGROUP_NAME}/g" $CLUSTER_DIR/config
+	sed -i -e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" -e "s/default/k8s-${HOSTNAME}-admin@${NODEGROUP_NAME}/g" ${CLUSTER_DIR}/config
 
-	rm -rf $CLUSTER_DIR/kubernetes/pki/temporary-certs
+	rm -rf ${CLUSTER_DIR}/kubernetes/pki/temporary-certs
 
 	KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
@@ -419,19 +419,19 @@ else
 
 	systemctl restart kubelet
 
-	if [ -z "$CNI_PLUGIN" ]; then
+	if [ -z "${CNI_PLUGIN}" ]; then
 		CNI_PLUGIN="calico"
 	fi
 
-	CNI_PLUGIN=$(echo "$CNI_PLUGIN" | tr '[:upper:]' '[:lower:]')
+	CNI_PLUGIN=$(echo "${CNI_PLUGIN}" | tr '[:upper:]' '[:lower:]')
 	KUBEADM_TOKEN=$(kubeadm token generate)
 
-	case $CNI_PLUGIN in
+	case ${CNI_PLUGIN} in
 		aws)
 			POD_NETWORK_CIDR="${VPC_IPV4_CIDR_BLOCK}"
 			TEN_RANGE=$(echo -n ${VPC_IPV4_CIDR_BLOCK} | grep -c '^10\..*' || true )
 
-			if [ $TEN_RANGE -eq 0 ]; then
+			if [ ${TEN_RANGE} -eq 0 ]; then
 				CLUSTER_DNS="10.100.0.10"
 				SERVICE_NETWORK_CIDR="10.100.0.0/16"
 			else
@@ -452,12 +452,12 @@ else
 			POD_NETWORK_CIDR="192.168.0.0/16"
 			;;
 		*)
-			echo "CNI $CNI_PLUGIN is not supported"
+			echo "CNI ${CNI_PLUGIN} is not supported"
 			exit -1
 			;;
 	esac
 
-	IFS=. read VERSION MAJOR MINOR <<< "$KUBERNETES_VERSION"
+	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
 
 	cat > ${KUBEADM_CONFIG} <<EOF
 apiVersion: kubeadm.k8s.io/v1beta3
@@ -555,11 +555,11 @@ EOF
 
 	for CERT_SAN in $(echo -n ${CERT_SANS} | tr ',' ' ')
 	do
-		echo "  - $CERT_SAN" >> ${KUBEADM_CONFIG}
+		echo "  - ${CERT_SAN}" >> ${KUBEADM_CONFIG}
 	done
 
 	# External ETCD
-	if [ "$EXTERNAL_ETCD" = "true" ] && [ -n "${ETCD_ENDPOINT}" ]; then
+	if [ "${EXTERNAL_ETCD}" = "true" ] && [ -n "${ETCD_ENDPOINT}" ]; then
 		cat >> ${KUBEADM_CONFIG} <<EOF
 etcd:
   external:
@@ -576,7 +576,7 @@ EOF
 	fi
 
 	# If version 27 or greater, remove this kuletet argument
-	if [ $MAJOR -ge 27 ]; then
+	if [ ${MAJOR} -ge 27 ]; then
 		sed -i '/container-runtime:/d' ${KUBEADM_CONFIG}
 	fi
 
@@ -588,42 +588,42 @@ EOF
 
 	echo "Retrieve token infos"
 
-	openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > $CLUSTER_DIR/ca.cert
-	kubeadm token list 2>&1 | grep "authentication,signing" | awk '{print $1}'  | tr -d '\n' > $CLUSTER_DIR/token 
+	openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > ${CLUSTER_DIR}/ca.cert
+	kubeadm token list 2>&1 | grep "authentication,signing" | awk '{print $1}'  | tr -d '\n' > ${CLUSTER_DIR}/token 
 
-	echo "Get token:$(cat $CLUSTER_DIR/token)"
-	echo "Get cacert:$(cat $CLUSTER_DIR/ca.cert)"
+	echo "Get token:$(cat ${CLUSTER_DIR}/token)"
+	echo "Get cacert:$(cat ${CLUSTER_DIR}/ca.cert)"
 	echo "Set local K8 environement"
 
-	mkdir -p $HOME/.kube
-	cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-	chown $(id -u):$(id -g) $HOME/.kube/config
+	mkdir -p ${HOME}/.kube
+	cp -i /etc/kubernetes/admin.conf ${HOME}/.kube/config
+	chown $(id -u):$(id -g) ${HOME}/.kube/config
 
-	cp /etc/kubernetes/admin.conf $CLUSTER_DIR/config
+	cp /etc/kubernetes/admin.conf ${CLUSTER_DIR}/config
 
 	KUBECONFIG=/etc/kubernetes/admin.conf
 
-	mkdir -p $CLUSTER_DIR/kubernetes/pki
+	mkdir -p ${CLUSTER_DIR}/kubernetes/pki
 
-	cp /etc/kubernetes/pki/ca.crt $CLUSTER_DIR/kubernetes/pki
-	cp /etc/kubernetes/pki/ca.key $CLUSTER_DIR/kubernetes/pki
-	cp /etc/kubernetes/pki/sa.key $CLUSTER_DIR/kubernetes/pki
-	cp /etc/kubernetes/pki/sa.pub $CLUSTER_DIR/kubernetes/pki
-	cp /etc/kubernetes/pki/front-proxy-ca.crt $CLUSTER_DIR/kubernetes/pki
-	cp /etc/kubernetes/pki/front-proxy-ca.key $CLUSTER_DIR/kubernetes/pki
+	cp /etc/kubernetes/pki/ca.crt ${CLUSTER_DIR}/kubernetes/pki
+	cp /etc/kubernetes/pki/ca.key ${CLUSTER_DIR}/kubernetes/pki
+	cp /etc/kubernetes/pki/sa.key ${CLUSTER_DIR}/kubernetes/pki
+	cp /etc/kubernetes/pki/sa.pub ${CLUSTER_DIR}/kubernetes/pki
+	cp /etc/kubernetes/pki/front-proxy-ca.crt ${CLUSTER_DIR}/kubernetes/pki
+	cp /etc/kubernetes/pki/front-proxy-ca.key ${CLUSTER_DIR}/kubernetes/pki
 
-	if [ "$EXTERNAL_ETCD" != "true" ]; then
-		mkdir -p $CLUSTER_DIR/kubernetes/pki/etcd
-		cp /etc/kubernetes/pki/etcd/ca.crt $CLUSTER_DIR/kubernetes/pki/etcd/ca.crt
-		cp /etc/kubernetes/pki/etcd/ca.key $CLUSTER_DIR/kubernetes/pki/etcd/ca.key
+	if [ "${EXTERNAL_ETCD}" != "true" ]; then
+		mkdir -p ${CLUSTER_DIR}/kubernetes/pki/etcd
+		cp /etc/kubernetes/pki/etcd/ca.crt ${CLUSTER_DIR}/kubernetes/pki/etcd/ca.crt
+		cp /etc/kubernetes/pki/etcd/ca.key ${CLUSTER_DIR}/kubernetes/pki/etcd/ca.key
 	fi
 
-	chmod -R uog+r $CLUSTER_DIR/*
+	chmod -R uog+r ${CLUSTER_DIR}/*
 
 	# Password for AWS cni plugin
 	kubectl create secret docker-registry aws-registry --docker-server=602401143452.dkr.ecr.us-west-2.amazonaws.com --docker-username=AWS --docker-password=${ECR_PASSWORD}
 
-	if [ "$CNI_PLUGIN" = "aws" ]; then
+	if [ "${CNI_PLUGIN}" = "aws" ]; then
 
 		echo "Install AWS network"
 
@@ -632,24 +632,24 @@ EOF
 
 		if [ ${KUBERNETES_MINOR_RELEASE} -gt 27 ]; then
 			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.16.0/config/master/aws-k8s-cni.yaml
-		elif [ $KUBERNETES_MINOR_RELEASE -gt 26 ]; then
+		elif [ ${KUBERNETES_MINOR_RELEASE} -gt 26 ]; then
 			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.15.5/config/master/aws-k8s-cni.yaml
-		elif [ $KUBERNETES_MINOR_RELEASE -gt 25 ]; then
+		elif [ ${KUBERNETES_MINOR_RELEASE} -gt 25 ]; then
 			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.14.1/config/master/aws-k8s-cni.yaml
-		elif [ $KUBERNETES_MINOR_RELEASE -gt 24 ]; then
+		elif [ ${KUBERNETES_MINOR_RELEASE} -gt 24 ]; then
 			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.12.1/config/master/aws-k8s-cni.yaml
-		elif [ $KUBERNETES_MINOR_RELEASE -gt 22 ]; then
+		elif [ ${KUBERNETES_MINOR_RELEASE} -gt 22 ]; then
 			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.11/config/master/aws-k8s-cni.yaml
-		elif [ $KUBERNETES_MINOR_RELEASE -gt 20 ]; then
+		elif [ ${KUBERNETES_MINOR_RELEASE} -gt 20 ]; then
 			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.10/config/master/aws-k8s-cni.yaml
 		else
 			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.9.3/config/v1.9/aws-k8s-cni.yaml
 		fi
 
-		if [ $CONTAINER_ENGINE == "cri-o" ]; then
+		if [ ${CONTAINER_ENGINE} == "cri-o" ]; then
 			curl -s ${AWS_CNI_URL} | yq e -P - \
 					| sed -e 's/mountPath: \/var\/run\/dockershim\.sock/mountPath: \/var\/run\/cri\.sock/g' -e 's/path: \/var\/run\/dockershim\.sock/path: \/var\/run\/cri\.sock/g' > cni-aws.yaml
-		elif [ $CONTAINER_ENGINE == "containerd" ]; then
+		elif [ ${CONTAINER_ENGINE} == "containerd" ]; then
 			curl -s ${AWS_CNI_URL} | yq e -P - \
 					| sed -e 's/mountPath: \/var\/run\/dockershim\.sock/mountPath: \/var\/run\/cri\.sock/g' -e 's/path: \/var\/run\/dockershim\.sock/path: \/var\/run\/containerd\/containerd\.sock/g' > cni-aws.yaml
 		else
@@ -665,38 +665,38 @@ EOF
 
 		kubectl set env daemonset -n kube-system aws-node AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS=${VPC_IPV4_CIDR_BLOCK}
 
-	elif [ "$CNI_PLUGIN" = "calico" ]; then
+	elif [ "${CNI_PLUGIN}" = "calico" ]; then
 
 		echo "Install calico network"
 
 		kubectl apply -f "https://docs.projectcalico.org/manifests/calico-vxlan.yaml" 2>&1
 
-	elif [ "$CNI_PLUGIN" = "flannel" ]; then
+	elif [ "${CNI_PLUGIN}" = "flannel" ]; then
 
 		echo "Install flannel network"
 
 		kubectl apply -f "https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml" 2>&1
 
-	elif [ "$CNI_PLUGIN" = "weave" ]; then
+	elif [ "${CNI_PLUGIN}" = "weave" ]; then
 
 		echo "Install weave network for K8"
 
 		kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')" 2>&1
 
-	elif [ "$CNI_PLUGIN" = "canal" ]; then
+	elif [ "${CNI_PLUGIN}" = "canal" ]; then
 
 		echo "Install canal network"
 
 		kubectl apply -f "https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/canal.yaml" 2>&1
 
-	elif [ "$CNI_PLUGIN" = "kube" ]; then
+	elif [ "${CNI_PLUGIN}" = "kube" ]; then
 
 		echo "Install kube network"
 
 		kubectl apply -f "https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml" 2>&1
 		kubectl apply -f "https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter-all-features.yaml" 2>&1
 
-	elif [ "$CNI_PLUGIN" = "romana" ]; then
+	elif [ "${CNI_PLUGIN}" = "romana" ]; then
 
 		echo "Install romana network"
 
@@ -714,7 +714,7 @@ EOF
 	fi
 fi
 
-chmod -R uog+r $CLUSTER_DIR/*
+chmod -R uog+r ${CLUSTER_DIR}/*
 
 kubectl label nodes ${NODENAME} \
 	"cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" \
@@ -743,6 +743,6 @@ fi
 
 sed -i -e "/${CONTROL_PLANE_ENDPOINT%%.}/d" /etc/hosts
 
-echo -n "${LOAD_BALANCER_IP[0]}:${APISERVER_ADVERTISE_PORT}" > $CLUSTER_DIR/manager-ip
+echo -n "${LOAD_BALANCER_IP[0]}:${APISERVER_ADVERTISE_PORT}" > ${CLUSTER_DIR}/manager-ip
 
 echo "Done k8s master node"

@@ -11,19 +11,19 @@ function vnet_to_inet() {
 		sudo /Applications/VMware\ Fusion.app/Contents/Library/vmnet-cfgcli gethostadapterlist \
 			| sed -E 's/vmnet\ -\ ([0-9])/vmnet\1/g' \
 			| sed -e '1,2d' -e 's/[,:-]//g' -e 's/Host Adapter: name //g' -e 's/Host Adapter name  //g' -e 's/printName//g' -e 's/drivername//g' -e 's/ \+/ /g' \
-			| grep "$VNET" \
+			| grep "${VNET}" \
 			| cut -d ' ' -f 1
 	else
-		case $VNET in
+		case ${VNET} in
 			vmnet0|vmnet1|vmnet8)
 				VNET=
 				;;
 			*)
-				VNET=$(cat /etc/vmware/networking| sed -e /-1/d | sed -E 's/([0-9]+)$/vmnet\1/g' | grep $VNET | cut -d ' ' -f 2)
+				VNET=$(cat /etc/vmware/networking| sed -e /-1/d | sed -E 's/([0-9]+)$/vmnet\1/g' | grep ${VNET} | cut -d ' ' -f 2)
 				;;
 		esac
 
-		echo -n $VNET
+		echo -n ${VNET}
 	fi
 }
 
@@ -31,9 +31,9 @@ function inet_to_name() {
 	local INET=$1
 
 	if [ "${OSDISTRO}" = "Darwin" ]; then
-		networksetup -listallhardwareports | gsed -e '/Parent Device:/d' -e 's/ ("Hardware" Port)//g' | gsed -n "/^Device: ${INET}/{x;p;d;}; x" | awk 'NF>1{print $NF}'
+		networksetup -listallhardwareports | gsed -e '/Parent Device:/d' -e 's/ ("Hardware" Port)//g' | gsed -n "/^Device: ${INET}/{x;p;d;}; x" | awk 'NF>1{print ${NF}}'
 	else
-		nmcli c show | grep "$INET" | cut -d ' ' -f 1
+		nmcli c show | grep "${INET}" | cut -d ' ' -f 1
 	fi
 }
 
@@ -80,7 +80,7 @@ function vmrest_get_vmpath() {
 	local VMPATH="${VMPATH_BY_UUID[${STRUUID}]}"
 
 	if [ -z "${VMPATH}" ]; then
-		VMPATH=$(do_get "${VMREST_URL}/api/vms" | jq --arg VMID "${VMUUID}" -r '.[] | select(.id == $VMID)|.path // ""')
+		VMPATH=$(do_get "${VMREST_URL}/api/vms" | jq --arg VMUUID "${VMUUID}" -r '.[] | select(.id == $VMUUID)|.path // ""')
 
 		if [ -n "${VMPATH}" ]; then
 			VMPATH_BY_UUID[${STRUUID}]="${VMPATH}"
@@ -96,12 +96,12 @@ function vmrest_get_vmuuid() {
 	local VMIDS=$(do_get "${VMREST_URL}/api/vms" | jq -r '.[]|.id // ""')
 	local VMID=
 
-	for VMID in $VMIDS
+	for VMID in ${VMIDS}
 	do
 		NAME=$(do_get "${VMREST_URL}/api/vms/${VMID}/params/vmname" | jq -r '.value // ""')
 
 		if [ "${NAME}" = "${VMNAME}" ]; then
-			echo -n $VMID
+			echo -n ${VMID}
 			break
 		fi
 	done
@@ -147,7 +147,7 @@ function set_vmx_custom_network_vmx() {
 	local VMUUID=$1
 	local VNET=$2
 	local NIC=$3
-	local VMPATH="$(vmrest_get_vmpath $VMUUID)"
+	local VMPATH="$(vmrest_get_vmpath ${VMUUID})"
 	local INET_INDEX=$((NIC - 1))
 	local ADDRESSTYPE=$(grep "\bethernet${INET_INDEX}.addressType\b" "${VMPATH}" | cut -d '"' -f 2)
 	local MACADDRESS=$(grep "\bethernet${INET_INDEX}.generatedAddress\b" "${VMPATH}" | cut -d '"' -f 2)
@@ -194,19 +194,19 @@ fi
 		echo "ethernet${INET_INDEX}.pciSlotNumber = \"${SLOTNUMBER}\"" >> "${VMPATH}"
 	fi
 
-	echo -n $NIC
+	echo -n ${NIC}
 }
 
 function vmrest_vnet_custom() {
 	local VMUUID=$1
 	local VNET=$2
 	local NIC=$3
-	local VMPATH="$(vmrest_get_vmpath $VMUUID)"
+	local VMPATH="$(vmrest_get_vmpath ${VMUUID})"
 	local INET_INDEX=$((NIC - 1))
-	local ADDRESSTYPE=$(vmrest_get_params $VMUUID "ethernet${INET_INDEX}.addressType")
-	local MACADDRESS=$(vmrest_get_params $VMUUID "ethernet${INET_INDEX}.generatedAddress")
-	local OFFSET=$(vmrest_get_params $VMUUID "ethernet${INET_INDEX}.generatedAddressOffset")
-	local SLOTNUMBER=$(vmrest_get_params $VMUUID "ethernet${INET_INDEX}.pciSlotNumber")
+	local ADDRESSTYPE=$(vmrest_get_params ${VMUUID} "ethernet${INET_INDEX}.addressType")
+	local MACADDRESS=$(vmrest_get_params ${VMUUID} "ethernet${INET_INDEX}.generatedAddress")
+	local OFFSET=$(vmrest_get_params ${VMUUID} "ethernet${INET_INDEX}.generatedAddressOffset")
+	local SLOTNUMBER=$(vmrest_get_params ${VMUUID} "ethernet${INET_INDEX}.pciSlotNumber")
 	local PARAMS=
 
 	sed -i "/ethernet${INET_INDEX}/d" "${VMPATH}"
@@ -243,13 +243,13 @@ function vmrest_vnet_custom() {
 
 	for PARAM in ${PARAMS[@]}
 	do
-		IFS== read KEY VALUE <<< "$PARAM"
+		IFS== read KEY VALUE <<< "${PARAM}"
 		if [ -n "${VALUE}" ]; then
 			vmrest_set_params ${VMUUID} "${KEY}" "${VALUE}"
 		fi
 	done
 
-	echo -n $NIC
+	echo -n ${NIC}
 }
 
 # Change network adapter
@@ -260,7 +260,7 @@ function vmrest_network_change() {
 	local VNET_TYPE=$(vmrest_get_net_type ${VNET})
 
 	if [ "${VNET_TYPE}" == "custom" ]; then
-		vmrest_vnet_custom $VMUUID $VNET $NIC
+		vmrest_vnet_custom ${VMUUID} ${VNET} ${NIC}
 	elif [ -n "${VNET_TYPE}" ]; then
 		local BODY=$(echo '{}' | jq --arg VNET_TYPE "${VNET_TYPE}" '.type = $VNET_TYPE')
 		local INET_INDEX=$((NIC - 1))
@@ -280,7 +280,7 @@ function vmrest_network_add() {
 
 	if [ "${VNET_TYPE}" == "custom" ]; then
 		local NIC=$(do_get "${VMREST_URL}/api/vms/${VMUUID}/nic" | jq -r '.num // "0"')
-		vmrest_vnet_custom $VMUUID $VNET $((NIC + 1))
+		vmrest_vnet_custom ${VMUUID} ${VNET} $((NIC + 1))
 	elif [ -n "${VNET_TYPE}" ]; then
 		local BODY=$(echo '{}' | jq --arg VNET_TYPE ${VNET_TYPE} '.type = $VNET_TYPE')
 		local NIC=$(do_post "${VMREST_URL}/api/vms/${VMUUID}/nic" "${BODY}" | jq -r '.index // ""')
@@ -293,7 +293,7 @@ function vmrest_network_add() {
 # Power on a VM
 function vmrest_poweron() {
 	local VMUUID=$1
-	local VMPATH="$(vmrest_get_vmpath $VMUUID)"
+	local VMPATH="$(vmrest_get_vmpath ${VMUUID})"
 
 	if [ -n "${VMPATH}" ]; then
 		vmrun start "${VMPATH}" nogui &> /dev/null
@@ -304,7 +304,7 @@ function vmrest_poweron() {
 function vmrest_poweroff() {
 	local VMUUID=$1
 	local MODE=$2
-	local VMPATH="$(vmrest_get_vmpath $VMUUID)"
+	local VMPATH="$(vmrest_get_vmpath ${VMUUID})"
 
 	if [ -n "${VMPATH}" ]; then
 		vmrun stop "${VMPATH}" ${MODE} &> /dev/null
@@ -321,7 +321,7 @@ function vmrest_getip() {
 # Wait for IP
 function vmrest_waitip() {
 	local VMUUID=$1
-	local VMPATH="$(vmrest_get_vmpath $VMUUID)"
+	local VMPATH="$(vmrest_get_vmpath ${VMUUID})"
 	local IPADDR=
 
 	if [ -n "${VMPATH}" ]; then
@@ -337,7 +337,7 @@ function vmrest_waitip() {
 # Return power state of a VM
 function vmrest_power_state() {
 	local VMUUID=$1
-	local VMPATH="$(vmrest_get_vmpath $VMUUID)"
+	local VMPATH="$(vmrest_get_vmpath ${VMUUID})"
 	local STATE="poweredOff"
 
 	while read -r VMX
@@ -355,12 +355,12 @@ function vmrest_power_state() {
 function vmrest_wait_for_powerstate() {
 	local VMUUID=$1
 	local STATE=$2
-	local POWER_STATE=$(vmrest_power_state $VMUUID)
+	local POWER_STATE=$(vmrest_power_state ${VMUUID})
 
 	while [ "${POWER_STATE}" != "${STATE}" ] && [ -n "${POWER_STATE}" ] && [ "${POWER_STATE}" != "ERROR" ];
 	do
 		sleep 1
-		POWER_STATE=$(vmrest_power_state $VMUUID)
+		POWER_STATE=$(vmrest_power_state ${VMUUID})
 	done
 
 	echo -n ${POWER_STATE}
@@ -370,16 +370,16 @@ function vmrest_wait_for_powerstate() {
 function vmrest_wait_for_poweron() {
 	local VMUUID=$1
 
-	vmrest_poweron $VMUUID &> /dev/null
-	vmrest_wait_for_powerstate $VMUUID poweredOn
+	vmrest_poweron ${VMUUID} &> /dev/null
+	vmrest_wait_for_powerstate ${VMUUID} poweredOn
 }
 
 # Wait for vm off
 function vmrest_wait_for_poweroff() {
 	local VMUUID=$1
 
-	vmrest_poweroff $VMUUID &> /dev/null
-	vmrest_wait_for_powerstate $VMUUID poweredOff
+	vmrest_poweroff ${VMUUID} &> /dev/null
+	vmrest_wait_for_powerstate ${VMUUID} poweredOff
 }
 
 # Clone VM
@@ -392,7 +392,7 @@ function vmrest_clone() {
 	local AUTOSTART=$6
 
 	if [ "${REGISTER_VM}" == "true" ]; then
-		local VMPATH="$(vmrest_get_vmpath $VMUUID)"
+		local VMPATH="$(vmrest_get_vmpath ${VMUUID})"
 
 		vmrun clone "${VMPATH}" "${NEWVM_PATH}" full -cloneName=${NEWVM_NAME}
 
@@ -452,7 +452,7 @@ function vmrest_get_params() {
 # Set guestinfo for a VM
 function vmrest_set_guestinfos() {
 	local VMUUID=$1
-	local VMPATH="$(vmrest_get_vmpath $VMUUID)"
+	local VMPATH="$(vmrest_get_vmpath ${VMUUID})"
 
 	shift
 
@@ -468,9 +468,9 @@ function vmrest_set_guestinfos() {
 # Destroy a VM
 function vmrest_destroy() {
 	local VMUUID=$1
-	local VMPATH="$(vmrest_get_vmpath $VMUUID)"
+	local VMPATH="$(vmrest_get_vmpath ${VMUUID})"
 
-	if [ $(vmrest_power_state $VMUUID) == "poweredOff" ]; then
+	if [ $(vmrest_power_state ${VMUUID}) == "poweredOff" ]; then
 		vmrun deleteVM "${VMPATH}"
 	else
 		echo_red "Unable to delete running VM: ${VMPATH}"
@@ -480,7 +480,7 @@ function vmrest_destroy() {
 function vmrest_resize_disk() {
 	local VMUUID=$1
 	local DISK_SIZE=$2
-	local VMPATH="$(vmrest_get_vmpath $VMUUID)"
+	local VMPATH="$(vmrest_get_vmpath ${VMUUID})"
 	local VMDK=
 
 	if [ -n "${VMPATH}" ]; then

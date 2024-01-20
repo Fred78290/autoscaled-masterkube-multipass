@@ -6,6 +6,6 @@
 			"k8s-app": "kubernetes-dashboard"
 		},
 		"name": "kubernetes-dashboard-settings",
-		"namespace": "$K8NAMESPACE"
+		"namespace": "${NAMESPACE}"
 	}
 }

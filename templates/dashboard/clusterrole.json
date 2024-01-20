@@ -5,7 +5,7 @@
 		"labels": {
 			"k8s-app": "kubernetes-dashboard"
 		},
-		"name": "$K8NAMESPACE"
+		"name": "${NAMESPACE}"
 	},
 	"rules": [
 		{

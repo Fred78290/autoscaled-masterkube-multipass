@@ -7,9 +7,8 @@ export VMREST_PASSWORD=
 export VMREST_INSECURE=true
 export VMREST_FOLDER="${HOME}/Virtual Machines.localized"
 
-source $CURDIR/masterkube.defs
-source $CURDIR/common.sh
-source $CURDIR/vmrest.sh
+source ${CURDIR}/common.sh
+source ${CURDIR}/vmrest.sh
 
 VMREST_HOME=$(do_get ${VMREST_URL})
 
@@ -18,7 +17,7 @@ if [ -z "${VMREST_HOME}" ]; then
 
 	vmrest --config
 
-	if [ $OSDISTRO = "Darwin" ]; then
+	if [ ${OSDISTRO} = "Darwin" ]; then
 		mkdir -p ${HOME}/Library/etc/ssl/vmrest/
 
 		${CURDIR}/create-cert.sh --domain ${NET_DOMAIN} --ssl-location ${HOME}/Library/etc/ssl/vmrest/ --cert-email ${CERT_EMAIL}
@@ -53,16 +52,16 @@ EOF
 		launchctl load ${HOME}/Library/LaunchAgents/com.vmware.vmrest.plist
 		launchctl start ${HOME}/Library/LaunchAgents/com.vmware.vmrest.plist
 	else
-		mkdir -p $HOME/.config/systemd/user
+		mkdir -p ${HOME}/.config/systemd/user
 
-		${CURDIR}/create-cert.sh --domain ${NET_DOMAIN} --ssl-location $HOME/.config/systemd/user/ --cert-email ${CERT_EMAIL}
+		${CURDIR}/create-cert.sh --domain ${NET_DOMAIN} --ssl-location ${HOME}/.config/systemd/user/ --cert-email ${CERT_EMAIL}
 
-	cat > $HOME/.config/systemd/user/vmrest.service <<EOF
+	cat > ${HOME}/.config/systemd/user/vmrest.service <<EOF
 [Unit]
 Description=vmrest
 
 [Service]
-Environment="VMREST_ARGS=-c $HOME/.config/systemd/user/cert.perm -k $HOME/.config/systemd/user/privkey.pem"
+Environment="VMREST_ARGS=-c ${HOME}/.config/systemd/user/cert.perm -k ${HOME}/.config/systemd/user/privkey.pem"
 EnvironmentFile=-/etc/default/vmrest
 ExecStart=/usr/bin/vmrest \$VMREST_ARGS \$VMREST_EXTRA_ARGS
 Restart=always

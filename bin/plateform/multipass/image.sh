@@ -24,12 +24,12 @@ CONTAINER_ENGINE=docker
 CONTAINER_CTL=docker
 KUBERNETES_DISTRO=kubeadm
 
-source $CURDIR/common.sh
+source ${CURDIR}/common.sh
 
-mkdir -p $CACHE
+mkdir -p ${CACHE}
 
 TEMP=`getopt -o d:a:i:k:n:op:s:u:v: --long primary-network:,second-network:,aws-access-key:,aws-secret-key:,k8s-distribution:,distribution:,arch:,container-runtime:,user:,seed:,custom-image:,ssh-key:,ssh-priv-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
-eval set -- "$TEMP"
+eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true ; do
@@ -105,35 +105,15 @@ if [ -f "${CACHE}/${TARGET_IMAGE}" ]; then
 	exit 0
 fi
 
-echo_blue_bold "Ubuntu password:$KUBERNETES_PASSWORD"
+echo_blue_bold "Ubuntu password:${KUBERNETES_PASSWORD}"
 
 mkdir -p ${CACHE}/packer/cloud-data
 
 echo -n > ${CACHE}/packer/cloud-data/meta-data
-cat >  ${CACHE}/packer/cloud-data/user-data <<EOF
-#cloud-config
-timezone: ${TZ}
-package_update: false
-package_upgrade: false
-ssh_pwauth: true
-users:
-  - default
-  - name: kubernetes
-    groups: users, admin
-    lock_passwd: false
-    shell: /bin/bash
-    plain_text_passwd: ${KUBERNETES_PASSWORD}
-    ssh_authorized_keys:
-      - ${SSH_KEY}
-  - name: packer
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: users, admin
-    plain_text_passwd: packerpassword
-    ssh_authorized_keys:
-      - ${SSH_KEY}
-apt:
-    preserve_sources_list: true
-EOF
+
+echo $(eval "cat <<EOF
+$(<${PWD}/templates/packer/cloud-data/user-data)
+EOF") >  ${CACHE}/packer/cloud-data/user-data
 
 case "${KUBERNETES_DISTRO}" in
 	k3s|rke2)
@@ -146,10 +126,10 @@ case "${KUBERNETES_DISTRO}" in
 		;;
 esac
 
-KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | tr '.' ' ' | awk '{ print $2 }')
-CRIO_VERSION=$(echo -n $KUBERNETES_VERSION | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
+KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | tr '.' ' ' | awk '{ print $2 }')
+CRIO_VERSION=$(echo -n ${KUBERNETES_VERSION} | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
 
-echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: $CRIO_VERSION and kubernetes: $KUBERNETES_VERSION"
+echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: ${CRIO_VERSION} and kubernetes: ${KUBERNETES_VERSION}"
 
 cat > "${CACHE}/prepare-image.sh" << EOF
 #!/bin/bash
@@ -162,8 +142,8 @@ CRIO_VERSION=${CRIO_VERSION}
 CONTAINER_ENGINE=${CONTAINER_ENGINE}
 CONTAINER_CTL=${CONTAINER_CTL}
 KUBERNETES_DISTRO=${KUBERNETES_DISTRO}
-CREDENTIALS_CONFIG=$CREDENTIALS_CONFIG
-CREDENTIALS_BIN=$CREDENTIALS_BIN
+CREDENTIALS_CONFIG=${CREDENTIALS_CONFIG}
+CREDENTIALS_BIN=${CREDENTIALS_BIN}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
@@ -174,7 +154,7 @@ update-grub
 
 EOF
 
-cat $CURDIR/prepare-image.sh >> "${CACHE}/prepare-image.sh"
+cat ${CURDIR}/prepare-image.sh >> "${CACHE}/prepare-image.sh"
 
 chmod +x "${CACHE}/prepare-image.sh"
 
@@ -183,10 +163,10 @@ read ISO_CHECKSUM ISO_FILE <<< "$(curl -s http://cloud-images.ubuntu.com/release
 ACCEL=kvm
 CPU_HOST=host
 
-pushd $CURDIR/..
+pushd ${CURDIR}/..
 
 if [ ${SEED_ARCH} == "amd64" ]; then
-	cp ./templates/packer/template.json $CACHE/packer/template.json
+	cp ./templates/packer/template.json ${CACHE}/packer/template.json
 
 	QEMU_BINARY=qemu-system-x86_64
 	MACHINE_TYPE="pc"
@@ -200,7 +180,7 @@ else
 	MACHINE_TYPE="virt"
 
 	jq --arg BIOS "${PWD}/qemu-efi-aarch64/QEMU_EFI.fd" '.builders[0].qemuargs += [[ "-bios", $BIOS ]]' \
-		./templates/packer/template.json > $CACHE/packer/template.json
+		./templates/packer/template.json > ${CACHE}/packer/template.json
 
 	if [ "${OSDISTRO}" == "Darwin" ]; then
 		ACCEL=hvf
@@ -209,7 +189,7 @@ fi
 
 popd
 
-pushd $CACHE/packer
+pushd ${CACHE}/packer
 rm -rf output-qemu
 export PACKER_LOG=1
 packer build \

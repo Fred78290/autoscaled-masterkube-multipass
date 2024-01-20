@@ -1,4 +1,18 @@
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl aws"
+CLOUD_PROVIDER=external
+CNI_PLUGIN=aws
+LOAD_BALANCER_PORT=80,443,6443
+
+AUTOSCALE_MACHINE="t3a.medium"
+CONTROL_PLANE_MACHINE="t3a.medium"
+NGINX_MACHINE="t3a.small"
+WORKER_NODE_MACHINE="t3a.medium"
+
+SEED_ARCH=amd64
+KUBERNETES_USER=ubuntu
+
+export SEED_IMAGE_AMD64="ami-0333305f9719618c7"
+export SEED_IMAGE_ARM64="ami-03d568a0c334477dd"
 
 function wait_instance_status() {
     local INSTANCE_ID=$1
@@ -13,32 +27,32 @@ function wait_instance_status() {
 function delete_instance() {
     local INSTANCE_NAME=$1
 
-    local INSTANCE=$(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=tag:Name,Values=$INSTANCE_NAME" | jq -r '.Reservations[].Instances[]|select(.State.Code == 16)')
-    local INSTANCE_ID=$(echo $INSTANCE | jq -r '.InstanceId // ""')
+    local INSTANCE=$(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=tag:Name,Values=${INSTANCE_NAME}" | jq -r '.Reservations[].Instances[]|select(.State.Code == 16)')
+    local INSTANCE_ID=$(echo ${INSTANCE} | jq -r '.InstanceId // ""')
 
-    if [ -n "$INSTANCE_ID" ]; then
-        echo_blue_bold "Delete VM: $MASTERKUBE_NODE"
+    if [ -n "${INSTANCE_ID}" ]; then
+        echo_blue_bold "Delete VM: ${MASTERKUBE_NODE}"
         delete_instance_id "${INSTANCE_ID}" &
     fi
 
     aws ec2 stop-instances --force --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${INSTANCE_ID}" &>/dev/null
 
-    wait_instance_status $INSTANCE_ID 80
+    wait_instance_status ${INSTANCE_ID} 80
 
     aws ec2 terminate-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${INSTANCE_ID}" &>/dev/null
 
-    wait_instance_status $INSTANCE_ID 48
+    wait_instance_status ${INSTANCE_ID} 48
 
     echo_blue_bold "Terminated instance: ${INSTANCE_ID}"
 }
 
 function delete_vm_by_name() {
     local INSTANCE_NAME=$1
-    local INSTANCE=$(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=tag:Name,Values=$INSTANCE_NAME" | jq -r '.Reservations[].Instances[]|select(.State.Code == 16)')
-    local INSTANCE_ID=$(echo $INSTANCE | jq -r '.InstanceId // ""')
+    local INSTANCE=$(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=tag:Name,Values=${INSTANCE_NAME}" | jq -r '.Reservations[].Instances[]|select(.State.Code == 16)')
+    local INSTANCE_ID=$(echo ${INSTANCE} | jq -r '.InstanceId // ""')
 
-    if [ -n "$INSTANCE_ID" ]; then
-        echo_blue_bold "Delete VM: $MASTERKUBE_NODE"
+    if [ -n "${INSTANCE_ID}" ]; then
+        echo_blue_bold "Delete VM: ${MASTERKUBE_NODE}"
         delete_instance_id "${INSTANCE_ID}" &
     fi
 }
@@ -49,11 +63,11 @@ function unregister_dns() {
     # Delete DNS entries
     for FILE in ${TARGET_CONFIG_LOCATION}/dns-*.json
     do
-        if [ -f $FILE ]; then
-            DNS=$(cat $FILE | jq '.Changes[0].Action = "DELETE"')
-            DNSNAME=$(echo $DNS | jq -r '.Changes[0].ResourceRecordSet.Name')
+        if [ -f ${FILE} ]; then
+            DNS=$(cat ${FILE} | jq '.Changes[0].Action = "DELETE"')
+            DNSNAME=$(echo ${DNS} | jq -r '.Changes[0].ResourceRecordSet.Name')
 
-            echo $DNS | jq . > $FILE
+            echo ${DNS} | jq . > ${FILE}
 
             echo_blue_bold "Delete DNS entry: ${DNSNAME}"
             if [[ "${DNSNAME}" == *.${PUBLIC_DOMAIN_NAME} ]]; then
@@ -72,8 +86,8 @@ function unregister_dns() {
     # Delete ENI entries
     for FILE in ${TARGET_CONFIG_LOCATION}/eni-*.json
     do
-        if [ -f $FILE ]; then
-            ENI=$(cat $FILE | jq -r '.NetworkInterfaceId')
+        if [ -f ${FILE} ]; then
+            ENI=$(cat ${FILE} | jq -r '.NetworkInterfaceId')
             echo_blue_bold "Delete ENI: ${ENI}"
             aws ec2 delete-network-interface --profile ${AWS_PROFILE} --region ${AWS_REGION} --network-interface-id ${ENI} &> /dev/null
         fi
@@ -209,5 +223,5 @@ EOF
 function update_provider_config() {
     PROVIDER_AUTOSCALER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
 
-    echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE "${TARGET_IMAGE_AMI}" '.ami = ${TARGET_IMAGE}' > ${TARGET_CONFIG_LOCATION}/provider.json
+    echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE "${TARGET_IMAGE_AMI}" '.ami = $TARGET_IMAGE' > ${TARGET_CONFIG_LOCATION}/provider.json
 }

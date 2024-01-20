@@ -3,17 +3,17 @@
 	"kind": "Ingress",
 	"metadata": {
 		"name": "kubernetes-dashboard-server-ingress",
-		"namespace": "$K8NAMESPACE",
+		"namespace": "${NAMESPACE}",
 		"annotations": {
 			"nginx.ingress.kubernetes.io/ssl-redirect": "true",
 			"nginx.ingress.kubernetes.io/use-regex": "true",
-			"nginx.ingress.kubernetes.io/rewrite-target": "$REWRITE_TARGET",
+			"nginx.ingress.kubernetes.io/rewrite-target": "${REWRITE_TARGET}",
 			"nginx.ingress.kubernetes.io/backend-protocol": "HTTPS",
 			"cert-manager.io/cluster-issuer": "cert-issuer-prod",
 			"external-dns.alpha.kubernetes.io/register": "true",
 			"external-dns.alpha.kubernetes.io/ttl": "600",
-			"external-dns.alpha.kubernetes.io/target": "$MASTERKUBE.$DOMAIN_NAME",
-			"external-dns.alpha.kubernetes.io/hostname": "$DASHBOARD_HOSTNAME.$DOMAIN_NAME"
+			"external-dns.alpha.kubernetes.io/target": "${EXTERNAL_DNS_TARGET}",
+			"external-dns.alpha.kubernetes.io/hostname": "${DASHBOARD_HOSTNAME}.${DOMAIN_NAME}"
 		}
 	},
 	"spec": {
@@ -21,14 +21,14 @@
 		"tls": [
 			{
 				"hosts": [
-					"$DASHBOARD_HOSTNAME.$DOMAIN_NAME"
+					"${DASHBOARD_HOSTNAME}.${DOMAIN_NAME}"
 				],
 				"secretName": "kubernetes-dashboard-server-ingress-tls"
 			}
 		],
 		"rules": [
 			{
-				"host": "$DASHBOARD_HOSTNAME.$DOMAIN_NAME",
+				"host": "${DASHBOARD_HOSTNAME}.${DOMAIN_NAME}",
 				"http": {
 					"paths": [
 						{

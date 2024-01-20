@@ -19,7 +19,7 @@ CONTROLPLANE_INSTANCES_ID=
 source ${CURDIR}/common.sh
 
 TEMP=`getopt -o n:p:r:s:x --long cert-arn:,trace,expose-public:,name:,profile:,region:,target-vpc-id:,private-subnet-id:,public-subnet-id:,target-port:,security-group:,public-instances-id:,controlplane-instances-id: -n "$0" -- "$@"`
-eval set -- "$TEMP"
+eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true ; do
@@ -88,7 +88,7 @@ while true ; do
 	esac
 done
 
-if [ -z "$AWS_NLB_NAME" ]; then
+if [ -z "${AWS_NLB_NAME}" ]; then
 	echo_red_bold "subnet is not defined"
 	exit -1
 fi
@@ -103,12 +103,12 @@ if [ ${#AWS_PRIVATE_SUBNETID[@]} -eq 0 ]; then
 	exit -1
 fi
 
-if [ -z "$AWS_SECURITY_GROUP" ]; then
+if [ -z "${AWS_SECURITY_GROUP}" ]; then
 	echo_red_bold "security group is not defined"
 	exit -1
 fi
 
-if [ -z "$AWS_CERT_ARN" ]; then
+if [ -z "${AWS_CERT_ARN}" ]; then
 	echo_red_bold "certificat arn is not defined"
 	exit -1
 fi
@@ -129,12 +129,12 @@ CONTROLPLANE_INSTANCES_IP=
 # Extract IP
 for INSTANCE in $(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids ${PUBLIC_INSTANCES_ID[*]} | jq '.Reservations[].Instances[].PrivateIpAddress')
 do
-	PUBLIC_INSTANCES_IP+=("Id=$INSTANCE")
+	PUBLIC_INSTANCES_IP+=("Id=${INSTANCE}")
 done
 
 for INSTANCE in $(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids ${CONTROLPLANE_INSTANCES_ID[*]} | jq '.Reservations[].Instances[].PrivateIpAddress')
 do
-	CONTROLPLANE_INSTANCES_IP+=("Id=$INSTANCE")
+	CONTROLPLANE_INSTANCES_IP+=("Id=${INSTANCE}")
 done
 
 function create_nlb() {
@@ -148,19 +148,19 @@ function create_nlb() {
 	local TARGET_ARN
 	local TARGET_PORT
 
-	if [ $TYPE == "network" ]; then
+	if [ ${TYPE} == "network" ]; then
 		NLB_ARN=$(aws elbv2 create-load-balancer --profile=${AWS_PROFILE} --region=${AWS_REGION} --name ${NLB_NAME} --scheme ${PLATEFORM} --type ${TYPE} --subnets ${AWS_SUBNETID} | jq -r '.LoadBalancers[0].LoadBalancerArn')
 	else
 		NLB_ARN=$(aws elbv2 create-load-balancer --profile=${AWS_PROFILE} --region=${AWS_REGION} --name ${NLB_NAME} --security-groups ${AWS_SECURITY_GROUP} --scheme ${PLATEFORM} --type ${TYPE} --subnets ${AWS_SUBNETID} | jq -r '.LoadBalancers[0].LoadBalancerArn')
 	fi
 
-	for TARGET_PORT in $TARGET_PORTS
+	for TARGET_PORT in ${TARGET_PORTS}
 	do
 
 		local CERTIFICAT_ARGS=
 		local PROTOCOL=
 
-		if [ $TYPE == "network" ]; then
+		if [ ${TYPE} == "network" ]; then
 			PROTOCOL=TCP
 	   elif [ "${TARGET_PORT}" = "80" ]; then
 			PROTOCOL=HTTP
@@ -187,18 +187,18 @@ function create_nlb() {
 			--default-actions Type=forward,TargetGroupArn=${TARGET_ARN} > /dev/null
 	done
 
-	echo $NLB_ARN
+	echo ${NLB_ARN}
 }
 
-if [ $AWS_USE_PUBLICIP = "true" ]; then
+if [ ${AWS_USE_PUBLICIP} = "true" ]; then
 	create_nlb "p-${AWS_NLB_NAME}" internet-facing "${AWS_PUBLIC_SUBNETID[*]}" "80 443" network "${PUBLIC_INSTANCES_IP[*]}"
 fi
 
 NLB_ARN=$(create_nlb "c-${AWS_NLB_NAME}" internal "${AWS_PRIVATE_SUBNETID[*]}" "${LOAD_BALANCER_PORT[*]}" network "${CONTROLPLANE_INSTANCES_IP[*]}")
 
-echo_blue_dot_title -n "Wait NLB to start $NLB_ARN"
+echo_blue_dot_title -n "Wait NLB to start ${NLB_ARN}"
 
-while [ "$(echo "$NBL_DESCRIBE" | jq -r '.LoadBalancers[0].State.Code // ""')" != "active" ];
+while [ "$(echo "${NBL_DESCRIBE}" | jq -r '.LoadBalancers[0].State.Code // ""')" != "active" ];
 do
 	echo_blue_dot
 	sleep 5

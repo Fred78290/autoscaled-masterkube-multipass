@@ -14,7 +14,7 @@ AUTOSCALER_DESKTOP_UTILITY_CERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -
 AUTOSCALER_DESKTOP_UTILITY_CACERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .Certificate)"
 AUTOSCALER_DESKTOP_UTILITY_ADDR=${LOCAL_IPADDR}:5700
 
-if [ "$LAUNCH_CA" == YES ]; then
+if [ "${LAUNCH_CA}" == YES ]; then
     AUTOSCALER_DESKTOP_UTILITY_CERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CERT})"
     AUTOSCALER_DESKTOP_UTILITY_KEY="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_KEY})"
     AUTOSCALER_DESKTOP_UTILITY_CACERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CACERT})"
@@ -24,8 +24,8 @@ function delete_vm_by_name() {
     local VMNAME=$1
 
     if [ "$(multipass info ${VMNAME} 2>/dev/null)" ]; then
-        echo_blue_bold "Delete VM: $VMNAME"
-        multipass delete $VMNAME -p
+        echo_blue_bold "Delete VM: ${VMNAME}"
+        multipass delete ${VMNAME} -p
 	fi
 
     delete_host "${VMNAME}"
@@ -142,7 +142,7 @@ EOF
 function update_provider_config() {
     PROVIDER_AUTOSCALER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
 
-    echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE "file://${TARGET_IMAGE}" '.template-name = ${TARGET_IMAGE}' > ${TARGET_CONFIG_LOCATION}/provider.json
+    echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE "file://${TARGET_IMAGE}" '.template-name = $TARGET_IMAGE' > ${TARGET_CONFIG_LOCATION}/provider.json
 }
 
 function get_vmuuid() {

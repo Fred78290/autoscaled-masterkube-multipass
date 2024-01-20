@@ -6,6 +6,8 @@ else
     PATH=${HOME}/.local/vmware:${PATH}
 fi
 
+export TRACE_CURL=NO
+
 CMD_MANDATORIES="helm kubectl vmrun vmrest jq yq cfssl ovftool kubernetes-desktop-autoscaler-utility vmware-vdiskmanager"
 
 AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)
@@ -14,7 +16,7 @@ AUTOSCALER_DESKTOP_UTILITY_CERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -
 AUTOSCALER_DESKTOP_UTILITY_CACERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .Certificate)"
 AUTOSCALER_DESKTOP_UTILITY_ADDR=${LOCAL_IPADDR}:5700
 
-if [ "$LAUNCH_CA" == YES ]; then
+if [ "${LAUNCH_CA}" == YES ]; then
     AUTOSCALER_DESKTOP_UTILITY_CERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CERT})"
     AUTOSCALER_DESKTOP_UTILITY_KEY="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_KEY})"
     AUTOSCALER_DESKTOP_UTILITY_CACERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CACERT})"
@@ -31,7 +33,7 @@ function delete_vm_by_name() {
     local VMUUID=$(vmrest_get_vmuuid ${VMNAME})
 
     if [ -n "${VMUUID}" ]; then
-		echo_blue_bold "Delete VM: $VMNAME"
+		echo_blue_bold "Delete VM: ${VMNAME}"
 		vmrest_poweroff ${VMUUID} hard &> /dev/null
 		vmrest_wait_for_powerstate ${VMUUID} "poweredOff" &> /dev/null
 		vmrest_destroy ${VMUUID} &> /dev/null
@@ -152,7 +154,7 @@ EOF
 function update_provider_config() {
 	PROVIDER_AUTOSCALER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
 
-	echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE ${TARGET_IMAGE_UUID} "template-name = ${TARGET_IMAGE}" > ${TARGET_CONFIG_LOCATION}/provider.json
+	echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE ${TARGET_IMAGE_UUID} "template-name = $TARGET_IMAGE" > ${TARGET_CONFIG_LOCATION}/provider.json
 }
 
 function get_vmuuid() {

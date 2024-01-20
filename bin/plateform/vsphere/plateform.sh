@@ -1,4 +1,7 @@
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl govc"
+VC_NETWORK_PRIVATE="VM Private"
+VC_NETWORK_PUBLIC="VM Network"
+SEED_ARCH=amd64
 
 if [ "${OSDISTRO}" == "Darwin" ]; then
     VMWAREWM=".vmwarevm"
@@ -18,9 +21,9 @@ function delete_vm_by_name() {
     local VMNAME=$1
 
     if [ "$(govc vm.info ${VMNAME} 2>&1)" ]; then
-        echo_blue_bold "Delete VM: $VMNAME"
-        govc vm.power -persist-session=false -s $VMNAME || echo_blue_bold "Already power off"
-        govc vm.destroy $VMNAME
+        echo_blue_bold "Delete VM: ${VMNAME}"
+        govc vm.power -persist-session=false -s ${VMNAME} || echo_blue_bold "Already power off"
+        govc vm.destroy ${VMNAME}
     fi
 
     delete_host "${VMNAME}"
@@ -140,7 +143,7 @@ EOF
 function update_provider_config() {
     PROVIDER_AUTOSCALER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
 
-    echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE "${TARGET_IMAGE}" '.template-name = ${TARGET_IMAGE}' > ${TARGET_CONFIG_LOCATION}/provider.json
+    echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE "${TARGET_IMAGE}" '.template-name = $TARGET_IMAGE' > ${TARGET_CONFIG_LOCATION}/provider.json
 }
 
 function get_vmuuid() {

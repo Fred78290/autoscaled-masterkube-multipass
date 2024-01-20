@@ -2,7 +2,7 @@
 CURDIR=$(dirname $0)
 FORCE=NO
 
-source $CURDIR/common.sh
+source ${CURDIR}/common.sh
 
 pushd ${CURDIR}/../ &>/dev/null
 
@@ -77,15 +77,15 @@ if [ -f ${TARGET_CONFIG_LOCATION}/buildenv ]; then
 	source ${TARGET_CONFIG_LOCATION}/buildenv
 fi
 
-if [ "$FORCE" = "YES" ]; then
-	TOTALNODES=$((WORKERNODES + $CONTROLNODES))
+if [ "${FORCE}" = "YES" ]; then
+	TOTALNODES=$((WORKERNODES + ${CONTROLNODES}))
 
-	for NODEINDEX in $(seq 0 $TOTALNODES)
+	for NODEINDEX in $(seq 0 ${TOTALNODES})
 	do
-		if [ $NODEINDEX = 0 ]; then
+		if [ ${NODEINDEX} = 0 ]; then
 			MASTERKUBE_NODE="${MASTERKUBE}"
-		elif [[ $NODEINDEX > $CONTROLNODES ]]; then
-			NODEINDEX=$((NODEINDEX - $CONTROLNODES))
+		elif [[ ${NODEINDEX} > ${CONTROLNODES} ]]; then
+			NODEINDEX=$((NODEINDEX - ${CONTROLNODES}))
 			MASTERKUBE_NODE="${NODEGROUP_NAME}-worker-0${NODEINDEX}"
 		else
 			MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${NODEINDEX}"
@@ -97,7 +97,7 @@ if [ "$FORCE" = "YES" ]; then
 elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
 	WORKERNODES=$(kubectl get node -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config | jq -r '.items |reverse | .[] | select(.metadata.labels["node-role.kubernetes.io/worker"]) | .metadata.name')
 
-	for NODE in $WORKERNODES
+	for NODE in ${WORKERNODES}
 	do
 		delete_vm_by_name ${NODE}
 	done
@@ -107,7 +107,7 @@ fi
 unregister_dns
 wait_jobs_finish
 
-./bin/kubeconfig-delete.sh $MASTERKUBE $NODEGROUP_NAME &> /dev/null
+./bin/kubeconfig-delete.sh ${MASTERKUBE} ${NODEGROUP_NAME} &> /dev/null
 
 if [ -f ${TARGET_CONFIG_LOCATION}/autoscaler.pid ]; then
 	kill ${TARGET_CONFIG_LOCATION}/autoscaler.pid

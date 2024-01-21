@@ -19,4 +19,4 @@ users:
     ssh_authorized_keys:
       - ${SSH_KEY}
 apt:
-    preserve_sources_list: true
+  preserve_sources_list: true

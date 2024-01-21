@@ -17,13 +17,6 @@
 			"qemu_binary": "{{ user `QEMU_BINARY` }}",
 			"qemuargs": [
 				[
-					"-monitor","stdio"
-				],
-				[
-					"-display",
-					"cocoa"
-				],
-				[
 					"-cpu",
 					"{{ user `CPU_HOST` }}"
 				],

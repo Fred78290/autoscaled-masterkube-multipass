@@ -1,7 +1,9 @@
 #!/bin/bash
-set -e
+set -eu
 
 CURDIR=$(dirname $0)
+
+source "${CURDIR}/common.sh"
 
 AWS_PROFILE=
 AWS_REGION=
@@ -15,8 +17,6 @@ AWS_NLB_NAME=
 AWS_USE_PUBLICIP=false
 PUBLIC_INSTANCES_ID=
 CONTROLPLANE_INSTANCES_ID=
-
-source ${CURDIR}/common.sh
 
 TEMP=`getopt -o n:p:r:s:x --long cert-arn:,trace,expose-public:,name:,profile:,region:,target-vpc-id:,private-subnet-id:,public-subnet-id:,target-port:,security-group:,public-instances-id:,controlplane-instances-id: -n "$0" -- "$@"`
 eval set -- "${TEMP}"

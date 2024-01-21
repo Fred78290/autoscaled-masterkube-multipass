@@ -2,7 +2,7 @@
 CURDIR=$(dirname $0)
 FORCE=NO
 
-source ${CURDIR}/common.sh
+source "${CURDIR}/common.sh"
 
 pushd ${CURDIR}/../ &>/dev/null
 

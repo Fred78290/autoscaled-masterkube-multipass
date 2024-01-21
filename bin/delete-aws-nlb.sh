@@ -2,13 +2,12 @@
 set -e
 
 CURDIR=$(dirname $0)
-NODEGROUP_NAME="aws-ca-k8s"
-MASTERKUBE=${NODEGROUP_NAME}-masterkube
+
+source "${CURDIR}/common.sh"
+
 AWS_NLB_NAME=${MASTERKUBE}
 AWS_PROFILE=
 AWS_REGION=
-
-source ${CURDIR}/common.sh
 
 TEMP=`getopt -o n:p:r: --long name:,profile:,region: -n "$0" -- "$@"`
 eval set -- "${TEMP}"

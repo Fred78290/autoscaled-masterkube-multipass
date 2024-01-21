@@ -1,14 +1,9 @@
 #!/bin/bash
 
 CURDIR=$(dirname $0)
-export VMREST_URL=https://localhost:8697
-export VMREST_USERNAME=
-export VMREST_PASSWORD=
-export VMREST_INSECURE=true
-export VMREST_FOLDER="${HOME}/Virtual Machines.localized"
 
-source ${CURDIR}/common.sh
-source ${CURDIR}/vmrest.sh
+source "${CURDIR}/common.sh"
+source "${CURDIR}/vmrest.sh"
 
 VMREST_HOME=$(do_get ${VMREST_URL})
 

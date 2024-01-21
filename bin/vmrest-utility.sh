@@ -8,7 +8,7 @@ export AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility ce
 
 export LOCAL_AUTOSCALER_DESKTOP_UTILITY_KEY="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientKey)"
 export LOCAL_AUTOSCALER_DESKTOP_UTILITY_CERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientCertificate)"
-export LOCAL_AUTOSCALER_DESKTOP_UTILITY_REST_URL="https://localhost:5701"
+export LOCAL_AUTOSCALER_DESKTOP_UTILITY_REST_URL="https://localhost:5700"
 
 rm -f *.log
 
@@ -50,9 +50,14 @@ function url_encode() {
 function do_curl() {
 	local METHOD=$1
 	local URL=$2
-	local BODY=$3
 
 	if [ ${METHOD} == "POST" ] || [ ${METHOD} == "PUT" ]; then
+		local BODY=
+
+		if [ $# -eq 3 ]; then
+			BODY=$3
+		fi
+
 		curl -X${METHOD} -sk -H "Accept: application/vnd.vmware.vmw.rest-v1+json" \
 			-H "Content-Type: application/vnd.vmware.vmw.rest-v1+json" \
 			--key "${LOCAL_AUTOSCALER_DESKTOP_UTILITY_KEY}" \
@@ -71,9 +76,15 @@ function do_post() {
 	if [ "${TRACE_CURL}" == "YES" ]; then
 		TRACE_FILE="utility-$(date +%s).log"
 		echo "POST ${1}" > ${TRACE_FILE}
-		do_curl POST "${1}" "${2}" | jq . | tee ${TRACE_FILE}
-	else
+		if [ $# -eq 2 ]; then
+			do_curl POST "${1}" "${2}" | jq . | tee ${TRACE_FILE}
+		else
+			do_curl POST "${1}" | jq . | tee ${TRACE_FILE}
+		fi
+	elif [ $# -eq 2 ]; then
 		do_curl POST "${1}" "${2}"
+	else
+		do_curl POST "${1}"
 	fi
 }
 
@@ -81,9 +92,15 @@ function do_put() {
 	if [ "${TRACE_CURL}" == "YES" ]; then
 		TRACE_FILE="utility-$(date +%s).log"
 		echo "PUT ${1}" > ${TRACE_FILE}
-		do_curl PUT "${1}" "${2}" | jq . | tee ${TRACE_FILE}
-	else
+		if [ $# -eq 2 ]; then
+			do_curl PUT "${1}" "${2}" | jq . | tee ${TRACE_FILE}
+		else
+			do_curl PUT "${1}" | jq . | tee ${TRACE_FILE}
+		fi
+	elif [ $# -eq 2 ]; then
 		do_curl PUT "${1}" "${2}"
+	else
+		do_curl PUT "${1}"
 	fi
 }
 

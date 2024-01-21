@@ -44,7 +44,6 @@ function vmrest_listHostNetworks() {
 function do_curl() {
 	local METHOD=$1
 	local URL=$2
-	local BODY=$3
 	local AUTHENT=
 
 	if [ -n "${VMREST_USERNAME}" ] && [ -n "${VMREST_PASSWORD}" ]; then
@@ -52,6 +51,8 @@ function do_curl() {
 	fi
 
 	if [ ${METHOD} == "POST" ] || [ ${METHOD} == "PUT" ]; then
+		local BODY=$3
+
 		curl -X${METHOD} -sk -H 'Accept: application/vnd.vmware.vmw.rest-v1+json' -H 'Content-Type: application/vnd.vmware.vmw.rest-v1+json' ${AUTHENT} ${URL} -d "${BODY}" || echo "{}"
 	else
 		curl -X${METHOD} -sk -H 'Accept: application/vnd.vmware.vmw.rest-v1+json' -H 'Content-Type: application/vnd.vmware.vmw.rest-v1+json' ${AUTHENT} ${URL} || echo "{}"

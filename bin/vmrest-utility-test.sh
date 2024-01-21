@@ -7,7 +7,7 @@ pushd ${CURDIR}
 CURDIR=${PWD}
 popd
 
-source ${CURDIR}/common.sh
+source "${CURDIR}/common.sh"
 
 rm -f *.log
 

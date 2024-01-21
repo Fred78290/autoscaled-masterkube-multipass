@@ -1,8 +1,7 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
 
-source ${CURDIR}/common.sh
-
+source "${CURDIR}/common.sh"
 
 TEMP=$(getopt -o c:g: --long node-group:,cluster-nodes: -n "$0" -- "$@")
 

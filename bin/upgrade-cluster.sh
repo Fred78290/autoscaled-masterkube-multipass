@@ -2,8 +2,8 @@
 set -e
 
 CURDIR=$(dirname $0)
-SSH_OPTIONS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-SCP_OPTIONS="${SSH_OPTIONS} -p -r"
+
+source "${CURDIR}/common.sh"
 
 KUBECONFIG_CONTEXT=k8s-${MASTERKUBE}-admin@${NODEGROUP_NAME}
 
@@ -15,8 +15,6 @@ kubectl config get-contexts ${KUBECONFIG_CONTEXT} &>/dev/null || (echo_red_bold 
 kubectl config set-context ${KUBECONFIG_CONTEXT} &>/dev/null
 
 pushd ${CURDIR}/../ &>/dev/null
-
-source ${PWD}/bin/common.sh
 
 # Keep directory location
 KEEP_TARGET_CONFIG_LOCATION=${TARGET_CONFIG_LOCATION}

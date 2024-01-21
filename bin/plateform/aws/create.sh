@@ -15,14 +15,10 @@ RESERVED_ENI=()
 PRIVATE_ADDR_IPS=()
 PUBLIC_ADDR_IPS=()
 
-source ${CURDIR}/common.sh
-
 function usage() {
 	common_usage
 	cat <<EOF
 ### Flags ${PLATEFORM} plateform specific
---cache=<path>                                   # Cache location, default ${CACHE}
-
   # Flags to set AWS informations
 --profile | -p=<value>                           # Specify AWS profile, default ${AWS_PROFILE}
 --region | -r=<value>                            # Specify AWS region, default ${AWS_REGION}
@@ -32,109 +28,111 @@ function usage() {
   # Flags to set the template vm
 --target-image=<value>                           # Override the template VM image used for created VM, default ${TARGET_IMAGE}
 --seed-image=<value>                             # Override the seed image name used to create template, default ${SEED_IMAGE}
---seed-user=<value>                              # Override the seed user in template, default ${KUBERNETES_USER}
+--kubernetes-user=<value>                        # Override the seed user in template, default ${KUBERNETES_USER}
 --arch=<value>                                   # Specify the architecture of VM (amd64|arm64), default ${SEED_ARCH}
 --volume-type=<value>                            # Override the root EBS volume type, default ${VOLUME_TYPE}
 --volume-size=<value>                            # Override the root EBS volume size in Gb, default ${VOLUME_SIZE}
 
   # Flags in ha mode only
 --use-nlb                                        # Use AWS NLB as load balancer in public AZ
---dont-use-nlb                                   # Use NGINX as load balancer in public AZ
 --create-nginx-apigateway                        # Create NGINX instance to install an apigateway, default ${USE_NGINX_GATEWAY}
---dont-create-nginx-apigateway                   # Don't create NGINX instance to install an apigateway, default ${USE_NGINX_GATEWAY}
 
   # Flags to configure network in ${PLATEFORM}
 --prefer-ssh-publicip                            # Allow to SSH on publicip when available, default ${PREFER_SSH_PUBLICIP}
---dont-prefer-ssh-publicip                       # Disallow to SSH on publicip when available, default ${PREFER_SSH_PUBLICIP}--internet-facing                                # Expose the cluster on internet port: 80 443, default ${EXPOSE_PUBLIC_CLUSTER}
---no-internet-facing                             # Don't expose the cluster on internet, default ${EXPOSE_PUBLIC_CLUSTER}--public-subnet-id=<subnetid,...>                # Specify the public subnet ID for created VM, default ${VPC_PUBLIC_SUBNET_ID}
+--internet-facing                                # Expose the cluster on internet, default ${EXPOSE_PUBLIC_CLUSTER}--public-subnet-id=<subnetid,...>                # Specify the public subnet ID for created VM, default ${VPC_PUBLIC_SUBNET_ID}
 --public-sg-id=<sg-id>                           # Specify the public security group ID for VM, default ${VPC_PUBLIC_SECURITY_GROUPID}
 --private-subnet-id<subnetid,...>                # Specify the private subnet ID for created VM, default ${VPC_PRIVATE_SUBNET_ID}
 --private-sg-id=<sg-id>                          # Specify the private security group ID for VM, default ${VPC_PRIVATE_SECURITY_GROUPID}
 
   # Flags to expose nodes in public AZ with public IP
 --control-plane-public                           # Control plane are hosted in public subnet with public IP, default ${CONTROLPLANE_USE_PUBLICIP}
---no-control-plane-public                        # Control plane are hosted in private subnet, default ${CONTROLPLANE_USE_PUBLICIP}
 --worker-node-public                             # Worker nodes are hosted in public subnet with public IP, default ${WORKERNODE_USE_PUBLICIP}
---no-worker-node-public                          # Worker nodes are hosted in private subnet, default ${WORKERNODE_USE_PUBLICIP}
 EOF
 }
 
-TEMP=$(getopt -o hvxr --long upgrade,k8s-distribution:,cloudprovider:,use-zerossl,zerossl-eab-kid:,zerossl-eab-hmac-secret:,godaddy-key:,godaddy-secret:,route53-profile:,route53-zone-id:,cache:,cert-email:,public-domain:,private-domain:,dashboard-hostname:,delete,dont-prefer-ssh-publicip,prefer-ssh-publicip,dont-create-nginx-apigateway,create-nginx-apigateway,configuration-location:,ssl-location:,control-plane-machine:,worker-node-machine:,autoscale-machine:,internet-facing,no-internet-facing,control-plane-public,no-control-plane-public,create-image-only,nginx-machine:,volume-type:,volume-size:,aws-defs:,container-runtime:,cni-plugin:,trace,help,verbose,resume,ha-cluster,create-external-etcd,dont-use-nlb,use-nlb,worker-nodes:,arch:,max-pods:,profile:,region:,node-group:,target-image:,seed-image:,seed-user:,vpc-id:,public-subnet-id:,public-sg-id:,private-subnet-id:,private-sg-id:,transport:,ssh-private-key:,cni-version:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
+OPTIONS=(
+	"help"
+	"distribution:"
+	"upgrade"
+	"verbose"
+	"trace"
+	"resume"
+	"delete"
+	"configuration-location:"
+	"ssl-location:"
+	"cert-email:"
+	"use-zerossl:"
+	"zerossl-eab-kid:"
+	"zerossl-eab-hmac-secret:"
+	"godaddy-key:"
+	"godaddy-secret:"
+	"route53-zone-id:"
+	"route53-access-key:"
+	"route53-secret-key:"
+	"dashboard-hostname:"
+	"public-domain:"
+	"defs:"
+	"create-image-only"
+	"max-pods:"
+	"k8s-distribution:"
+	"ha-cluster"
+	"create-external-etcd"
+	"node-group:"
+	"container-runtime:"
+	"target-image:"
+	"arch:"
+	"seed-image:"
+	"nginx-machine:"
+	"control-plane-machine:"
+	"worker-node-machine:"
+	"autoscale-machine:"
+	"ssh-private-key:"
+	"cni-plugin:"
+	"cni-version:"
+	"transport:"
+	"kubernetes-version:"
+	"kubernetes-user:"
+	"kubernetes-password:"
+	"worker-nodes:"
+	"cloudprovider:"
+	"max-nodes-total:"
+	"cores-total:"
+	"memory-total:"
+	"max-autoprovisioned-node-group-count:"
+	"scale-down-enabled:"
+	"scale-down-delay-after-add:"
+	"scale-down-delay-after-delete:"
+	"scale-down-delay-after-failure:"
+	"scale-down-unneeded-time:"
+	"scale-down-unready-time:"
+	"unremovable-node-recheck-timeout:"
+
+	"profile:"
+	"route53-profile:"
+	"region:"
+	"public-subnet-id:"
+	"public-sg-id:"
+	"private-subnet-id:"
+	"private-sg-id:"
+	"create-nginx-apigatewa"y
+	"prefer-ssh-publicip"
+	"private-domain:"
+	"use-nlb"
+	"volume-size:"
+	"volume-type:"
+	"internet-facing"
+	"control-plane-public"
+	"worker-node-public"
+)
+
+PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+TEMP=$(getopt -o hvxrdk:u:p: --long "${PARAMS}"  -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true; do
 	case "$1" in
-	--create-nginx-apigateway)
-		USE_NGINX_GATEWAY=YES
-		shift 1
-		;;
-	--dont-create-nginx-apigateway)
-		USE_NGINX_GATEWAY=NO
-		shift 1
-		;;
-	--prefer-ssh-publicip)
-		PREFER_SSH_PUBLICIP=YES;
-		shift 1
-		;;
-	--dont-prefer-ssh-publicip)
-		PREFER_SSH_PUBLICIP=NO;
-		shift 1
-		;;
-	--private-domain)
-		PRIVATE_DOMAIN_NAME=$2
-		shift 2
-		;;
-	--cache)
-		CACHE=$2
-		shift 2
-		;;
-	--use-nlb)
-		USE_NLB=YES
-		shift 1
-		;;
-	--dont-use-nlb)
-		USE_NLB=NO
-		shift 1
-		;;
-	--volume-size)
-		VOLUME_SIZE=$2
-		shift 2
-		;;
-	--volume-type)
-		VOLUME_TYPE=$2
-		shift 2
-		;;
-	--internet-facing)
-		EXPOSE_PUBLIC_CLUSTER=true
-		shift 1
-		;;
-
-	--no-internet-facing)
-		EXPOSE_PUBLIC_CLUSTER=false
-		shift 1
-		;;
-
-	--control-plane-public)
-		CONTROLPLANE_USE_PUBLICIP=true
-		shift 1
-		;;
-
-	--no-control-plane-public)
-		CONTROLPLANE_USE_PUBLICIP=false
-		shift 1
-		;;
-
-	--worker-node-public)
-		WORKERNODE_USE_PUBLICIP=true
-		shift 1
-		;;
-
-	--no-worker-node-public)
-		WORKERNODE_USE_PUBLICIP=false
-		shift 1
-		;;
 	-h|--help)
 		usage
 		exit 0
@@ -161,7 +159,7 @@ while true; do
 		RESUME=YES
 		shift 1
 		;;
-	--delete)
+	-d|--delete)
 		DELETE_CLUSTER=YES
 		shift 1
 		;;
@@ -188,10 +186,6 @@ while true; do
 		;;
 	--use-zerossl)
 		USE_ZEROSSL=YES
-		shift 1
-		;;
-	--dont-use-zerossl)
-		USE_ZEROSSL=NO
 		shift 1
 		;;
 	--zerossl-eab-kid)
@@ -260,12 +254,11 @@ while true; do
 		esac
 		shift 2
 		;;
-	-c|--ha-cluster)
+	--ha-cluster)
 		HA_CLUSTER=true
-		CONTROLNODES=3
 		shift 1
 		;;
-	-e|--create-external-etcd)
+	--create-external-etcd)
 		EXTERNAL_ETCD=true
 		shift 1
 		;;
@@ -274,7 +267,6 @@ while true; do
 		MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 		shift 2
 		;;
-
 	--container-runtime)
 		case "$2" in
 			"docker"|"cri-o"|"containerd")
@@ -286,81 +278,35 @@ while true; do
 				;;
 		esac
 		shift 2;;
-
-	--profile)
-		AWS_PROFILE="$2"
-		shift 2
-		;;
-	--region)
-		AWS_REGION="$2"
-		shift 2
-		;;
-
-	--route53-profile)
-		AWS_PROFILE_ROUTE53=$2
-		shift 2
-		;;
-	--max-pods)
-		MAX_PODS=$2
-		shift 2
-		;;
-
 	--target-image)
 		TARGET_IMAGE="$2"
 		shift 2
 		;;
-
 	--arch)
 		SEED_ARCH=$2
 		shift 2
 		;;
-
 	--seed-image)
 		OVERRIDE_SEED_IMAGE="$2"
 		shift 2
 		;;
-
-	--seed-user)
-		KUBERNETES_USER="$2"
-		shift 2
-		;;
-
-	--public-subnet-id)
-		VPC_PUBLIC_SUBNET_ID="$2"
-		shift 2
-		;;
-
-	--public-sg-id)
-		VPC_PUBLIC_SECURITY_GROUPID="$2"
-		shift 2
-		;;
-
-	--private-subnet-id)
-		VPC_PRIVATE_SUBNET_ID="$2"
-		shift 2
-		;;
-
-	--private-sg-id)
-		VPC_PRIVATE_SECURITY_GROUPID="$2"
-		shift 2
-		;;
 	--nginx-machine)
-		OVERRIDE_NGINX_MACHINE="$2"
+		NGINX_MACHINE="$2"
 		shift 2
 		;;
 	--control-plane-machine)
-		OVERRIDE_CONTROL_PLANE_MACHINE="$2"
+		CONTROL_PLANE_MACHINE="$2"
 		shift 2
 		;;
 	--worker-node-machine)
-		OVERRIDE_WORKER_NODE_MACHINE="$2"
+		WORKER_NODE_MACHINE="$2"
 		shift 2
 		;;
 	--autoscale-machine)
-		OVERRIDE_AUTOSCALE_MACHINE="$2"
+		AUTOSCALE_MACHINE="$2"
 		shift 2
 		;;
-	-s | --ssh-private-key)
+	--ssh-private-key)
 		SSH_PRIVATE_KEY=$2
 		shift 2
 		;;
@@ -368,23 +314,30 @@ while true; do
 		CNI_PLUGIN="$2"
 		shift 2
 		;;
-	-n | --cni-version)
+	--cni-version)
 		CNI_VERSION="$2"
 		shift 2
 		;;
-	-t | --transport)
+	--transport)
 		TRANSPORT="$2"
 		shift 2
 		;;
-	-k | --kubernetes-version)
+	-k|--kubernetes-version)
 		KUBERNETES_VERSION="$2"
+		shift 2
+		;;
+	-u|--kubernetes-user)
+		KUBERNETES_USER="$2"
+		shift 2
+		;;
+	-p|--kubernetes-password)
+		KUBERNETES_PASSWORD="$2"
 		shift 2
 		;;
 	--worker-nodes)
 		WORKERNODES=$2
 		shift 2
 		;;
-
 	# Same argument as cluster-autoscaler
 	--cloudprovider)
 		GRPC_PROVIDER="$2"
@@ -434,6 +387,72 @@ while true; do
 		UNREMOVABLENODERECHECKTIMEOUT="$2"
 		shift 2
 		;;
+### Plateform specific
+	--profile)
+		AWS_PROFILE="$2"
+		shift 2
+		;;
+	--route53-profile)
+		AWS_PROFILE_ROUTE53=$2
+		shift 2
+		;;
+	--region)
+		AWS_REGION="$2"
+		shift 2
+		;;
+	--public-subnet-id)
+		VPC_PUBLIC_SUBNET_ID="$2"
+		shift 2
+		;;
+	--public-sg-id)
+		VPC_PUBLIC_SECURITY_GROUPID="$2"
+		shift 2
+		;;
+	--private-subnet-id)
+		VPC_PRIVATE_SUBNET_ID="$2"
+		shift 2
+		;;
+
+	--private-sg-id)
+		VPC_PRIVATE_SECURITY_GROUPID="$2"
+		shift 2
+		;;
+	--create-nginx-apigateway)
+		USE_NGINX_GATEWAY=YES
+		shift 1
+		;;
+	--prefer-ssh-publicip)
+		PREFER_SSH_PUBLICIP=YES;
+		shift 1
+		;;
+	--private-domain)
+		PRIVATE_DOMAIN_NAME=$2
+		shift 2
+		;;
+	--use-nlb)
+		USE_NLB=YES
+		shift 1
+		;;
+	--volume-size)
+		VOLUME_SIZE=$2
+		shift 2
+		;;
+	--volume-type)
+		VOLUME_TYPE=$2
+		shift 2
+		;;
+	--internet-facing)
+		EXPOSE_PUBLIC_CLUSTER=true
+		shift 1
+		;;
+	--control-plane-public)
+		CONTROLPLANE_USE_PUBLICIP=true
+		shift 1
+		;;
+	--worker-node-public)
+		WORKERNODE_USE_PUBLICIP=true
+		shift 1
+		;;
 	--)
 		shift
 		break
@@ -445,11 +464,6 @@ while true; do
 	esac
 done
 
-if [ ${NODEGROUP_SET} == "NO" ]; then
-	NODEGROUP_NAME="aws-ca-${KUBERNETES_DISTRO}"
-	MASTERKUBE="${NODEGROUP_NAME}-masterkube"
-fi
-
 if [ "${VERBOSE}" == "YES" ]; then
 	SILENT=
 else
@@ -457,9 +471,32 @@ else
 	SCP_OPTIONS="${SCP_OPTIONS} -q"
 fi
 
+# Check if ssh private key exists
+if [ ! -f ${SSH_PRIVATE_KEY} ]; then
+	echo_red "The private ssh key: ${SSH_PRIVATE_KEY} is not found"
+	exit -1
+fi
+
+# Check if ssh public key exists
+if [ ! -f ${SSH_PUBLIC_KEY} ]; then
+	echo_red "The private ssh key: ${SSH_PUBLIC_KEY} is not found"
+	exit -1
+fi
+
+if [ "${UPGRADE_CLUSTER}" == "YES" ] && [ "${DELETE_CLUSTER}" = "YES" ]; then
+	echo_red_bold "Can't upgrade deleted cluster, exit"
+	exit
+fi
+
 if [ "${GRPC_PROVIDER}" != "grpc" ] && [ "${GRPC_PROVIDER}" != "externalgrpc" ]; then
 	echo_red_bold "Unsupported cloud provider: ${GRPC_PROVIDER}, only grpc|externalgrpc, exit"
 	exit
+fi
+
+if [ ${GRPC_PROVIDER} = "grpc" ]; then
+	CLOUD_PROVIDER_CONFIG=grpc-config.json
+else
+	CLOUD_PROVIDER_CONFIG=grpc-config.yaml
 fi
 
 if [ "${USE_ZEROSSL}" = "YES" ]; then
@@ -469,12 +506,101 @@ if [ "${USE_ZEROSSL}" = "YES" ]; then
 	fi
 fi
 
-if [ ${HA_CLUSTER} = "false" ]; then
+if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+	LOAD_BALANCER_PORT="${LOAD_BALANCER_PORT},9345"
+	EXTERNAL_ETCD=false
+fi
+
+if [ "${HA_CLUSTER}" = "true" ]; then
+	CONTROLNODES=3
+else
+	CONTROLNODES=1
+	EXTERNAL_ETCD=false
+
 	if [ "${USE_NLB}" = "YES" ]; then
 		echo_red_bold "NLB usage is not available for single plane cluster"
 		exit 1
 	fi
+fi
 
+if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+	WANTED_KUBERNETES_VERSION=${KUBERNETES_VERSION}
+	IFS=. read K8S_VERSION K8S_MAJOR K8S_MINOR <<< "${KUBERNETES_VERSION}"
+
+	if [ ${K8S_MAJOR} -eq 28 ] && [ ${K8S_MINOR} -lt 5 ]; then 
+		DELETE_CREDENTIALS_CONFIG=YES
+	fi
+
+	if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+		RANCHER_CHANNEL=$(curl -s https://update.rke2.io/v1-release/channels)
+	else
+		RANCHER_CHANNEL=$(curl -s https://update.k3s.io/v1-release/channels)
+	fi
+
+	KUBERNETES_VERSION=$(echo -n "${RANCHER_CHANNEL}" | jq -r --arg KUBERNETES_VERSION "${K8S_VERSION}.${K8S_MAJOR}" '.data[]|select(.id == $KUBERNETES_VERSION)|.latest//""')
+
+	if [ -z "${KUBERNETES_VERSION}" ]; then
+		KUBERNETES_VERSION=$(echo -n "${RANCHER_CHANNEL}" | jq -r '.data[]|select(.id == "latest")|.latest//""')
+		echo_red_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} not available, use latest ${KUBERNETES_VERSION}"
+	else
+		echo_blue_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} found, use ${KUBERNETES_DISTRO} ${KUBERNETES_VERSION}"
+	fi
+fi
+
+SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
+SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+SSH_KEY=$(cat "${SSH_PUBLIC_KEY}")
+
+TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
+TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
+TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+
+mkdir -p ${TARGET_CONFIG_LOCATION}
+mkdir -p ${TARGET_DEPLOY_LOCATION}
+mkdir -p ${TARGET_CLUSTER_LOCATION}
+
+if [ "${EXTERNAL_ETCD}" = "true" ]; then
+	EXTERNAL_ETCD_ARGS="--use-external-etcd"
+	ETCD_DST_DIR="/etc/etcd/ssl"
+else
+	EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
+	ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
+fi
+
+# Check if passord is defined
+if [ -z ${KUBERNETES_PASSWORD} ]; then
+	if [ -f ~/.kubernetes_pwd ]; then
+		KUBERNETES_PASSWORD=$(cat ~/.kubernetes_pwd)
+	else
+		KUBERNETES_PASSWORD=$(uuidgen)
+		echo -n "${KUBERNETES_PASSWORD}" > ~/.kubernetes_pwd
+	fi
+fi
+
+# GRPC network endpoint
+if [ "${LAUNCH_CA}" != "YES" ]; then
+	SSH_PRIVATE_KEY_LOCAL="${SSH_PRIVATE_KEY}"
+
+	if [ "${TRANSPORT}" == "unix" ]; then
+		LISTEN="unix:/var/run/cluster-autoscaler/autoscaler.sock"
+		CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
+	elif [ "${TRANSPORT}" == "tcp" ]; then
+		LISTEN="tcp://${LOCAL_IPADDR}:5200"
+		CONNECTTO="${LOCAL_IPADDR}:5200"
+	else
+		echo_red "Unknown transport: ${TRANSPORT}, should be unix or tcp"
+		exit -1
+	fi
+else
+	SSH_PRIVATE_KEY_LOCAL="/etc/ssh/id_rsa"
+	TRANSPORT=unix
+	LISTEN="unix:/var/run/cluster-autoscaler/autoscaler.sock"
+	CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
+fi
+
+echo_blue_bold "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
+
+if [ ${HA_CLUSTER} = "false" ]; then
 	if [ "${USE_NGINX_GATEWAY}" = "NO" ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "false" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
 		echo_red_bold "Single plane cluster can not be exposed to internet because because control plane require public IP or require NGINX gateway in front"
 		exit
@@ -507,103 +633,15 @@ if [ "${SEED_ARCH}" = "amd64" ]; then
 	else
 		SEED_IMAGE="${OVERRIDE_SEED_IMAGE}"
 	fi
-
-	if [ -n "${OVERRIDE_CONTROL_PLANE_MACHINE}" ]; then
-		CONTROL_PLANE_MACHINE="${OVERRIDE_CONTROL_PLANE_MACHINE}"
-	fi
-
-	if [ -n "${OVERRIDE_WORKER_NODE_MACHINE}" ]; then
-		WORKER_NODE_MACHINE="${OVERRIDE_WORKER_NODE_MACHINE}"
-	fi
-
-	if [ -n "${OVERRIDE_AUTOSCALE_MACHINE}" ]; then
-		AUTOSCALE_MACHINE="${OVERRIDE_AUTOSCALE_MACHINE}"
-	fi
-
-	if [ -n "${OVERRIDE_NGINX_MACHINE}" ]; then
-		NGINX_MACHINE="${OVERRIDE_NGINX_MACHINE}"
-	fi
 elif [ "${SEED_ARCH}" = "arm64" ]; then
 	if [ -z "${OVERRIDE_SEED_IMAGE}" ]; then
 		SEED_IMAGE=${SEED_IMAGE_ARM64}
 	else
 		SEED_IMAGE="${OVERRIDE_SEED_IMAGE}"
 	fi
-
-	if [ -n "${OVERRIDE_CONTROL_PLANE_MACHINE}" ]; then
-		CONTROL_PLANE_MACHINE="${OVERRIDE_CONTROL_PLANE_MACHINE}"
-	fi
-
-	if [ -n "${OVERRIDE_WORKER_NODE_MACHINE}" ]; then
-		WORKER_NODE_MACHINE="${OVERRIDE_WORKER_NODE_MACHINE}"
-	fi
-
-	if [ -n "${OVERRIDE_AUTOSCALE_MACHINE}" ]; then
-		AUTOSCALE_MACHINE="${OVERRIDE_AUTOSCALE_MACHINE}"
-	fi
-
-	if [ -n "${OVERRIDE_AUTOSCALE_MACHINE}" ]; then
-		AUTOSCALE_MACHINE="${OVERRIDE_AUTOSCALE_MACHINE}"
-	fi
-
-	if [ -n "${OVERRIDE_NGINX_MACHINE}" ]; then
-		NGINX_MACHINE="${OVERRIDE_NGINX_MACHINE}"
-	fi
 else
 	echo_red "Unsupported architecture: ${SEED_ARCH}"
 	exit -1
-fi
-
-if [ "${UPGRADE_CLUSTER}" == "YES" ] && [ "${DELETE_CLUSTER}" = "YES" ]; then
-	echo_red_bold "Can't upgrade deleted cluster, exit"
-	exit
-fi
-
-if [ "${GRPC_PROVIDER}" != "grpc" ] && [ "${GRPC_PROVIDER}" != "externalgrpc" ]; then
-	echo_red_bold "Unsupported cloud provider: ${GRPC_PROVIDER}, only grpc|externalgrpc, exit"
-	exit
-fi
-
-if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-	LOAD_BALANCER_PORT="${LOAD_BALANCER_PORT},9345"
-	EXTERNAL_ETCD=false
-fi
-
-if [ "${HA_CLUSTER}" = "true" ]; then
-	CONTROLNODES=3
-else
-	CONTROLNODES=1
-fi
-
-if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-	WANTED_KUBERNETES_VERSION=${KUBERNETES_VERSION}
-	IFS=. read K8S_VERSION K8S_MAJOR K8S_MINOR <<< "${KUBERNETES_VERSION}"
-
-	if [ ${K8S_MAJOR} -eq 28 ] && [ ${K8S_MINOR} -lt 5 ]; then 
-		DELETE_CREDENTIALS_CONFIG=YES
-	fi
-
-	if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-		RANCHER_CHANNEL=$(curl -s https://update.rke2.io/v1-release/channels)
-	else
-		RANCHER_CHANNEL=$(curl -s https://update.k3s.io/v1-release/channels)
-	fi
-
-	KUBERNETES_VERSION=$(echo -n "${RANCHER_CHANNEL}" | jq -r --arg KUBERNETES_VERSION "${K8S_VERSION}.${K8S_MAJOR}" '.data[]|select(.id == $KUBERNETES_VERSION)|.latest//""')
-
-	if [ -z "${KUBERNETES_VERSION}" ]; then
-		KUBERNETES_VERSION=$(echo -n "${RANCHER_CHANNEL}" | jq -r '.data[]|select(.id == "latest")|.latest//""')
-		echo_red_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} not available, use latest ${KUBERNETES_VERSION}"
-	else
-		echo_blue_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} found, use ${KUBERNETES_DISTRO} ${KUBERNETES_VERSION}"
-	fi
-fi
-
-if [ "${VERBOSE}" == "YES" ]; then
-	SILENT=
-else
-	SSH_OPTIONS="${SSH_OPTIONS} -q"
-	SCP_OPTIONS="${SCP_OPTIONS} -q"
 fi
 
 if [ -z "${TARGET_IMAGE}" ]; then
@@ -621,22 +659,8 @@ if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; 
 else
 	TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 fi
+
 MACHINES_TYPES=$(jq --argjson VOLUME_SIZE ${VOLUME_SIZE} --arg VOLUME_TYPE ${VOLUME_TYPE} 'with_entries(.value += {"diskType": $VOLUME_TYPE, "diskSize": $VOLUME_SIZE})' templates/machines/${SEED_ARCH}.json)
-
-SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
-SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
-
-TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
-TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
-TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
-
-if [ "${EXTERNAL_ETCD}" = "true" ]; then
-	EXTERNAL_ETCD_ARGS="--use-external-etcd"
-	ETCD_DST_DIR="/etc/etcd/ssl"
-else
-	EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
-	ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
-fi
 
 # Check if we can resume the creation process
 if [ "${DELETE_CLUSTER}" = "YES" ]; then
@@ -646,20 +670,6 @@ elif [ ! -f ${TARGET_CONFIG_LOCATION}/buildenv ] && [ "${RESUME}" = "YES" ]; the
 	echo_red "Unable to resume, building env is not found"
 	exit -1
 fi
-
-# Check if ssh private key exists
-if [ ! -f ${SSH_PRIVATE_KEY} ]; then
-	echo_red "The private ssh key: ${SSH_PRIVATE_KEY} is not found"
-	exit -1
-fi
-
-# Check if ssh public key exists
-if [ ! -f ${SSH_PUBLIC_KEY} ]; then
-	echo_red "The private ssh key: ${SSH_PUBLIC_KEY} is not found"
-	exit -1
-fi
-
-SSH_KEY=$(cat "${SSH_PUBLIC_KEY}")
 
 # If we use AWS CNI, install eni-max-pods.txt definition file
 if [ ${CNI_PLUGIN} = "aws" ]; then
@@ -787,29 +797,6 @@ else
 	echo_grey "SSH Public key already exists"
 fi
 
-# GRPC network endpoint
-if [ "${LAUNCH_CA}" != "YES" ]; then
-	SSH_PRIVATE_KEY_LOCAL="${SSH_PRIVATE_KEY}"
-
-	if [ "${TRANSPORT}" == "unix" ]; then
-		LISTEN="unix:/var/run/cluster-autoscaler/autoscaler.sock"
-		CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
-	elif [ "${TRANSPORT}" == "tcp" ]; then
-		LISTEN="tcp://${LOCAL_IPADDR}:5200"
-		CONNECTTO="${LOCAL_IPADDR}:5200"
-	else
-		echo_red "Unknown transport: ${TRANSPORT}, should be unix or tcp"
-		exit -1
-	fi
-else
-	SSH_PRIVATE_KEY_LOCAL="/etc/ssh/id_rsa"
-	TRANSPORT=unix
-	LISTEN="unix:/var/run/cluster-autoscaler/autoscaler.sock"
-	CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
-fi
-
-echo_blue_bold "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
-
 # If CERT doesn't exist, create one autosigned
 if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
 	if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
@@ -884,24 +871,23 @@ if [ -z "${TARGET_IMAGE_AMI}" ]; then
 	fi
 
 	./bin/create-image.sh \
-		--plateform=${PLATEFORM} \
+		--ami="${SEED_IMAGE}" \
+		--arch="${SEED_ARCH}" \
+		--cni-plugin="${CNI_PLUGIN}" \
+		--cni-version="${CNI_VERSION}" \
+		--container-runtime=${CONTAINER_ENGINE} \
+		--custom-image="${TARGET_IMAGE}" \
+		--ecr-password="${ECR_PASSWORD}" \
 		--k8s-distribution=${KUBERNETES_DISTRO} \
+		--kubernetes-version="${KUBERNETES_VERSION}" \
+		--plateform=${PLATEFORM} \
 		--profile="${AWS_PROFILE}" \
 		--region="${AWS_REGION}" \
-		--cni-version="${CNI_VERSION}" \
-		--cni-plugin="${CNI_PLUGIN}" \
-		--ecr-password="${ECR_PASSWORD}" \
-		--custom-image="${TARGET_IMAGE}" \
-		--kubernetes-version="${KUBERNETES_VERSION}" \
-		--container-runtime=${CONTAINER_ENGINE} \
-		--cache=${CACHE} \
-		--arch="${SEED_ARCH}" \
-		--ami="${SEED_IMAGE}" \
-		--user="${KUBERNETES_USER}" \
+		--sg-id="${SGID}" \
 		--ssh-key-name="${SSH_KEYNAME}" \
 		--subnet-id="${SUBNETID}" \
-		--sg-id="${SGID}" \
-		--use-public-ip="${CONTROLPLANE_USE_PUBLICIP}"
+		--use-public-ip="${CONTROLPLANE_USE_PUBLICIP}" \
+		--user="${KUBERNETES_USER}" \
 fi
 
 if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
@@ -911,12 +897,6 @@ fi
 
 TARGET_IMAGE_AMI=$(aws ec2 describe-images --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=name,Values=${TARGET_IMAGE}" | jq -r '.Images[0].ImageId // ""')
 
-if [ ${GRPC_PROVIDER} = "grpc" ]; then
-	CLOUD_PROVIDER_CONFIG=grpc-config.json
-else
-	CLOUD_PROVIDER_CONFIG=grpc-config.yaml
-fi
-
 if [ -z "${TARGET_IMAGE_AMI}" ]; then
 	echo_red "AMI ${TARGET_IMAGE} not found"
 	exit -1
@@ -924,19 +904,15 @@ fi
 
 # Delete previous existing version
 if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
-	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}" > /dev/stderr
-	delete-masterkube.sh --configuration-location=${CONFIGURATION_LOCATION} --aws-defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
+	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
+	delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
 elif [ "${UPGRADE_CLUSTER}" == "NO" ]; then
-	echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}" > /dev/stderr
+	echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 else
 	echo_title "Upgrade ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	./bin/upgrade-cluster.sh
 	exit
 fi
-
-mkdir -p ${TARGET_CONFIG_LOCATION}
-mkdir -p ${TARGET_DEPLOY_LOCATION}
-mkdir -p ${TARGET_CLUSTER_LOCATION}
 
 if [ "${RESUME}" = "NO" ]; then
 	if [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
@@ -956,6 +932,8 @@ if [ "${RESUME}" = "NO" ]; then
 else
 	source ${TARGET_CONFIG_LOCATION}/buildenv
 fi
+
+echo "${KUBERNETES_PASSWORD}" >${TARGET_CONFIG_LOCATION}/kubernetes-password.txt
 
 EVAL=$(sed -i '/NODE_INDEX/d' ${TARGET_CONFIG_LOCATION}/buildenv)
 

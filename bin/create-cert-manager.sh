@@ -1,7 +1,7 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
 
-source ${CURDIR}/common.sh
+source "${CURDIR}/common.sh"
 
 function deploy {
 	echo "Create ${ETC_DIR}/$1.json"

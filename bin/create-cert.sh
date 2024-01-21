@@ -1,7 +1,7 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
 
-source ${CURDIR}/common.sh
+source "${CURDIR}/common.sh"
 
 function usage() {
 cat <<EOF

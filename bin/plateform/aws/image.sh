@@ -2,33 +2,40 @@
 
 set -eu
 
-KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-CNI_VERSION=v1.4.0
-CNI_PLUGIN=aws
-CACHE=~/.local/aws/cache
-OSDISTRO=$(uname -s)
-SSH_KEYNAME="aws-k8s-key"
-CURDIR=$(dirname $0)
 FORCE=NO
 INSTANCE_IMAGE=t3a.small
-SEED_ARCH=amd64
-KUBERNETES_USER=ubuntu
 SEED_IMAGE=
 TARGET_IMAGE=
-CONTAINER_ENGINE=docker
-CONTAINER_CTL=docker
-KUBERNETES_DISTRO=kubedm
 SUBNET_ID=
 SECURITY_GROUPID=
-SSH_KEY_PUB=~/.ssh/id_rsa.pub
-SSH_KEY_PRIV=~/.ssh/id_rsa
 MASTER_USE_PUBLICIP=true
 
-SSH_OPTIONS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+OPTIONS=(
+	"force"
+	"profile:"
+	"region:"
+	"custom-image:"
+	"cni-version:"
+	"cni-plugin:"
+	"user:"
+	"kubernetes-version:"
+	"ami:"
+	"arch:"
+	"ecr-password:"
+	"ssh-key-name:"
+	"ssh-key-file:"
+	"subnet-id:"
+	"sg-id:"
+	"use-public-ip:"
+	"k8s-distribution:"
+	"container-runtime:"
+	"aws-access-key:"
+	"aws-secret-key:"
+)
 
-source ${CURDIR}/common.sh
-
-TEMP=`getopt -o kfc:i:n:op:s:u:v: --long k8s-distribution:,aws-access-key:,aws-secret-key:,use-k3s:,cache-dir:,container-runtime:,arch:,ecr-password:,force,profile:,region:,subnet-id:,sg-id:,use-public-ip:,user:,ami:,custom-image:,ssh-key-name:,ssh-key-file:,ssh-key-private:,cni-plugin:,cni-version:,kubernetes-version: -n "$0" -- "$@"`
+PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+TEMP=$(getopt -o fp:r:i:n:c:u: --long "${PARAMS}"  -n "$0" -- "$@")
+v:
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
@@ -40,7 +47,7 @@ while true ; do
 		-p|--profile) AWS_PROFILE="${2}" ; shift 2;;
 		-r|--region) AWS_REGION="${2}" ; shift 2;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
-		-i|--cni-version) CNI_VERSION=$2 ; shift 2;;
+		-n|--cni-version) CNI_VERSION=$2 ; shift 2;;
 		-c|--cni-plugin) CNI_PLUGIN=$2 ; shift 2;;
 		-u|--user) KUBERNETES_USER=$2 ; shift 2;;
 		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
@@ -49,12 +56,10 @@ while true ; do
 		--arch) SEED_ARCH=$2 ; shift 2;;
 		--ecr-password) ECR_PASSWORD=$2 ; shift 2;;
 		--ssh-key-name) SSH_KEYNAME=$2 ; shift 2;;
-		--ssh-key-file) SSH_KEY_PUB="${2}" ; shift 2;;
-		--ssh-key-private) SSH_KEY_PRIV="${2}" ; shift 2;;
+		--ssh-key-file) SSH_PUBLIC_KEY="${2}" ; shift 2;;
 		--subnet-id) SUBNET_ID="${2}" ; shift 2;;
 		--sg-id) SECURITY_GROUPID="${2}" ; shift 2;;
 		--use-public-ip) MASTER_USE_PUBLICIP="${2}" ; shift 2;;
-		--cache-dir) CACHE=$2 ; shift 2;;
 		--k8s-distribution) 
 			case "$2" in
 				kubeadm|k3s|rke2)
@@ -83,7 +88,6 @@ while true ; do
 					;;
 			esac
 			shift 2;;
-
 		--aws-access-key)
 			AWS_ACCESS_KEY_ID=$2
 			shift 2
@@ -92,7 +96,6 @@ while true ; do
 			AWS_SECRET_ACCESS_KEY=$2
 			shift 2
 			;;
-
 		--) shift ; break ;;
 		*) echo_red_bold "$1 - Internal error!" ; exit 1 ;;
 	esac
@@ -155,11 +158,11 @@ fi
 
 if [ -z ${KEYEXISTS} ]; then
 	echo_red_bold "SSH Public key doesn't exist"
-	if [ -z ${SSH_KEY_PUB} ]; then
-		echo_red_bold "${SSH_KEY_PUB} doesn't exists. FATAL"
+	if [ -z ${SSH_PUBLIC_KEY} ]; then
+		echo_red_bold "${SSH_PUBLIC_KEY} doesn't exists. FATAL"
 		exit -1
 	fi
-	aws ec2 import-key-pair --profile ${AWS_PROFILE} --region ${AWS_REGION} --key-name ${SSH_KEYNAME} --public-key-material "file://${SSH_KEY_PUB}"
+	aws ec2 import-key-pair --profile ${AWS_PROFILE} --region ${AWS_REGION} --key-name ${SSH_KEYNAME} --public-key-material "file://${SSH_PUBLIC_KEY}"
 fi
 
 case "${KUBERNETES_DISTRO}" in
@@ -208,6 +211,7 @@ CREDENTIALS_CONFIG=${CREDENTIALS_CONFIG}
 CREDENTIALS_BIN=${CREDENTIALS_BIN}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+
 EOF
 
 cat ${CURDIR}/prepare-image.sh >> "${CACHE}/prepare-image.sh"
@@ -266,14 +270,14 @@ echo_blue_dot_title "Wait for ${TARGET_IMAGE} ssh ready for on ${IP_TYPE} IP=${I
 while :
 do
 	echo_blue_dot
-	scp ${SSH_OPTIONS} -o ConnectTimeout=1 "${CACHE}/prepare-image.sh" "${KUBERNETES_USER}@${IPADDR}":~ 2>/dev/null && break
+	scp ${SSH_OPTIONS} -o ConnectTimeout=1 "${CACHE}/prepare-image.sh" "${SEED_USER}@${IPADDR}":~ 2>/dev/null && break
 	sleep 1
 done
 
 echo
 
-ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo ./prepare-image.sh
-ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" rm ./prepare-image.sh
+ssh ${SSH_OPTIONS} -t "${SEED_USER}@${IPADDR}" sudo ./prepare-image.sh
+ssh ${SSH_OPTIONS} -t "${SEED_USER}@${IPADDR}" rm ./prepare-image.sh
 
 aws ec2 stop-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${LAUNCHED_ID}" &> /dev/null
 

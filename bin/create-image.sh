@@ -38,6 +38,7 @@ done
 eval set -- "${ARGS[@]}"
 
 if [ -n "${PLATEFORM}" ]; then
+	source "${CURDIR}/common.sh"
 	source "${CURDIR}/plateform/${PLATEFORM}/image.sh"
 else
 	echo "PLATEFORM not defined, exit"

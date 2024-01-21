@@ -10,31 +10,33 @@
 # This VM will be used to create the kubernetes template VM 
 
 # The second VM will contains everything to run kubernetes
-set -eu
 
-DISTRO=jammy
-KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-CNI_VERSION=v1.4.0
-SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
-SSH_PRIV_KEY="~/.ssh/id_rsa"
-CACHE=~/.local/autoscaler/cache
-TARGET_IMAGE=
-KUBERNETES_PASSWORD=$(uuidgen)
-OSDISTRO=$(uname -s)
-SEEDIMAGE=${DISTRO}-server-cloudimg-seed
-USER=ubuntu
 PRIMARY_NETWORK_NAME=vmnet0
 SECOND_NETWORK_NAME=vmnet8
-SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
-CONTAINER_ENGINE=docker
-CONTAINER_CTL=docker
-KUBERNETES_DISTRO=kubeadm
+TARGET_IMAGE=
 
-source ${CURDIR}/common.sh
+OPTIONS=(
+	"distribution:"
+	"custom-image:"
+	"ssh-key:"
+	"ssh-priv-key:"
+	"cni-version:"
+	"password:"
+	"seed:"
+	"arch:"
+	"user:"
+	"kubernetes-version:"
+	"primary-network:"
+	"second-network:"
+	"k8s-distribution:"
+	"container-runtime:"
+	"aws-access-key:"
+	"aws-secret-key:"
+)
 
-mkdir -p ${CACHE}
+PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+TEMP=$(getopt -o d:i:k:n:p:s:a:u:v: --long "${PARAMS}"  -n "$0" -- "$@")
 
-TEMP=`getopt -o d:i:k:n:p:s:u:v: --long aws-access-key:,aws-secret-key:,k8s-distribution:,distribution:,container-runtime:,user:,adapter:,primary-network:,second-network:,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
@@ -43,18 +45,17 @@ while true ; do
 	case "$1" in
 		-d|--distribution)
 			DISTRO="$2"
-			TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
-			SEEDIMAGE=${DISTRO}-server-cloudimg-seed
+			SEED_IMAGE=${DISTRO}-server-cloudimg-seed
 			shift 2
 			;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
 		-k|--ssh-key) SSH_KEY=$2 ; shift 2;;
-		-k|--ssh-priv-key) SSH_PRIV_KEY=$2 ; shift 2;;
+		--ssh-priv-key) SSH_PRIVATE_KEY=$2 ; shift 2;;
 		-n|--cni-version) CNI_VERSION=$2 ; shift 2;;
 		-p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
-		-s|--seed) SEEDIMAGE=$2 ; shift 2;;
+		-s|--seed) SEED_IMAGE=$2 ; shift 2;;
 		-a|--arch) SEED_ARCH=$2 ; shift 2;;
-		-u|--user) USER=$2 ; shift 2;;
+		-u|--user) KUBERNETES_USER=$2 ; shift 2;;
 		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
 		--primary-network) PRIMARY_NETWORK_NAME=$2 ; shift 2;;
 		--second-network) SECOND_NETWORK_NAME=$2 ; shift 2;;
@@ -102,8 +103,7 @@ while true ; do
 done
 
 if [ -z "${TARGET_IMAGE}" ]; then
-	echo_red_bold "TARGET_IMAGE not defined"
-	exit 1
+	TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
 fi
 
 TARGET_IMAGE_UUID=$(vmrest_get_vmuuid ${TARGET_IMAGE})
@@ -150,7 +150,7 @@ EOF
 
 cat > "${CACHE}/meta-data" <<EOF
 {
-	"local-hostname": "${SEEDIMAGE}",
+	"local-hostname": "${SEED_IMAGE}",
 	"instance-id": "$(uuidgen)"
 }
 EOF
@@ -160,11 +160,7 @@ USERDATA=$(gzip -c9 < "${CACHE}/user-data" | base64 -w 0)
 VENDORDATA=$(gzip -c9 < "${CACHE}/vendor-data" | base64 -w 0)
 
 # If your seed image isn't present create one by import ${DISTRO} cloud ova.
-SEEDIMAGE_UUID=$(vmrest_get_vmuuid "${SEEDIMAGE}")
-
-if [ -z "${CLOUD_IMAGES_UBUNTU}" ]; then
-	CLOUD_IMAGES_UBUNTU=cloud-images.ubuntu.com
-fi
+SEEDIMAGE_UUID=$(vmrest_get_vmuuid "${SEED_IMAGE}")
 
 function update_vmx() {
 	local VMX="$1"
@@ -241,49 +237,49 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 
 	fi
 
-	echo_blue_bold "Import ${CLOUDIMG_NAME}.ova to ${SEEDIMAGE} with ovftool"
+	echo_blue_bold "Import ${CLOUDIMG_NAME}.ova to ${SEED_IMAGE} with ovftool"
 
-	VMFOLDER="${VMREST_FOLDER}/${SEEDIMAGE}${VMWAREWM}"
-	VMX="${VMFOLDER}/${SEEDIMAGE}.vmx"
+	VMFOLDER="${VMREST_FOLDER}/${SEED_IMAGE}${VMWAREWM}"
+	VMX="${VMFOLDER}/${SEED_IMAGE}.vmx"
 
 	ovftool \
 		--acceptAllEulas \
 		--allowExtraConfig \
 		--allowAllExtraConfig \
-		--name="${SEEDIMAGE}" \
+		--name="${SEED_IMAGE}" \
 		${CACHE}/${CLOUDIMG_NAME}.ova \
 		"${VMREST_FOLDER}"
 
 	if [ $? -eq 0 ]; then
 
-		echo_blue_bold "Register ${SEEDIMAGE} '${VMX}'"
+		echo_blue_bold "Register ${SEED_IMAGE} '${VMX}'"
 
 		update_vmx "${VMX}" ${METADATA} ${USERDATA} ${VENDORDATA}
 
-		SEEDIMAGE_UUID=$(vmrest_vm_register ${SEEDIMAGE} "${VMX}")
+		SEEDIMAGE_UUID=$(vmrest_vm_register ${SEED_IMAGE} "${VMX}")
 
 		if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
-			echo_red_bold "Register ${SEEDIMAGE} failed!"
+			echo_red_bold "Register ${SEED_IMAGE} failed!"
 			rm -rf "${VMFOLDER}"
 			exit -1
 		fi
 
 		if [ -n "${PRIMARY_NETWORK_NAME}" ];then
-			echo_blue_bold "Change primary network card ${PRIMARY_NETWORK_NAME} on ${SEEDIMAGE}"
+			echo_blue_bold "Change primary network card ${PRIMARY_NETWORK_NAME} on ${SEED_IMAGE}"
 
 			vmrest_network_change ${SEEDIMAGE_UUID} ${PRIMARY_NETWORK_NAME} 1 > /dev/null
 		fi
 
 #        if [ -n "${SECOND_NETWORK_NAME}" ]; then
-#            echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${SEEDIMAGE}"
+#            echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${SEED_IMAGE}"
 #
 #            vmrest_network_add ${SEEDIMAGE_UUID} ${SECOND_NETWORK_NAME} > /dev/null
 #        fi
 
-		echo_blue_bold "Power On ${SEEDIMAGE}"
+		echo_blue_bold "Power On ${SEED_IMAGE}"
 		vmrest_poweron "${SEEDIMAGE_UUID}" > /dev/null
 
-		echo_blue_bold "Wait for IP from ${SEEDIMAGE}"
+		echo_blue_bold "Wait for IP from ${SEED_IMAGE}"
 		IPADDR=$(vmrest_waitip "${SEEDIMAGE_UUID}")
 
 		if [ -z "${IPADDR}" ] || [ "${IPADDR}" == "ERROR" ]; then
@@ -294,7 +290,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 		echo_blue_bold "Wait ssh ready for ${IPADDR}"
 		wait_ssh_ready ${USER}@${IPADDR}
 
-		echo_blue_bold "Update seed image ${SEEDIMAGE}"
+		echo_blue_bold "Update seed image ${SEED_IMAGE}"
 
 		ssh -t "${USER}@${IPADDR}" "sudo apt update ; sudo apt dist-upgrade -y"
 		
@@ -321,7 +317,7 @@ EOF
 		# Shutdown the guest
 		vmrest_poweroff "${SEEDIMAGE_UUID}" "soft" > /dev/null
 
-		echo_blue_bold "Wait ${SEEDIMAGE} to shutdown"
+		echo_blue_bold "Wait ${SEED_IMAGE} to shutdown"
 		while [ $(vmrest_power_state "${SEEDIMAGE_UUID}") == "poweredOn" ]
 		do
 			echo_blue_dot
@@ -329,13 +325,13 @@ EOF
 		done
 		echo
 
-		echo_blue_bold "${SEEDIMAGE} is ready"
+		echo_blue_bold "${SEED_IMAGE} is ready"
 	else
 		echo_red_bold "Import failed!"
 		exit -1
 	fi 
 else
-	echo_blue_bold "${SEEDIMAGE} already exists, nothing to do!"
+	echo_blue_bold "${SEED_IMAGE} already exists, nothing to do!"
 fi
 
 case "${KUBERNETES_DISTRO}" in
@@ -373,10 +369,13 @@ timezone: ${TZ}
 ssh_authorized_keys:
   - ${SSH_KEY}
 users:
-  - default
-system_info:
-  default_user:
-    name: kubernetes
+  - name: ${KUBERNETES_USER}
+    groups: users, admin
+    lock_passwd: false
+    shell: /bin/bash
+    plain_text_passwd: ${KUBERNETES_PASSWORD}
+    ssh_authorized_keys:
+      - ${SSH_KEY}
 EOF
 
 cat > "${CACHE}/meta-data" <<EOF
@@ -414,7 +413,7 @@ gzip -c9 < "${CACHE}/vendor-data" | base64 -w 0 > ${CACHE}/vendordata.base64
 TARGET_IMAGE_UUID=$(vmrest_create ${SEEDIMAGE_UUID} 2 2048 ${TARGET_IMAGE} 0 "${CACHE}/metadata.base64" "${CACHE}/userdata.base64" "${CACHE}/vendordata.base64" true false)
 
 if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
-	echo_red_bold "Unable to clone ${SEEDIMAGE} to ${TARGET_IMAGE}"
+	echo_red_bold "Unable to clone ${SEED_IMAGE} to ${TARGET_IMAGE}"
 	rm -rf "${VMREST_FOLDER}/${TARGET_IMAGE}"
 	exit 1
 fi
@@ -432,11 +431,11 @@ echo_blue_bold "Wait for IP from ${TARGET_IMAGE}"
 IPADDR=$(vmrest_waitip ${TARGET_IMAGE_UUID})
 
 echo_blue_bold "Wait ssh ready on ${IPADDR}"
-wait_ssh_ready ${USER}@${IPADDR}
+wait_ssh_ready ${SEED_USER}@${IPADDR}
 
-scp ${SCP_OPTIONS} "${CACHE}/prepare-image.sh" "${USER}@${IPADDR}:~"
+scp ${SCP_OPTIONS} "${CACHE}/prepare-image.sh" "${SEED_USER}@${IPADDR}:~"
 
-ssh -t "${USER}@${IPADDR}" sudo ./prepare-image.sh
+ssh -t "${SEED_USER}@${IPADDR}" sudo ./prepare-image.sh
 
 vmrest_poweroff ${TARGET_IMAGE_UUID} > /dev/null
 

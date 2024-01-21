@@ -8,25 +8,18 @@
 
 set -eu
 
-source ${CURDIR}/common.sh
-
 function usage() {
 	common_usage
 	cat <<EOF
 ### Flags ${PLATEFORM} plateform specific
-  # Route53
---route53-zone-id                              # Specify the route53 zone id, default ${AWS_ROUTE53_PUBLIC_ZONE_ID}
---route53-access-key                           # Specify the route53 aws access key, default ${AWS_ROUTE53_ACCESSKEY}
---route53-secret-key                           # Specify the route53 aws secret key, default ${AWS_ROUTE53_SECRETKEY}
-
   # Flags to set the template vm
---target-image=<value>                           # Override the prefix template VM image used for created VM, default ${ROOT_IMG_NAME}
---seed-image=<value>                             # Override the seed image name used to create template, default ${SEED_IMAGE}
---seed-user=<value>                              # Override the seed user in template, default ${SEED_USER}
---password | -p=<value>                          # Override the password to ssh the cluster VM, default random word
+--target-image=<value>                         # Override the prefix template VM image used for created VM, default ${ROOT_IMG_NAME}
+--seed-image=<value>                           # Override the seed image name used to create template, default ${SEED_IMAGE}
+--kubernetes-user=<value>                      # Override the seed user in template, default ${KUBERNETES_USER}
+--kubernetes-password | -p=<value>             # Override the password to ssh the cluster VM, default random word
 
   # Flags in ha mode only
---use-keepalived | -u                            # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
+--use-keepalived | -u                          # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
 
   # Flags to configure network in ${PLATEFORM}
 --public-address=<value>                       # The public address to expose kubernetes endpoint, default ${PUBLIC_IP}
@@ -50,29 +43,90 @@ function usage() {
 EOF
 }
 
-TEMP=$(getopt -o xvheucrk:n:p:s:t: --long upgrade,autoscale-machine:,distribution:,k8s-distribution:,cloudprovider:,route53-zone-id:,route53-access-key:,route53-secret-key:,use-zerossl,dont-use-zerossl,zerossl-eab-kid:,zerossl-eab-hmac-secret:,godaddy-key:,godaddy-secret:,nfs-server-adress:,nfs-server-mount:,nfs-storage-class:,add-route-private:,add-route-public:,dont-use-dhcp-routes-private,dont-use-dhcp-routes-public,nginx-machine:,control-plane-machine:,worker-node-machine:,delete,configuration-location:,ssl-location:,cert-email:,public-domain:,dashboard-hostname:,create-image-only,no-dhcp-autoscaled-node,metallb-ip-range:,trace,container-runtime:,verbose,help,create-external-etcd,use-keepalived,defs:,worker-nodes:,ha-cluster,public-address:,resume,node-group:,target-image:,seed-image:,seed-user:,vm-public-network:,vm-private-network:,net-address:,net-gateway:,net-dns:,net-domain:,transport:,ssh-private-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
+OPTIONS=(
+	"help"
+	"distribution:"
+	"upgrade"
+	"verbose"
+	"trace"
+	"resume"
+	"delete"
+	"configuration-location:"
+	"ssl-location:"
+	"cert-email:"
+	"use-zerossl:"
+	"zerossl-eab-kid:"
+	"zerossl-eab-hmac-secret:"
+	"godaddy-key:"
+	"godaddy-secret:"
+	"route53-zone-id:"
+	"route53-access-key:"
+	"route53-secret-key:"
+	"dashboard-hostname:"
+	"public-domain:"
+	"defs:"
+	"create-image-only"
+	"max-pods:"
+	"k8s-distribution:"
+	"ha-cluster"
+	"create-external-etcd"
+	"node-group:"
+	"container-runtime:"
+	"target-image:"
+	"arch:"
+	"seed-image:"
+	"nginx-machine:"
+	"control-plane-machine:"
+	"worker-node-machine:"
+	"autoscale-machine:"
+	"ssh-private-key:"
+	"cni-plugin:"
+	"cni-version:"
+	"transport:"
+	"kubernetes-version:"
+	"kubernetes-user:"
+	"kubernetes-password:"
+	"worker-nodes:"
+	"cloudprovider:"
+	"max-nodes-total:"
+	"cores-total:"
+	"memory-total:"
+	"max-autoprovisioned-node-group-count:"
+	"scale-down-enabled:"
+	"scale-down-delay-after-add:"
+	"scale-down-delay-after-delete:"
+	"scale-down-delay-after-failure:"
+	"scale-down-unneeded-time:"
+	"scale-down-unready-time:"
+	"unremovable-node-recheck-timeout:"
+
+	"nfs-server-adress:"
+	"nfs-server-mount:"
+	"nfs-storage-class:"
+	"vm-private-network:"
+	"vm-public-network:"
+	"dont-use-dhcp-routes-private"
+	"dont-use-dhcp-routes-public"
+	"add-route-private:"
+	"add-route-public:"
+	"net-address:"
+	"net-gateway:"
+	"net-dns:"
+	"net-domain:"
+	"no-dhcp-autoscaled-node"
+	"public-address:"
+	"metallb-ip-range:"
+	"use-keepalived:"
+)
+
+PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+TEMP=$(getopt -o hvxrdk:u:p: --long "${PARAMS}"  -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true; do
 	case "$1" in
-	--no-dhcp-autoscaled-node)
-		SCALEDNODES_DHCP=false
-		shift 1
-		;;
-	--public-address)
-		PUBLIC_IP="$2"
-		shift 2
-		;;
-	--metallb-ip-range)
-		METALLB_IP_RANGE="$2"
-		shift 2
-		;;
-	-u|--use-keepalived)
-		USE_KEEPALIVED=YES
-		shift 1
-		;;
 	-h|--help)
 		usage
 		exit 0
@@ -99,7 +153,7 @@ while true; do
 		RESUME=YES
 		shift 1
 		;;
-	--delete)
+	-d|--delete)
 		DELETE_CLUSTER=YES
 		shift 1
 		;;
@@ -126,10 +180,6 @@ while true; do
 		;;
 	--use-zerossl)
 		USE_ZEROSSL=YES
-		shift 1
-		;;
-	--dont-use-zerossl)
-		USE_ZEROSSL=NO
 		shift 1
 		;;
 	--zerossl-eab-kid)
@@ -198,12 +248,11 @@ while true; do
 		esac
 		shift 2
 		;;
-	-c|--ha-cluster)
+	--ha-cluster)
 		HA_CLUSTER=true
-		CONTROLNODES=3
 		shift 1
 		;;
-	-e|--create-external-etcd)
+	--create-external-etcd)
 		EXTERNAL_ETCD=true
 		shift 1
 		;;
@@ -212,7 +261,6 @@ while true; do
 		MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 		shift 2
 		;;
-
 	--container-runtime)
 		case "$2" in
 			"docker"|"cri-o"|"containerd")
@@ -224,85 +272,14 @@ while true; do
 				;;
 		esac
 		shift 2;;
-
 	--target-image)
 		ROOT_IMG_NAME="$2"
 		shift 2
 		;;
-
 	--seed-image)
 		SEED_IMAGE="$2"
 		shift 2
 		;;
-
-	--seed-user)
-		SEED_USER="$2"
-		shift 2
-		;;
-
-	--vm-private-network)
-		VC_NETWORK_PRIVATE="$2"
-		shift 2
-		;;
-
-	--vm-public-network)
-		VC_NETWORK_PUBLIC="$2"
-		shift 2
-		;;
-
-	--dont-use-dhcp-routes-private)
-		USE_DHCP_ROUTES_PRIVATE=false
-		shift 1
-		;;
-
-	--dont-use-dhcp-routes-public)
-		USE_DHCP_ROUTES_PUBLIC=false
-		shift 2
-		;;
-
-	--add-route-private)
-		NETWORK_PRIVATE_ROUTES+=($2)
-		shift 2
-		;;
-
-	--add-route-public)
-		NETWORK_PUBLIC_ROUTES+=($2)
-		shift 2
-		;;
-
-	--net-address)
-		NET_IP="$2"
-		shift 2
-		;;
-
-	--net-gateway)
-		NET_GATEWAY="$2"
-		shift 2
-		;;
-
-	--net-dns)
-		NET_DNS="$2"
-		shift 2
-		;;
-
-	--net-domain)
-		NET_DOMAIN="$2"
-		shift 2
-		;;
-
-	--nfs-server-adress)
-		NFS_SERVER_ADDRESS="$2"
-		shift 2
-		;;
-	--nfs-server-mount)
-		NFS_SERVER_PATH="$2"
-		shift 2
-		;;
-	--nfs-storage-class)
-		NFS_STORAGE_CLASS="$2"
-		shift 2
-		;;
-
 	--nginx-machine)
 		NGINX_MACHINE="$2"
 		shift 2
@@ -319,7 +296,7 @@ while true; do
 		AUTOSCALE_MACHINE="$2"
 		shift 2
 		;;
-	-s | --ssh-private-key)
+	--ssh-private-key)
 		SSH_PRIVATE_KEY=$2
 		shift 2
 		;;
@@ -327,19 +304,23 @@ while true; do
 		CNI_PLUGIN="$2"
 		shift 2
 		;;
-	-n | --cni-version)
+	--cni-version)
 		CNI_VERSION="$2"
 		shift 2
 		;;
-	-t | --transport)
+	--transport)
 		TRANSPORT="$2"
 		shift 2
 		;;
-	-k | --kubernetes-version)
+	-k|--kubernetes-version)
 		KUBERNETES_VERSION="$2"
 		shift 2
 		;;
-	-p | --password)
+	-u|--kubernetes-user)
+		KUBERNETES_USER="$2"
+		shift 2
+		;;
+	-p|--kubernetes-password)
 		KUBERNETES_PASSWORD="$2"
 		shift 2
 		;;
@@ -347,7 +328,6 @@ while true; do
 		WORKERNODES=$2
 		shift 2
 		;;
-
 	# Same argument as cluster-autoscaler
 	--cloudprovider)
 		GRPC_PROVIDER="$2"
@@ -397,6 +377,75 @@ while true; do
 		UNREMOVABLENODERECHECKTIMEOUT="$2"
 		shift 2
 		;;
+### Plateform specific
+	--nfs-server-adress)
+		NFS_SERVER_ADDRESS="$2"
+		shift 2
+		;;
+	--nfs-server-mount)
+		NFS_SERVER_PATH="$2"
+		shift 2
+		;;
+	--nfs-storage-class)
+		NFS_STORAGE_CLASS="$2"
+		shift 2
+		;;
+	--vm-private-network)
+		VC_NETWORK_PRIVATE="$2"
+		shift 2
+		;;
+	--vm-public-network)
+		VC_NETWORK_PUBLIC="$2"
+		shift 2
+		;;
+	--dont-use-dhcp-routes-private)
+		USE_DHCP_ROUTES_PRIVATE=false
+		shift 1
+		;;
+	--dont-use-dhcp-routes-public)
+		USE_DHCP_ROUTES_PUBLIC=false
+		shift 2
+		;;
+	--add-route-private)
+		NETWORK_PRIVATE_ROUTES+=($2)
+		shift 2
+		;;
+	--add-route-public)
+		NETWORK_PUBLIC_ROUTES+=($2)
+		shift 2
+		;;
+	--net-address)
+		NET_IP="$2"
+		shift 2
+		;;
+	--net-gateway)
+		NET_GATEWAY="$2"
+		shift 2
+		;;
+	--net-dns)
+		NET_DNS="$2"
+		shift 2
+		;;
+	--net-domain)
+		NET_DOMAIN="$2"
+		shift 2
+		;;
+	--no-dhcp-autoscaled-node)
+		SCALEDNODES_DHCP=false
+		shift 1
+		;;
+	--public-address)
+		PUBLIC_IP="$2"
+		shift 2
+		;;
+	--metallb-ip-range)
+		METALLB_IP_RANGE="$2"
+		shift 2
+		;;
+	--use-keepalived)
+		USE_KEEPALIVED=YES
+		shift 1
+		;;
 	--)
 		shift
 		break
@@ -408,17 +457,23 @@ while true; do
 	esac
 done
 
-VC_NETWORK_PRIVATE_TYPE=$(get_net_type ${VC_NETWORK_PRIVATE})
-VC_NETWORK_PUBLIC_TYPE=$(get_net_type ${VC_NETWORK_PUBLIC})
-
-if [ -z "${VC_NETWORK_PUBLIC_TYPE}" ]; then
-	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PUBLIC}"
-	exit 1
+if [ "${VERBOSE}" == "YES" ]; then
+	SILENT=
+else
+	SSH_OPTIONS="${SSH_OPTIONS} -q"
+	SCP_OPTIONS="${SCP_OPTIONS} -q"
 fi
 
-if [ -z "${VC_NETWORK_PRIVATE_TYPE}" ]; then
-	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PRIVATE}"
-	exit 1
+# Check if ssh private key exists
+if [ ! -f ${SSH_PRIVATE_KEY} ]; then
+	echo_red "The private ssh key: ${SSH_PRIVATE_KEY} is not found"
+	exit -1
+fi
+
+# Check if ssh public key exists
+if [ ! -f ${SSH_PUBLIC_KEY} ]; then
+	echo_red "The private ssh key: ${SSH_PUBLIC_KEY} is not found"
+	exit -1
 fi
 
 if [ "${UPGRADE_CLUSTER}" == "YES" ] && [ "${DELETE_CLUSTER}" = "YES" ]; then
@@ -431,6 +486,19 @@ if [ "${GRPC_PROVIDER}" != "grpc" ] && [ "${GRPC_PROVIDER}" != "externalgrpc" ];
 	exit
 fi
 
+if [ ${GRPC_PROVIDER} = "grpc" ]; then
+	CLOUD_PROVIDER_CONFIG=grpc-config.json
+else
+	CLOUD_PROVIDER_CONFIG=grpc-config.yaml
+fi
+
+if [ "${USE_ZEROSSL}" = "YES" ]; then
+	if [ -z "${CERT_ZEROSSL_EAB_KID}" ] || [ -z "${CERT_ZEROSSL_EAB_HMAC_SECRET}" ]; then
+		echo_red_bold "CERT_ZEROSSL_EAB_KID or CERT_ZEROSSL_EAB_HMAC_SECRET is empty, exit"
+		exit 1
+	fi
+fi
+
 if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 	LOAD_BALANCER_PORT="${LOAD_BALANCER_PORT},9345"
 	EXTERNAL_ETCD=false
@@ -440,6 +508,12 @@ if [ "${HA_CLUSTER}" = "true" ]; then
 	CONTROLNODES=3
 else
 	CONTROLNODES=1
+	EXTERNAL_ETCD=false
+
+	if [ "${USE_NLB}" = "YES" ]; then
+		echo_red_bold "NLB usage is not available for single plane cluster"
+		exit 1
+	fi
 fi
 
 if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
@@ -466,27 +540,17 @@ if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; 
 	fi
 fi
 
-if [ "${VERBOSE}" == "YES" ]; then
-	SILENT=
-else
-	SSH_OPTIONS="${SSH_OPTIONS} -q"
-	SCP_OPTIONS="${SCP_OPTIONS} -q"
-fi
-
-if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-	TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}"
-else
-	TARGET_IMAGE="${ROOT_IMG_NAME}-k8s-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
-fi
-
-TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}".img
-
 SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
 SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+SSH_KEY=$(cat "${SSH_PUBLIC_KEY}")
 
 TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
 TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
 TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+
+mkdir -p ${TARGET_CONFIG_LOCATION}
+mkdir -p ${TARGET_DEPLOY_LOCATION}
+mkdir -p ${TARGET_CLUSTER_LOCATION}
 
 if [ "${EXTERNAL_ETCD}" = "true" ]; then
 	EXTERNAL_ETCD_ARGS="--use-external-etcd"
@@ -494,39 +558,6 @@ if [ "${EXTERNAL_ETCD}" = "true" ]; then
 else
 	EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
 	ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
-fi
-
-# Check if we can resume the creation process
-if [ "${DELETE_CLUSTER}" = "YES" ]; then
-	delete-masterkube.sh --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
-	exit
-elif [ ! -f ${TARGET_CONFIG_LOCATION}/buildenv ] && [ "${RESUME}" = "YES" ]; then
-	echo_red "Unable to resume, building env is not found"
-	exit -1
-fi
-
-# Check if ssh private key exists
-if [ ! -f ${SSH_PRIVATE_KEY} ]; then
-	echo_red "The private ssh key: ${SSH_PRIVATE_KEY} is not found"
-	exit -1
-fi
-
-# Check if ssh public key exists
-if [ ! -f ${SSH_PUBLIC_KEY} ]; then
-	echo_red "The private ssh key: ${SSH_PUBLIC_KEY} is not found"
-	exit -1
-fi
-
-# Check variables coherence
-if [ "${HA_CLUSTER}" = "true" ]; then
-	CONTROLNODES=3
-	if [ ${USE_KEEPALIVED} = "YES" ]; then
-		FIRSTNODE=1
-	fi
-else
-	CONTROLNODES=1
-	USE_KEEPALIVED=NO
-	EXTERNAL_ETCD=false
 fi
 
 # Check if passord is defined
@@ -538,8 +569,6 @@ if [ -z ${KUBERNETES_PASSWORD} ]; then
 		echo -n "${KUBERNETES_PASSWORD}" > ~/.kubernetes_pwd
 	fi
 fi
-
-SSH_KEY="$(cat ${SSH_PUBLIC_KEY})"
 
 # GRPC network endpoint
 if [ "${LAUNCH_CA}" != "YES" ]; then
@@ -563,6 +592,45 @@ else
 fi
 
 echo_blue_bold "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
+
+VC_NETWORK_PRIVATE_TYPE=$(get_net_type ${VC_NETWORK_PRIVATE})
+VC_NETWORK_PUBLIC_TYPE=$(get_net_type ${VC_NETWORK_PUBLIC})
+
+if [ -z "${VC_NETWORK_PUBLIC_TYPE}" ]; then
+	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PUBLIC}"
+	exit 1
+fi
+
+if [ -z "${VC_NETWORK_PRIVATE_TYPE}" ]; then
+	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PRIVATE}"
+	exit 1
+fi
+
+if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+	TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}"
+else
+	TARGET_IMAGE="${ROOT_IMG_NAME}-k8s-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
+fi
+
+TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}.img"
+
+# Check if we can resume the creation process
+if [ "${DELETE_CLUSTER}" = "YES" ]; then
+	delete-masterkube.sh --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
+	exit
+elif [ ! -f ${TARGET_CONFIG_LOCATION}/buildenv ] && [ "${RESUME}" = "YES" ]; then
+	echo_red "Unable to resume, building env is not found"
+	exit -1
+fi
+
+# Check variables coherence
+if [ "${HA_CLUSTER}" = "true" ]; then
+	if [ ${USE_KEEPALIVED} = "YES" ]; then
+		FIRSTNODE=1
+	fi
+else
+	USE_KEEPALIVED=NO
+fi
 
 # If CERT doesn't exist, create one autosigned
 if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
@@ -592,23 +660,23 @@ if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 	echo_title "Create ${PLATEFORM} preconfigured image ${TARGET_IMAGE}"
 
 	./bin/create-image.sh \
-		--plateform=${PLATEFORM} \
-		--k8s-distribution=${KUBERNETES_DISTRO} \
+		--arch="${SEED_ARCH}" \
 		--aws-access-key=${AWS_ACCESSKEY} \
 		--aws-secret-key=${AWS_SECRETKEY} \
-		--password="${KUBERNETES_PASSWORD}" \
-		--distribution="${DISTRO}" \
 		--cni-version="${CNI_VERSION}" \
-		--custom-image="${TARGET_IMAGE}" \
-		--kubernetes-version="${KUBERNETES_VERSION}" \
 		--container-runtime=${CONTAINER_ENGINE} \
-		--arch="${SEED_ARCH}" \
+		--custom-image="${TARGET_IMAGE}" \
+		--distribution="${DISTRO}" \
+		--k8s-distribution=${KUBERNETES_DISTRO} \
+		--kubernetes-version="${KUBERNETES_VERSION}" \
+		--password="${KUBERNETES_PASSWORD}" \
+		--plateform=${PLATEFORM} \
+		--primary-network="${VC_NETWORK_PUBLIC}" \
+		--second-network="${VC_NETWORK_PRIVATE}" \
 		--seed="${SEED_IMAGE}-${SEED_ARCH}" \
-		--user="${SEED_USER}" \
 		--ssh-key="${SSH_KEY}" \
 		--ssh-priv-key="${SSH_PRIVATE_KEY}" \
-		--primary-network="${VC_NETWORK_PUBLIC}" \
-		--second-network="${VC_NETWORK_PRIVATE}"
+		--user="${KUBERNETES_USER}"
 
 	TARGET_IMAGE_UUID=$(get_vmuuid ${TARGET_IMAGE})
 fi
@@ -618,19 +686,13 @@ if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
 	exit 0
 fi
 
-if [ ${GRPC_PROVIDER} = "grpc" ]; then
-	CLOUD_PROVIDER_CONFIG=grpc-config.json
-else
-	CLOUD_PROVIDER_CONFIG=grpc-config.yaml
-fi
-
 # Extract the domain name from CERT
 DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
 
-# Delete previous exixting version
+# Delete previous existing version
 if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
 	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-	delete-masterkube.sh --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
+	delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
 elif [ "${UPGRADE_CLUSTER}" == "NO" ]; then
 	echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 else
@@ -638,10 +700,6 @@ else
 	./bin/upgrade-cluster.sh
 	exit
 fi
-
-mkdir -p ${TARGET_CONFIG_LOCATION}
-mkdir -p ${TARGET_DEPLOY_LOCATION}
-mkdir -p ${TARGET_CLUSTER_LOCATION}
 
 if [ "${RESUME}" = "NO" ]; then
 	update_build_env

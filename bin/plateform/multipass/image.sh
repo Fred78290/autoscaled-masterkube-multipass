@@ -5,30 +5,36 @@
 # This script will create a VM used as template
 # This step is done by importing https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-amd64.img
 # This VM will be used to create the kubernetes template VM 
-set -eu
 
-DISTRO=jammy
-KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-KUBERNETES_PASSWORD=$(uuidgen)
-CNI_VERSION=v1.4.0
-SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
-SSH_PRIV_KEY="~/.ssh/id_rsa"
-CACHE=~/.local/autoscaler/cache
+PRIMARY_NETWORK_NAME="mpbr0"
+SECOND_NETWORK_NAME="lxdbr0"
 TARGET_IMAGE=
-KUBERNETES_PASSWORD=$(uuidgen)
-OSDISTRO=$(uname -s)
-SEEDIMAGE=${DISTRO}-server-cloudimg-seed
-USER=ubuntu
-SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
-CONTAINER_ENGINE=docker
-CONTAINER_CTL=docker
-KUBERNETES_DISTRO=kubeadm
 
-source ${CURDIR}/common.sh
+OPTIONS=(
+	"distribution:"
+	"custom-image:"
+	"ssh-key:"
+	"ssh-priv-key:"
+	"cni-version:"
+	"password:"
+	"seed:"
+	"arch:"
+	"user:"
+	"kubernetes-version:"
+	"primary-network:"
+	"second-network:"
+	"k8s-distribution:"
+	"container-runtime:"
+	"aws-access-key:"
+	"aws-secret-key:"
+	"primary-adapter:"
+	"second-adapter:"
+	"ovftool:"
+)
 
-mkdir -p ${CACHE}
+PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+TEMP=$(getopt -o d:i:k:n:p:s:a:u:v:o --long "${PARAMS}"  -n "$0" -- "$@")
 
-TEMP=`getopt -o d:a:i:k:n:op:s:u:v: --long primary-network:,second-network:,aws-access-key:,aws-secret-key:,k8s-distribution:,distribution:,arch:,container-runtime:,user:,seed:,custom-image:,ssh-key:,ssh-priv-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
@@ -37,18 +43,17 @@ while true ; do
 	case "$1" in
 		-d|--distribution)
 			DISTRO="$2"
-			TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
-			SEEDIMAGE=${DISTRO}-server-cloudimg-seed
+			SEED_IMAGE=${DISTRO}-server-cloudimg-seed
 			shift 2
 			;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
 		-k|--ssh-key) SSH_KEY=$2 ; shift 2;;
-		-k|--ssh-priv-key) SSH_PRIV_KEY=$2 ; shift 2;;
+		--ssh-priv-key) SSH_PRIVATE_KEY=$2 ; shift 2;;
 		-n|--cni-version) CNI_VERSION=$2 ; shift 2;;
 		-p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
-		-s|--seed) SEEDIMAGE=$2 ; shift 2;;
+		-s|--seed) SEED_IMAGE=$2 ; shift 2;;
 		-a|--arch) SEED_ARCH=$2 ; shift 2;;
-		-u|--user) USER=$2 ; shift 2;;
+		-u|--user) KUBERNETES_USER=$2 ; shift 2;;
 		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
 		--primary-network) PRIMARY_NETWORK_NAME=$2 ; shift 2;;
 		--second-network) SECOND_NETWORK_NAME=$2 ; shift 2;;
@@ -80,7 +85,6 @@ while true ; do
 					;;
 			esac
 			shift 2;;
-
 		--aws-access-key)
 			AWS_ACCESS_KEY_ID=$2
 			shift 2
@@ -89,19 +93,17 @@ while true ; do
 			AWS_SECRET_ACCESS_KEY=$2
 			shift 2
 			;;
-
 		--) shift ; break ;;
 		*) echo_red_bold "$1 - Internal error!" ; exit 1 ;;
 	esac
 done
 
 if [ -z "${TARGET_IMAGE}" ]; then
-	echo_red_bold "TARGET_IMAGE not defined"
-	exit 1
+	TARGET_IMAGE=${CURDIR}/../images/${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
 fi
 
-if [ -f "${CACHE}/${TARGET_IMAGE}" ]; then
-	echo_blue_bold "${CACHE}/${TARGET_IMAGE} already exists!"
+if [ -f "${TARGET_IMAGE}" ]; then
+	echo_blue_bold "${TARGET_IMAGE} already exists!"
 	exit 0
 fi
 
@@ -111,9 +113,30 @@ mkdir -p ${CACHE}/packer/cloud-data
 
 echo -n > ${CACHE}/packer/cloud-data/meta-data
 
-echo $(eval "cat <<EOF
-$(<${PWD}/templates/packer/cloud-data/user-data)
-EOF") >  ${CACHE}/packer/cloud-data/user-data
+cat > ${CACHE}/packer/cloud-data/user-data <<EOF
+#cloud-config
+timezone: ${TZ}
+package_update: false
+package_upgrade: false
+ssh_pwauth: true
+users:
+  - name: ${KUBERNETES_USER}
+    groups: users, admin
+    lock_passwd: false
+    shell: /bin/bash
+    plain_text_passwd: ${KUBERNETES_PASSWORD}
+    ssh_authorized_keys:
+      - ${SSH_KEY}
+  - name: packer
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    lock_passwd: false
+    plain_text_passwd: packerpassword
+    ssh_authorized_keys:
+      - ${SSH_KEY}
+apt:
+  preserve_sources_list: true
+EOF
 
 case "${KUBERNETES_DISTRO}" in
 	k3s|rke2)
@@ -198,7 +221,7 @@ packer build \
 	-var MACHINE_TYPE="${MACHINE_TYPE}" \
 	-var DISTRO=${DISTRO} \
 	-var ACCEL=${ACCEL} \
-	-var SSH_PRIV_KEY="${SSH_PRIV_KEY}" \
+	-var SSH_PRIVATE_KEY="${SSH_PRIVATE_KEY}" \
 	-var ISO_CHECKSUM="sha256:${ISO_CHECKSUM}" \
 	-var ISO_FILE="${ISO_FILE}" \
 	-var INIT_SCRIPT="${CACHE}/prepare-image.sh" \

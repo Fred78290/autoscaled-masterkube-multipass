@@ -53,6 +53,7 @@ time {
 	eval set -- "${ARGS[@]}"
 
 	if [ -n "${PLATEFORM}" ]; then
+		source ${CURDIR}/common.sh
 		source "${CURDIR}/plateform/${PLATEFORM}/create.sh"
 	else
 		echo "PLATEFORM not defined, exit"

@@ -13,32 +13,35 @@
 # The second VM will contains everything to run kubernetes
 set -eu
 
-DISTRO=jammy
-KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-CNI_VERSION=v1.4.0
-SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
-SSH_PRIV_KEY="~/.ssh/id_rsa"
-CACHE=~/.local/autoscaler/cache
-TARGET_IMAGE=
-KUBERNETES_PASSWORD=$(uuidgen)
-OSDISTRO=$(uname -s)
-SEEDIMAGE=${DISTRO}-server-cloudimg-seed
 IMPORTMODE="govc"
-USER=ubuntu
 PRIMARY_NETWORK_ADAPTER=vmxnet3
 PRIMARY_NETWORK_NAME="${GOVC_NETWORK}"
 SECOND_NETWORK_ADAPTER=vmxnet3
 SECOND_NETWORK_NAME=
-SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
-CONTAINER_ENGINE=docker
-CONTAINER_CTL=docker
-KUBERNETES_DISTRO=kubeadm
+TARGET_IMAGE=
 
-source ${CURDIR}/common.sh
+OPTIONS=(
+	"distribution:"
+	"custom-image:"
+	"ssh-key:"
+	"ssh-priv-key:"
+	"cni-version:"
+	"password:"
+	"seed:"
+	"arch:"
+	"user:"
+	"kubernetes-version:"
+	"primary-network:"
+	"second-network:"
+	"k8s-distribution:"
+	"container-runtime:"
+	"aws-access-key:"
+	"aws-secret-key:"
+)
 
-mkdir -p ${CACHE}
+PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+TEMP=$(`getopt -o d:i:k:n:p:s:a:u:v: --long "${PARAMS}"  -n "$0" -- "$@")
 
-TEMP=`getopt -o d:a:i:k:n:op:s:u:v: --long k8s-distribution:,aws-access-key:,aws-secret-key:,distribution:,arch:,container-runtime:,user:,adapter:,primary-adapter:,primary-network:,second-adapter:,second-network:,ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
@@ -47,22 +50,18 @@ while true ; do
 	case "$1" in
 		-d|--distribution)
 			DISTRO="$2"
-			TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
-			SEEDIMAGE=${DISTRO}-server-cloudimg-seed
+			SEED_IMAGE=${DISTRO}-server-cloudimg-seed
 			shift 2
 			;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
 		-k|--ssh-key) SSH_KEY=$2 ; shift 2;;
-		-k|--ssh-priv-key) SSH_PRIV_KEY=$2 ; shift 2;;
+		--ssh-priv-key) SSH_PRIVATE_KEY=$2 ; shift 2;;
 		-n|--cni-version) CNI_VERSION=$2 ; shift 2;;
-		-o|--ovftool) IMPORTMODE=ovftool ; shift 2;;
 		-p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
-		-s|--seed) SEEDIMAGE=$2 ; shift 2;;
+		-s|--seed) SEED_IMAGE=$2 ; shift 2;;
 		-a|--arch) SEED_ARCH=$2 ; shift 2;;
-		-u|--user) USER=$2 ; shift 2;;
+		-u|--user) KUBERNETES_USER=$2 ; shift 2;;
 		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
-		--primary-adapter) PRIMARY_NETWORK_ADAPTER=$2 ; shift 2;;
-		--second-adapter) SECOND_NETWORK_ADAPTER=$2 ; shift 2;;
 		--primary-network) PRIMARY_NETWORK_NAME=$2 ; shift 2;;
 		--second-network) SECOND_NETWORK_NAME=$2 ; shift 2;;
 		--k8s-distribution) 
@@ -93,7 +92,6 @@ while true ; do
 					;;
 			esac
 			shift 2;;
-
 		--aws-access-key)
 			AWS_ACCESS_KEY_ID=$2
 			shift 2
@@ -102,15 +100,16 @@ while true ; do
 			AWS_SECRET_ACCESS_KEY=$2
 			shift 2
 			;;
-
+		--primary-adapter) PRIMARY_NETWORK_ADAPTER=$2 ; shift 2;;
+		--second-adapter) SECOND_NETWORK_ADAPTER=$2 ; shift 2;;
+		-o|--ovftool) IMPORTMODE=ovftool ; shift 2;;
 		--) shift ; break ;;
 		*) echo_red_bold "$1 - Internal error!" ; exit 1 ;;
 	esac
 done
 
 if [ -z "${TARGET_IMAGE}" ]; then
-	echo_red_bold "TARGET_IMAGE not defined"
-	exit 1
+	TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
 fi
 
 if [ -n "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
@@ -141,7 +140,7 @@ EOF
 # If you don't have the access right to import with govc (firewall rules blocking https traffic to esxi),
 # you can try with ovftool to import the ova.
 # If you have the bug "unsupported server", you must do it manually!
-if [ -z "$(govc vm.info ${SEEDIMAGE} 2>&1)" ]; then
+if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 	[ -f ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova ] || curl -Ls https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova -o ${CACHE}/${DISTRO}-server-cloudimg-amd64.ova
 
 	if [ "${IMPORTMODE}" == "govc" ]; then
@@ -155,36 +154,36 @@ if [ -z "$(govc vm.info ${SEEDIMAGE} 2>&1)" ]; then
 			| jq --arg SSH_KEY "${SSH_KEY}" \
 				--arg SSH_KEY "${SSH_KEY}" \
 				--arg USERDATA "${USERDATA}" \
-				--arg KUBERNETES_PASSWORD "${BOOTSTRAP_PASSWORD}" \
-				--arg NAME "${SEEDIMAGE}" \
+				--arg BOOTSTRAP_PASSWORD "${BOOTSTRAP_PASSWORD}" \
+				--arg NAME "${SEED_IMAGE}" \
 				--arg INSTANCEID $(uuidgen) \
 				--arg TARGET_IMAGE "${TARGET_IMAGE}" \
-				'.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $KUBERNETES_PASSWORD } ]' \
+				'.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $BOOTSTRAP_PASSWORD } ]' \
 				> ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.txt
 
 		DATASTORE="/${GOVC_DATACENTER}/datastore/${GOVC_DATASTORE}"
 		FOLDER="/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
 
-		echo_blue_bold "Import ${DISTRO}-server-cloudimg-${SEED_ARCH}.ova to ${SEEDIMAGE} with govc"
+		echo_blue_bold "Import ${DISTRO}-server-cloudimg-${SEED_ARCH}.ova to ${SEED_IMAGE} with govc"
 		govc import.ova \
 			-options=${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.txt \
 			-folder="${FOLDER}" \
 			-ds="${DATASTORE}" \
-			-name="${SEEDIMAGE}" \
+			-name="${SEED_IMAGE}" \
 			${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova
 	else
-		echo_blue_bold "Import ${DISTRO}-server-cloudimg-${SEED_ARCH}.ova to ${SEEDIMAGE} with ovftool"
+		echo_blue_bold "Import ${DISTRO}-server-cloudimg-${SEED_ARCH}.ova to ${SEED_IMAGE} with ovftool"
 
 		MAPPED_NETWORK=$(govc import.spec ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova | jq -r '.NetworkMapping[0].Name//""')
 
 		ovftool \
 			--acceptAllEulas \
-			--name="${SEEDIMAGE}" \
+			--name="${SEED_IMAGE}" \
 			--datastore="${GOVC_DATASTORE}" \
 			--vmFolder="${GOVC_FOLDER}" \
 			--diskMode=thin \
 			--prop:instance-id="$(uuidgen)" \
-			--prop:hostname="${SEEDIMAGE}" \
+			--prop:hostname="${SEED_IMAGE}" \
 			--prop:public-keys="${SSH_KEY}" \
 			--prop:user-data="${USERDATA}" \
 			--prop:password="${BOOTSTRAP_PASSWORD}" \
@@ -196,23 +195,23 @@ if [ -z "$(govc vm.info ${SEEDIMAGE} 2>&1)" ]; then
 	if [ $? -eq 0 ]; then
 
 		if [ -n "${PRIMARY_NETWORK_ADAPTER}" ];then
-			echo_blue_bold "Change primary network card ${PRIMARY_NETWORK_NAME} to ${PRIMARY_NETWORK_ADAPTER} on ${SEEDIMAGE}"
+			echo_blue_bold "Change primary network card ${PRIMARY_NETWORK_NAME} to ${PRIMARY_NETWORK_ADAPTER} on ${SEED_IMAGE}"
 
-			govc vm.network.change -vm "${SEEDIMAGE}" -net="${PRIMARY_NETWORK_NAME}" -net.adapter="${PRIMARY_NETWORK_ADAPTER}"
+			govc vm.network.change -vm "${SEED_IMAGE}" -net="${PRIMARY_NETWORK_NAME}" -net.adapter="${PRIMARY_NETWORK_ADAPTER}"
 		fi
 
 		if [ -n "${SECOND_NETWORK_NAME}" ]; then
-			echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${SEEDIMAGE}"
+			echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${SEED_IMAGE}"
 
-			govc vm.network.add -vm "${SEEDIMAGE}" -net="${SECOND_NETWORK_NAME}" -net.adapter="${SECOND_NETWORK_ADAPTER}"
+			govc vm.network.add -vm "${SEED_IMAGE}" -net="${SECOND_NETWORK_NAME}" -net.adapter="${SECOND_NETWORK_ADAPTER}"
 		fi
 
-		echo_blue_bold "Power On ${SEEDIMAGE}"
-		govc vm.upgrade -version=17 -vm ${SEEDIMAGE}
-		govc vm.power -on "${SEEDIMAGE}"
+		echo_blue_bold "Power On ${SEED_IMAGE}"
+		govc vm.upgrade -version=17 -vm ${SEED_IMAGE}
+		govc vm.power -on "${SEED_IMAGE}"
 
-		echo_blue_bold "Wait for IP from ${SEEDIMAGE}"
-		IPADDR=$(govc vm.ip -wait 5m "${SEEDIMAGE}")
+		echo_blue_bold "Wait for IP from ${SEED_IMAGE}"
+		IPADDR=$(govc vm.ip -wait 5m "${SEED_IMAGE}")
 
 		if [ -z "${IPADDR}" ]; then
 			echo_red_bold "Can't get IP!"
@@ -222,7 +221,7 @@ if [ -z "$(govc vm.info ${SEEDIMAGE} 2>&1)" ]; then
 		# Prepare seed VM
 		echo_blue_bold "Install cloud-init VMWareGuestInfo datasource"
 
-		ssh -t "${USER}@${IPADDR}" <<EOF
+		ssh -t "${SEED_USER}@${IPADDR}" <<EOF
 		sudo sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"/' /etc/default/grub
 		sudo update-grub
 		sudo apt update
@@ -233,30 +232,30 @@ if [ -z "$(govc vm.info ${SEEDIMAGE} 2>&1)" ]; then
 EOF
 
 		echo_blue_bold "clean cloud-init"
-		ssh -t "${USER}@${IPADDR}" <<EOF
+		ssh -t "${SEED_USER}@${IPADDR}" <<EOF
 		sudo cloud-init clean
 		cloud-init clean -l
 		sudo shutdown -h now
 EOF
 
 		# Shutdown the guest
-		govc vm.power -persist-session=false -s "${SEEDIMAGE}"
+		govc vm.power -persist-session=false -s "${SEED_IMAGE}"
 
-		echo_blue_bold "Wait ${SEEDIMAGE} to shutdown"
-		while [ $(govc vm.info -json "${SEEDIMAGE}" | jq .virtualMachines[0].runtime.powerState | tr -d '"') == "poweredOn" ]
+		echo_blue_bold "Wait ${SEED_IMAGE} to shutdown"
+		while [ $(govc vm.info -json "${SEED_IMAGE}" | jq .virtualMachines[0].runtime.powerState | tr -d '"') == "poweredOn" ]
 		do
 			echo_blue_dot
 			sleep 1
 		done
 		echo
 
-		echo_blue_bold "${SEEDIMAGE} is ready"
+		echo_blue_bold "${SEED_IMAGE} is ready"
 	else
 		echo_red_bold "Import failed!"
 		exit -1
 	fi 
 else
-	echo_blue_bold "${SEEDIMAGE} already exists, nothing to do!"
+	echo_blue_bold "${SEED_IMAGE} already exists, nothing to do!"
 fi
 
 case "${KUBERNETES_DISTRO}" in
@@ -294,10 +293,13 @@ timezone: ${TZ}
 ssh_authorized_keys:
   - ${SSH_KEY}
 users:
-  - default
-system_info:
-  default_user:
-    name: kubernetes
+  - name: ${KUBERNETES_USER}
+    groups: users, admin
+    lock_passwd: false
+    shell: /bin/bash
+    plain_text_passwd: ${KUBERNETES_PASSWORD}
+    ssh_authorized_keys:
+      - ${SSH_KEY}
 EOF
 
 cat > "${CACHE}/meta-data" <<EOF
@@ -340,7 +342,7 @@ if [ "${GOVC_FOLDER}" ]; then
 	fi
 fi
 
-govc vm.clone -on=false ${FOLDER_OPTIONS} -c=2 -m=4096 -vm=${SEEDIMAGE} ${TARGET_IMAGE}
+govc vm.clone -on=false ${FOLDER_OPTIONS} -c=2 -m=4096 -vm=${SEED_IMAGE} ${TARGET_IMAGE}
 
 govc vm.change -vm "${TARGET_IMAGE}" \
 	-e disk.enableUUID=1 \
@@ -357,9 +359,9 @@ govc vm.power -on "${TARGET_IMAGE}"
 echo_blue_bold "Wait for IP from ${TARGET_IMAGE}"
 IPADDR=$(govc vm.ip -wait 5m "${TARGET_IMAGE}")
 
-scp "${CACHE}/prepare-image.sh" "${USER}@${IPADDR}:~"
+scp "${CACHE}/prepare-image.sh" "${SEED_USER}@${IPADDR}:~"
 
-ssh -t "${USER}@${IPADDR}" sudo ./prepare-image.sh
+ssh -t "${SEED_USER}@${IPADDR}" sudo ./prepare-image.sh
 
 govc vm.power -persist-session=false -s=true "${TARGET_IMAGE}"
 

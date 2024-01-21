@@ -3,6 +3,8 @@ if [ -z "${PLATEFORM}" ]; then
     exit 1
 fi
 
+set -eu
+
 export ACM_CERTIFICATE_ARN=
 export ACM_DOMAIN_NAME=
 export AUTOSCALE_MACHINE="medium"
@@ -19,19 +21,21 @@ export AWS_ROUTE53_SECRETKEY=
 export AWS_ROUTE53_TOKEN=
 export AWS_SECRETKEY=
 export AWS_TOKEN=
-export CACHE=${HOME}/.local/${PLATEFORM}/cache
+export CACHE=${HOME}/.local/masterkube/${PLATEFORM}/cache
 export CERT_DOMAIN=
 export CERT_EMAIL=
 export CERT_GODADDY_API_KEY=${GODADDY_API_KEY}
 export CERT_GODADDY_API_SECRET=${GODADDY_API_SECRET}
 export CERT_ZEROSSL_EAB_HMAC_SECRET=${ZEROSSL_EAB_HMAC_SECRET}
 export CERT_ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID}
+export CLOUD_IMAGES_UBUNTU=cloud-images.ubuntu.com
 export CLOUD_PROVIDER_CONFIG=
 export CLOUD_PROVIDER=
 export CNI_PLUGIN=flannel
 export CNI_VERSION=v1.4.0
 export CONFIGURATION_LOCATION=${PWD}
 export CONTAINER_ENGINE=containerd
+export CONTAINER_CTL=docker
 export CONTROL_PLANE_MACHINE="small"
 export CONTROLNODES=1
 export CONTROLPLANE_USE_PUBLICIP=false
@@ -89,7 +93,6 @@ export NFS_SERVER_PATH=
 export NFS_STORAGE_CLASS=nfs-client
 export NGINX_MACHINE="tiny"
 export NODEGROUP_NAME=
-export NODEGROUP_SET=NO
 export OSDISTRO=$(uname -s)
 export PREFER_SSH_PUBLICIP=NO
 export PRIVATE_DOMAIN_NAME=
@@ -179,10 +182,11 @@ cat <<EOF
 $0 create a kubernetes simple cluster or HA cluster with 3 control planes
 Options are:
 --help | -h                                      # Display usage
+--plateform=[vsphere|aws|desktop|multipass]      # Where to deploy cluster
 --verbose | -v                                   # Verbose
 --trace | -x                                     # Trace execution
 --resume | -r                                    # Allow to resume interrupted creation of cluster kubernetes
---delete                                         # Delete cluster and exit
+--delete | -d                                    # Delete cluster and exit
 --distribution                                   # Ubuntu distribution to use ${DISTRO}
 --create-image-only                              # Create image only
 --upgrade                                        # Upgrade existing cluster to upper version of kubernetes
@@ -222,11 +226,17 @@ Options are:
 
 --cert-email=<value>                             # Specify the mail for lets encrypt, default ${CERT_EMAIL}
 --use-zerossl                                    # Specify cert-manager to use zerossl, default ${USE_ZEROSSL}
---dont-use-zerossl                               # Specify cert-manager to use letsencrypt, default ${USE_ZEROSSL}
 --zerossl-eab-kid=<value>                        # Specify zerossl eab kid, default ${CERT_ZEROSSL_EAB_KID}
 --zerossl-eab-hmac-secret=<value>                # Specify zerossl eab hmac secret, default ${CERT_ZEROSSL_EAB_HMAC_SECRET}
+
+  # GoDaddy
 --godaddy-key                                    # Specify godaddy api key
 --godaddy-secret                                 # Specify godaddy api secret
+
+  # Route53
+--route53-zone-id                                # Specify the route53 zone id, default ${AWS_ROUTE53_PUBLIC_ZONE_ID}
+--route53-access-key                             # Specify the route53 aws access key, default ${AWS_ROUTE53_ACCESSKEY}
+--route53-secret-key                             # Specify the route53 aws secret key, default ${AWS_ROUTE53_SECRETKEY}
 
 ### Flags for autoscaler
 --cloudprovider=<value>                          # autoscaler flag <grpc|externalgrpc>, default: ${GRPC_PROVIDER}
@@ -521,6 +531,7 @@ fi
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+mkdir -p ${CACHE}
 
 source ${CURDIR}/plateform/${PLATEFORM}/plateform.sh
 

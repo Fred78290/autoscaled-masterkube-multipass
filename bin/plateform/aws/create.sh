@@ -14,6 +14,10 @@ LAUNCHED_INSTANCES=()
 RESERVED_ENI=()
 PRIVATE_ADDR_IPS=()
 PUBLIC_ADDR_IPS=()
+OVERRIDE_SEED_IMAGE=
+PUBLIC_SUBNET_NLB_TARGET=
+PRIVATE_SUBNET_NLB_TARGET=
+ACM_CERTIFICATE_TAGGING=
 
 function usage() {
 	common_usage
@@ -660,7 +664,7 @@ else
 	TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 fi
 
-MACHINES_TYPES=$(jq --argjson VOLUME_SIZE ${VOLUME_SIZE} --arg VOLUME_TYPE ${VOLUME_TYPE} 'with_entries(.value += {"diskType": $VOLUME_TYPE, "diskSize": $VOLUME_SIZE})' templates/machines/${SEED_ARCH}.json)
+MACHINES_TYPES=$(jq --argjson VOLUME_SIZE ${VOLUME_SIZE} --arg VOLUME_TYPE ${VOLUME_TYPE} 'with_entries(.value += {"diskType": $VOLUME_TYPE, "diskSize": $VOLUME_SIZE})' templates/setup/aws/machines.json)
 
 # Check if we can resume the creation process
 if [ "${DELETE_CLUSTER}" = "YES" ]; then
@@ -862,7 +866,7 @@ fi
 if [ -z "${TARGET_IMAGE_AMI}" ]; then
 	echo_blue_bold "Create aws preconfigured image ${TARGET_IMAGE}"
 
-	if [ ${CONTROLPLANE_USE_PUBLICIP} == "true" ]; then
+	if [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ]; then
 		SUBNETID=${VPC_PUBLIC_SUBNET_IDS[0]}
 		SGID=${VPC_PUBLIC_SECURITY_GROUPID}
 	else
@@ -873,6 +877,8 @@ if [ -z "${TARGET_IMAGE_AMI}" ]; then
 	./bin/create-image.sh \
 		--ami="${SEED_IMAGE}" \
 		--arch="${SEED_ARCH}" \
+		--aws-access-key="${AWS_ACCESSKEY}" \
+		--aws-secret-key="${AWS_SECRETKEY}" \
 		--cni-plugin="${CNI_PLUGIN}" \
 		--cni-version="${CNI_VERSION}" \
 		--container-runtime=${CONTAINER_ENGINE} \
@@ -887,7 +893,8 @@ if [ -z "${TARGET_IMAGE_AMI}" ]; then
 		--ssh-key-name="${SSH_KEYNAME}" \
 		--subnet-id="${SUBNETID}" \
 		--use-public-ip="${CONTROLPLANE_USE_PUBLICIP}" \
-		--user="${KUBERNETES_USER}" \
+		--user="${KUBERNETES_USER}"
+
 fi
 
 if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then

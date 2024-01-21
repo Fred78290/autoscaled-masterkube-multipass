@@ -5,7 +5,6 @@ fi
 
 set -eu
 
-export ACM_CERTIFICATE_ARN=
 export ACM_DOMAIN_NAME=
 export AUTOSCALE_MACHINE="medium"
 export AUTOSCALER_DESKTOP_UTILITY_ADDR=

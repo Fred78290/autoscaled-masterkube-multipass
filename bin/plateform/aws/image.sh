@@ -35,7 +35,7 @@ OPTIONS=(
 
 PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
 TEMP=$(getopt -o fp:r:i:n:c:u: --long "${PARAMS}"  -n "$0" -- "$@")
-v:
+
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.

@@ -270,12 +270,6 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 			vmrest_network_change ${SEEDIMAGE_UUID} ${PRIMARY_NETWORK_NAME} 1 > /dev/null
 		fi
 
-#        if [ -n "${SECOND_NETWORK_NAME}" ]; then
-#            echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${SEED_IMAGE}"
-#
-#            vmrest_network_add ${SEEDIMAGE_UUID} ${SECOND_NETWORK_NAME} > /dev/null
-#        fi
-
 		echo_blue_bold "Power On ${SEED_IMAGE}"
 		vmrest_poweron "${SEEDIMAGE_UUID}" > /dev/null
 
@@ -288,31 +282,24 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 		fi
 
 		echo_blue_bold "Wait ssh ready for ${IPADDR}"
-		wait_ssh_ready ${USER}@${IPADDR}
+		wait_ssh_ready ${SEED_USER}@${IPADDR}
 
 		echo_blue_bold "Update seed image ${SEED_IMAGE}"
 
-		ssh -t "${USER}@${IPADDR}" "sudo apt update ; sudo apt dist-upgrade -y"
+		ssh -t "${SEED_USER}@${IPADDR}" "sudo apt update ; sudo apt upgrade -y"
 		
 		# Prepare seed VM
 		echo_blue_bold "Install cloud-init VMWareGuestInfo datasource"
 
-		ssh -t "${USER}@${IPADDR}" <<EOF
+		ssh -t "${SEED_USER}@${IPADDR}" <<EOF
 		sudo sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"/' /etc/default/grub
 		sudo update-grub
-		sudo apt update
-		sudo apt dist-upgrade -y
 		sudo apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
 		sudo sh -c 'echo datasource_list: [ NoCloud, VMware, OVF ] > /etc/cloud/cloud.cfg.d/99-VMWare-Only.cfg'
-		exit 
-EOF
-
-		echo_blue_bold "clean cloud-init"
-		ssh -t "${USER}@${IPADDR}" <<EOF
 		sudo cloud-init clean
-		cloud-init clean -l
-		sudo shutdown -h now
+		exit
 EOF
+		echo_blue_bold "Cloud-init done, poweroff"
 
 		# Shutdown the guest
 		vmrest_poweroff "${SEEDIMAGE_UUID}" "soft" > /dev/null
@@ -437,7 +424,7 @@ scp ${SCP_OPTIONS} "${CACHE}/prepare-image.sh" "${SEED_USER}@${IPADDR}:~"
 
 ssh -t "${SEED_USER}@${IPADDR}" sudo ./prepare-image.sh
 
-vmrest_poweroff ${TARGET_IMAGE_UUID} > /dev/null
+vmrest_poweroff "${TARGET_IMAGE_UUID}" "soft" > /dev/null
 
 echo_blue_dot_title "Wait ${TARGET_IMAGE} to shutdown"
 while [ $(vmrest_power_state ${TARGET_IMAGE_UUID}) == "poweredOn" ]

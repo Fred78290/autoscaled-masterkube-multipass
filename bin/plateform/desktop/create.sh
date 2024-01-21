@@ -612,8 +612,6 @@ else
 	TARGET_IMAGE="${ROOT_IMG_NAME}-k8s-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 fi
 
-TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}.img"
-
 # Check if we can resume the creation process
 if [ "${DELETE_CLUSTER}" = "YES" ]; then
 	delete-masterkube.sh --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}

@@ -8,11 +8,12 @@ while true; do
 	if [ -z "${ARG}" ]; then
 		break
 	elif [[ "${ARG}" = --plateform* ]] || [[ "${ARG}" = -p* ]]; then
+		export PLATEFORM=
 		IFS== read IGNORE PLATEFORM <<<"${ARG}"
 
 		if [ -z "${PLATEFORM}" ]; then
-			PLATEFORM=$1
 			shift
+			PLATEFORM=$1
 		fi
 	elif [[ "${ARG}" =~ --[\w]* ]] || [[ "${ARG}" = -[\w* ]]; then
 		IFS== read ARGUMENT VALUE <<<"${ARG}"

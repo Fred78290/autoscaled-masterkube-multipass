@@ -1,5 +1,5 @@
 if [ -z "${PLATEFORM}" ]; then
-    echo "env PLATEFORM= [ aws | vsphere | multipass | desktop ] not defined!"
+    echo "export PLATEFORM=[ aws | vsphere | multipass | desktop ] not defined!"
     exit 1
 fi
 

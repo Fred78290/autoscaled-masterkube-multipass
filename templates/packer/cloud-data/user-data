@@ -4,7 +4,6 @@ package_update: false
 package_upgrade: false
 ssh_pwauth: true
 users:
-  - default
   - name: kubernetes
     groups: users, admin
     lock_passwd: false

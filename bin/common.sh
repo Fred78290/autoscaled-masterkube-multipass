@@ -161,6 +161,15 @@ export DASHBOARD_HOSTNAME=masterkube-${PLATEFORM}-dashboard
 
 export PLATEFORMDEFS=${CURDIR}/plateform/${PLATEFORM}/vars.defs
 
+# Check if passord is defined
+if [ -z ${KUBERNETES_PASSWORD} ]; then
+	if [ -f ~/.kubernetes_pwd ]; then
+		KUBERNETES_PASSWORD=$(cat ~/.kubernetes_pwd)
+	else
+		KUBERNETES_PASSWORD=$(uuidgen)
+		echo -n "${KUBERNETES_PASSWORD}" > ~/.kubernetes_pwd
+	fi
+fi
 
 #===========================================================================================================================================
 #

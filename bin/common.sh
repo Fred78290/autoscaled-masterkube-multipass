@@ -106,13 +106,12 @@ export SCALEDOWNDELAYAFTERFAILURE="1m"
 export SCALEDOWNENABLED="true"
 export SCALEDOWNUNEEDEDTIME="1m"
 export SCALEDOWNUNREADYTIME="1m"
-export SCP_OPTIONS="${SSH_OPTIONS} -p -r"
 export SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
 export SEED_IMAGE="${DISTRO}-server-cloudimg-seed"
 export SEED_USER=ubuntu
 export SILENT="&> /dev/null"
 export SSH_KEY_FNAME=
-export SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
+export SSH_KEY=$(cat ${HOME}/.ssh/id_rsa.pub)
 export SSH_KEYNAME="aws-k8s-key"
 export SSH_OPTIONS="-o BatchMode=yes -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 export SSH_PRIVATE_KEY="${HOME}/.ssh/id_rsa"
@@ -154,6 +153,7 @@ export WORKERNODE_USE_PUBLICIP=false
 export WORKERNODES=3
 export ZONEID=office
 
+export SCP_OPTIONS="${SSH_OPTIONS} -p -r"
 
 export NODEGROUP_NAME="${PLATEFORM}-ca-k8s"
 export MASTERKUBE=${NODEGROUP_NAME}-masterkube

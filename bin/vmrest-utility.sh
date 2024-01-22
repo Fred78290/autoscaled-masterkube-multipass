@@ -77,9 +77,9 @@ function do_post() {
 		TRACE_FILE="utility-$(date +%s).log"
 		echo "POST ${1}" > ${TRACE_FILE}
 		if [ $# -eq 2 ]; then
-			do_curl POST "${1}" "${2}" | jq . | tee ${TRACE_FILE}
+			do_curl POST "${1}" "${2}" | jq . | tee -a ${TRACE_FILE}
 		else
-			do_curl POST "${1}" | jq . | tee ${TRACE_FILE}
+			do_curl POST "${1}" | jq . | tee -a ${TRACE_FILE}
 		fi
 	elif [ $# -eq 2 ]; then
 		do_curl POST "${1}" "${2}"
@@ -93,9 +93,9 @@ function do_put() {
 		TRACE_FILE="utility-$(date +%s).log"
 		echo "PUT ${1}" > ${TRACE_FILE}
 		if [ $# -eq 2 ]; then
-			do_curl PUT "${1}" "${2}" | jq . | tee ${TRACE_FILE}
+			do_curl PUT "${1}" "${2}" | jq . | tee -a ${TRACE_FILE}
 		else
-			do_curl PUT "${1}" | jq . | tee ${TRACE_FILE}
+			do_curl PUT "${1}" | jq . | tee -a ${TRACE_FILE}
 		fi
 	elif [ $# -eq 2 ]; then
 		do_curl PUT "${1}" "${2}"
@@ -108,7 +108,7 @@ function do_delete() {
 	if [ "${TRACE_CURL}" == "YES" ]; then
 		TRACE_FILE="utility-$(date +%s).log"
 		echo "DELETE ${1}" > ${TRACE_FILE}
-		do_curl DELETE "${1}" | jq . | tee ${TRACE_FILE}
+		do_curl DELETE "${1}" | jq . | tee -a ${TRACE_FILE}
 	else
 		do_curl DELETE "${1}"
 	fi
@@ -118,7 +118,7 @@ function do_get() {
 	if [ "${TRACE_CURL}" == "YES" ]; then
 		TRACE_FILE="utility-$(date +%s).log"
 		echo "GET ${1}" > ${TRACE_FILE}
-		do_curl GET "${1}" | jq . | tee ${TRACE_FILE}
+		do_curl GET "${1}" | jq . | tee -a ${TRACE_FILE}
 	else
 		do_curl GET "${1}"
 	fi

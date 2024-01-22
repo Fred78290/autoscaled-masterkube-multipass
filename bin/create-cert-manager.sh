@@ -10,7 +10,7 @@ function deploy {
 $(<${KUBERNETES_TEMPLATE}/$1.json)
 EOF")
 
-	if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
+	if [ -z "${PUBLIC_DOMAIN_NAME}" ] || [ "${CERT_SELFSIGNED}" == "YES" ]; then
 		echo ${CONFIG} | jq . > ${ETC_DIR}/cluster-issuer.json
 	elif [ "${USE_ZEROSSL}" = "YES" ]; then
 		echo ${CONFIG} | jq \
@@ -69,7 +69,7 @@ helm upgrade -i ${NAMESPACE} jetstack/cert-manager \
 	--version ${CERT_MANAGER_VERSION} \
 	--set installCRDs=true
 
-if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
+if [ -z "${PUBLIC_DOMAIN_NAME}" ] || [ "${CERT_SELFSIGNED}" == "YES" ]; then
 	echo_blue_bold "Register CA self signed issuer"
 	kubectl create secret generic ca-key-pair --dry-run=client -o yaml \
 		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \

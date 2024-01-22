@@ -43,63 +43,7 @@ function usage() {
 EOF
 }
 
-OPTIONS=(
-	"help"
-	"distribution:"
-	"upgrade"
-	"verbose"
-	"trace"
-	"resume"
-	"delete"
-	"configuration-location:"
-	"ssl-location:"
-	"cert-email:"
-	"use-zerossl:"
-	"zerossl-eab-kid:"
-	"zerossl-eab-hmac-secret:"
-	"godaddy-key:"
-	"godaddy-secret:"
-	"route53-zone-id:"
-	"route53-access-key:"
-	"route53-secret-key:"
-	"dashboard-hostname:"
-	"public-domain:"
-	"defs:"
-	"create-image-only"
-	"max-pods:"
-	"k8s-distribution:"
-	"ha-cluster"
-	"create-external-etcd"
-	"node-group:"
-	"container-runtime:"
-	"target-image:"
-	"arch:"
-	"seed-image:"
-	"nginx-machine:"
-	"control-plane-machine:"
-	"worker-node-machine:"
-	"autoscale-machine:"
-	"ssh-private-key:"
-	"cni-plugin:"
-	"cni-version:"
-	"transport:"
-	"kubernetes-version:"
-	"kubernetes-user:"
-	"kubernetes-password:"
-	"worker-nodes:"
-	"cloudprovider:"
-	"max-nodes-total:"
-	"cores-total:"
-	"memory-total:"
-	"max-autoprovisioned-node-group-count:"
-	"scale-down-enabled:"
-	"scale-down-delay-after-add:"
-	"scale-down-delay-after-delete:"
-	"scale-down-delay-after-failure:"
-	"scale-down-unneeded-time:"
-	"scale-down-unready-time:"
-	"unremovable-node-recheck-timeout:"
-
+OPTIONS+=(
 	"nfs-server-adress:"
 	"nfs-server-mount:"
 	"nfs-storage-class:"
@@ -180,6 +124,10 @@ while true; do
 		;;
 	--use-zerossl)
 		USE_ZEROSSL=YES
+		shift 1
+		;;
+	--use-self-signed-ca)
+		CERT_SELFSIGNED=YES
 		shift 1
 		;;
 	--zerossl-eab-kid)

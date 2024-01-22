@@ -27,6 +27,7 @@ export CERT_GODADDY_API_KEY=${GODADDY_API_KEY}
 export CERT_GODADDY_API_SECRET=${GODADDY_API_SECRET}
 export CERT_ZEROSSL_EAB_HMAC_SECRET=${ZEROSSL_EAB_HMAC_SECRET}
 export CERT_ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID}
+export CERT_SELFSIGNED=NO
 export CLOUD_IMAGES_UBUNTU=cloud-images.ubuntu.com
 export CLOUD_PROVIDER_CONFIG=
 export CLOUD_PROVIDER=
@@ -226,6 +227,7 @@ Options are:
 
 --cert-email=<value>                             # Specify the mail for lets encrypt, default ${CERT_EMAIL}
 --use-zerossl                                    # Specify cert-manager to use zerossl, default ${USE_ZEROSSL}
+--use-self-signed-ca                             # Specify if use self-signed CA, default ${CERT_SELFSIGNED}
 --zerossl-eab-kid=<value>                        # Specify zerossl eab kid, default ${CERT_ZEROSSL_EAB_KID}
 --zerossl-eab-hmac-secret=<value>                # Specify zerossl eab hmac secret, default ${CERT_ZEROSSL_EAB_HMAC_SECRET}
 

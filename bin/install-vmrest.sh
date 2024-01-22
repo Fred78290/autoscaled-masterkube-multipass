@@ -1,13 +1,16 @@
 #!/bin/bash
+export PLATEFORM=desktop
 
 CURDIR=$(dirname $0)
 
 source "${CURDIR}/common.sh"
-source "${CURDIR}/vmrest.sh"
+source "${CURDIR}/vmrest-utility.sh"
 
 VMREST_HOME=$(do_get ${VMREST_URL})
 
-if [ -z "${VMREST_HOME}" ]; then
+echo "VMREST_HOME=${VMREST_HOME}"
+
+if [ -z "${VMREST_HOME}" ] || [ "${VMREST_HOME}" == '{}' ]; then
 	echo_blue_bold "Install vmrest and configure as user service, provide a username and a password"
 
 	vmrest --config
@@ -70,4 +73,6 @@ EOF
 		systemctl --user enable vmrest.service
 		systemctl --user start vmrest.service
 	fi
+else
+	echo_blue_bold "${VMREST_URL} already installed"
 fi

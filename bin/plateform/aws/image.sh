@@ -212,6 +212,10 @@ CREDENTIALS_BIN=${CREDENTIALS_BIN}
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
+apt update
+apt upgrade -y
+apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
+snap install yq
 EOF
 
 cat ${CURDIR}/prepare-image.sh >> "${CACHE}/prepare-image.sh"

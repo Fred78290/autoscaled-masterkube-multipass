@@ -225,8 +225,9 @@ if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 		sudo sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"/' /etc/default/grub
 		sudo update-grub
 		sudo apt update
-		sudo apt dist-upgrade -y
+		sudo apt upgrade -y
 		sudo apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
+		sudo snap install yq
 		sudo sh -c 'echo datasource_list: [ NoCloud, VMware, OVF ] > /etc/cloud/cloud.cfg.d/99-VMWare-Only.cfg'
 		exit 
 EOF

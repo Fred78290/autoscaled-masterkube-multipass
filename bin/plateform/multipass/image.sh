@@ -172,6 +172,7 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
 apt update
 apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
+snap install yq
 sed -i 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0\"/' /etc/default/grub
 update-grub
 

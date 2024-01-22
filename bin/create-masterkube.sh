@@ -46,7 +46,7 @@ time {
 		elif [[ "${ARG}" = *" "* ]]; then
 			ARGS+=("\"${ARG}\"")
 		else
-			ARGS+=("${ARG}'")
+			ARGS+=("${ARG}")
 		fi
 
 		shift

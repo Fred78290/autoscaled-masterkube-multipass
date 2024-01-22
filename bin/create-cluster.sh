@@ -3,6 +3,7 @@
 set -e
 
 APISERVER_ADVERTISE_PORT=6443
+ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
 CERT_EXTRA_SANS=()
 CERT_SANS=
 CLOUD_PROVIDER=
@@ -42,12 +43,6 @@ TOKEN_TLL="0s"
 ZONEID=office
 
 export KUBECONFIG=
-
-if [ "$(uname -p)" == "aarch64" ]; then
-	ARCH="arm64"
-else
-	ARCH="amd64"
-fi
 
 TEMP=$(getopt -o xm:g:r:i:c:n:k: --long cloud-provider:,plateform:,tls-san:,delete-credentials-provider:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace:,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
 
@@ -257,8 +252,6 @@ mkdir -p /etc/kubernetes
 mkdir -p ${CLUSTER_DIR}/etcd
 
 echo "${APISERVER_ADVERTISE_ADDRESS} $(hostname) ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
-
-NODENAME=${HOSTNAME}
 
 if [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 	ANNOTE_MASTER=true

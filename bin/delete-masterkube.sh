@@ -1,4 +1,6 @@
 #!/bin/bash
+set -eu
+
 CURDIR=$(dirname $0)
 FORCE=NO
 TRACE=NO
@@ -119,7 +121,7 @@ if [ "${FORCE}" = "YES" ]; then
 			MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${NODEINDEX}"
 		fi
 
-		delete_vm_by_name ${MASTERKUBE_NODE}
+		delete_vm_by_name ${MASTERKUBE_NODE} || true
 	done
 
 elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
@@ -127,9 +129,10 @@ elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
 
 	for NODE in ${WORKERNODES}
 	do
-		delete_vm_by_name ${NODE}
+		delete_vm_by_name ${NODE} || true
 	done
-	delete_vm_by_name ${MASTERKUBE}
+
+	delete_vm_by_name ${MASTERKUBE} || true
 fi
 
 unregister_dns
@@ -144,10 +147,16 @@ fi
 delete_host "${MASTERKUBE}"
 delete_host "masterkube-${PLATEFORM}"
 
-echo TARGET_CLUSTER_LOCATION=$TARGET_CLUSTER_LOCATION
-exit
-rm -rf ${TARGET_CLUSTER_LOCATION}/*
-rm -rf ${TARGET_CONFIG_LOCATION}/*
-rm -rf ${TARGET_DEPLOY_LOCATION}/*
+if [ -n "${TARGET_CLUSTER_LOCATION}" ]; then
+	rm -rf ${TARGET_CLUSTER_LOCATION}/*
+fi
+
+if [ -n "${TARGET_CONFIG_LOCATION}" ]; then
+	rm -rf ${TARGET_CONFIG_LOCATION}/*
+fi
+
+if [ -n "${TARGET_DEPLOY_LOCATION}" ]; then
+	rm -rf ${TARGET_DEPLOY_LOCATION}/*
+fi
 
 popd &>/dev/null

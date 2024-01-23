@@ -809,7 +809,7 @@ EOF
 
 		# Cloud init meta-data
 		echo "#cloud-config" > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
-		echo ${NETWORK_DEFS} | yq -P - | tee > /dev/null > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
+		echo ${NETWORK_DEFS} | yq -p json P - | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml > /dev/null
 
 		# Cloud init user-data
 		cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
@@ -858,17 +858,18 @@ EOF
 
 				IPADDR=$(vmrest_waitip "${MASTERKUBE_NODE_UUID}")
 
-		if [ ${IPADDR} == "ERROR" ]; then
-			echo_red_bold "Failed to get ip for ${MASTERKUBE_NODE}"
-			exit 1
-		fi
+				if [ ${IPADDR} == "ERROR" ]; then
+					echo_red_bold "Failed to get ip for ${MASTERKUBE_NODE}"
+					exit 1
+				fi
 
 				echo_title "Wait ssh ready on ${IPADDR}"
 				wait_ssh_ready ${KUBERNETES_USER}@${IPADDR}
 				echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${IPADDR}"
-				eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
+				eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin ${SILENT}
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
 
 				# Update /etc/hosts
 				delete_host "${MASTERKUBE_NODE}"
@@ -945,12 +946,10 @@ if [ "${HA_CLUSTER}" = "true" ]; then
 				IPADDR="${IPADDRS[${INDEX}]}"
 
 				echo_title "Start etcd node: ${IPADDR}"
-				
-				eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin ${SILENT}
-
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh --user=${KUBERNETES_USER} --cluster-nodes="${CLUSTER_NODES}" --node-index="${INDEX}" ${SILENT}
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh \
+					--user=${KUBERNETES_USER} \
+					--cluster-nodes="${CLUSTER_NODES}" \
+					--node-index="${INDEX}" ${SILENT}
 
 				touch ${TARGET_CONFIG_LOCATION}/etdc-0${INDEX}-prepared
 			fi
@@ -985,7 +984,7 @@ if [ "${HA_CLUSTER}" = "true" ]; then
 						;;
 				esac
 
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo /usr/local/bin/install-keepalived.sh \
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-keepalived.sh \
 					"${IPADDRS[0]}" \
 					"${KUBERNETES_PASSWORD}" \
 					"$((80-INDEX))" \
@@ -1028,9 +1027,6 @@ do
 		VMUUID=$(get_vmuuid ${MASTERKUBE_NODE})
 
 		echo_title "Prepare VM ${MASTERKUBE_NODE}, UUID=${VMUUID} with IP:${IPADDR}"
-
-		eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin ${SILENT}
 
 		if [ ${INDEX} = 0 ]; then
 			if [ "${HA_CLUSTER}" = "true" ]; then

@@ -31,7 +31,7 @@ eval set -- "${TEMP}"
 # extract options and their arguments into variables.
 while true; do
 	case "$1" in
-	--plateform)
+	--cloud-provider)
 		CLOUD_PROVIDER=$2
 		shift 2
 		;;

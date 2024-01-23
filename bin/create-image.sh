@@ -1,12 +1,16 @@
 #!/bin/bash
 
 export CURDIR=$(dirname $0)
+export TRACE=${TRACE:=NO}
 
 while true; do
 	ARG=$1
 
 	if [ -z "${ARG}" ]; then
 		break
+	elif [[ "${ARG}" = --trace ]] || [[ "${ARG}" = -x ]]; then
+		TRACE=YES
+		shift
 	elif [[ "${ARG}" = --plateform* ]] || [[ "${ARG}" = -p* ]]; then
 		export PLATEFORM=
 		IFS== read IGNORE PLATEFORM <<<"${ARG}"
@@ -37,6 +41,10 @@ while true; do
 done
 
 eval set -- "${ARGS[@]}"
+
+if [ ${TRACE} == "YES" ]; then
+	set -x
+fi
 
 if [ -n "${PLATEFORM}" ]; then
 	source "${CURDIR}/common.sh"

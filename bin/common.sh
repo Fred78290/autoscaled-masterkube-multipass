@@ -40,8 +40,10 @@ export CONTROL_PLANE_MACHINE="small"
 export CONTROLNODES=1
 export CONTROLPLANE_USE_PUBLICIP=false
 export CORESTOTAL="0:16"
+export CREATE_IMAGE_ONLY=NO
 export DELETE_CLUSTER=NO
 export DELETE_CREDENTIALS_CONFIG=NO
+export DEPLOY_COMPONENTS=YES
 export DISTRO=jammy
 export DOMAIN_NAME=
 export ETCD_DST_DIR=
@@ -162,6 +164,12 @@ export SCP_OPTIONS="${SSH_OPTIONS} -p -r"
 export NODEGROUP_NAME="${PLATEFORM}-ca-k8s"
 export MASTERKUBE=${NODEGROUP_NAME}-masterkube
 export DASHBOARD_HOSTNAME=masterkube-${PLATEFORM}-dashboard
+
+if [ -e ${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
+    SSL_LOCATION=${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}
+elif [ -e $HOME/.acme.sh/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
+    SSL_LOCATION=$HOME/.acme.sh/${PUBLIC_DOMAIN_NAME}
+fi
 
 export PLATEFORMDEFS=${CURDIR}/plateform/${PLATEFORM}/vars.defs
 

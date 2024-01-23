@@ -35,65 +35,66 @@ else
 		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 fi
 
-# Create Pods
-echo_title "Create autoscaler"
-create-autoscaler.sh ${LAUNCH_CA}
-
-if [ ${PLATEFORM} == "vsphere" ]; then
-	echo_title "Create VSphere CSI provisionner"
-	create-vsphere-provisionner.sh
-elif [ ${PLATEFORM} == "aws" ]; then
-	echo_title "Create AWS controller"
-	create-aws-controller.sh
-
-
-	echo_title "Create EBS provisionner"
-	create-ebs-provisionner.sh
-
-	echo_title "Create EFS provisionner"
-	create-efs-provisionner.sh
-fi
-
-if [ ${PLATEFORM} != "aws" ]; then
-	echo_title "Create MetalLB"
-	create-metallb.sh
-
-	echo_title "Create NFS provisionner"
-	create-nfs-provisionner.sh
-fi
-
-echo_title "Create CERT Manager"
-create-cert-manager.sh
-
-echo_title "Create Ingress Controller"
-create-ingress-controller.sh
-
-echo_title "Create Kubernetes dashboard"
-create-dashboard.sh
-
-echo_title "Create Kubernetes metric scraper"
-create-metrics.sh
-
-echo_title "Create Rancher"
-create-rancher.sh
-
-echo_title "Create Sample hello"
-create-helloworld.sh
-
-echo_title "Create External DNS"
-create-external-dns.sh
-
-if [ ${PLATEFORM} != "aws" ]; then
-	NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o json | jq -r '.status.loadBalancer.ingress[0].ip//""')
-
-	sudo sed -i '' -e "/masterkube-${PLATEFORM}/d" /etc/hosts
-	sudo bash -c "echo '${NGINX_IP} masterkube-${PLATEFORM}.${DOMAIN_NAME} ${DASHBOARD_HOSTNAME}.${DOMAIN_NAME}' >> /etc/hosts"
-fi
-
 echo_title "Save templates into cluster"
 
 # Save template
 kubectl create ns ${NODEGROUP_NAME} --kubeconfig=${TARGET_CLUSTER_LOCATION}/config --dry-run=client -o yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+
+if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
+	# Create Pods
+	echo_title "Create autoscaler"
+	create-autoscaler.sh ${LAUNCH_CA}
+
+	if [ ${PLATEFORM} == "vsphere" ]; then
+		echo_title "Create VSphere CSI provisionner"
+		create-vsphere-provisionner.sh
+	elif [ ${PLATEFORM} == "aws" ]; then
+		echo_title "Create AWS controller"
+		create-aws-controller.sh
+
+		echo_title "Create EBS provisionner"
+		create-ebs-provisionner.sh
+
+		echo_title "Create EFS provisionner"
+		create-efs-provisionner.sh
+	fi
+
+	if [ ${PLATEFORM} != "aws" ]; then
+		echo_title "Create MetalLB"
+		create-metallb.sh
+
+		echo_title "Create NFS provisionner"
+		create-nfs-provisionner.sh
+	fi
+
+	echo_title "Create CERT Manager"
+	create-cert-manager.sh
+
+	echo_title "Create Ingress Controller"
+	create-ingress-controller.sh
+
+	echo_title "Create Kubernetes dashboard"
+	create-dashboard.sh
+
+	echo_title "Create Kubernetes metric scraper"
+	create-metrics.sh
+
+	echo_title "Create Rancher"
+	create-rancher.sh
+
+	echo_title "Create Sample hello"
+	create-helloworld.sh
+
+	echo_title "Create External DNS"
+	create-external-dns.sh
+
+	if [ ${PLATEFORM} != "aws" ]; then
+		NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o json | jq -r '.status.loadBalancer.ingress[0].ip//""')
+
+		sudo sed -i '' -e "/masterkube-${PLATEFORM}/d" /etc/hosts
+		sudo bash -c "echo '${NGINX_IP} masterkube-${PLATEFORM}.${DOMAIN_NAME} ${DASHBOARD_HOSTNAME}.${DOMAIN_NAME}' >> /etc/hosts"
+	fi
+fi
 
 # Add cluster config in configmap
 kubectl create configmap cluster -n ${NODEGROUP_NAME} --dry-run=client -o yaml \

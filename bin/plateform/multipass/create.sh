@@ -564,7 +564,7 @@ TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}.img"
 
 # Check if we can resume the creation process
 if [ "${DELETE_CLUSTER}" = "YES" ]; then
-	delete-masterkube.sh --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
+	delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
 	exit
 elif [ ! -f ${TARGET_CONFIG_LOCATION}/buildenv ] && [ "${RESUME}" = "YES" ]; then
 	echo_red "Unable to resume, building env is not found"
@@ -750,9 +750,10 @@ function create_vm() {
 						"eth0": {
 							"dhcp4": true,
 							"gateway4": "${NET_GATEWAY}",
-							"addresses": [
-								"${NODE_IP}/${NET_MASK_CIDR}": {
-									"label": "eth0:1"
+							"addresses": [{
+									"${NODE_IP}/${NET_MASK_CIDR}": {
+										"label": "eth0:1"
+									}
 								}
 							]
 						},
@@ -774,9 +775,10 @@ EOF
 					"version": 2,
 					"ethernets": {
 						"eth0": {
-							"addresses": [
-								"${NODE_IP}/${NET_MASK_CIDR}": {
-									"label": "eth0:1"
+							"addresses": [{
+									"${NODE_IP}/${NET_MASK_CIDR}": {
+										"label": "eth0:1"
+									}
 								}
 							]
 						},
@@ -809,8 +811,7 @@ EOF
 		echo ${NETWORK_DEFS} | jq . > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.json
 
 		# Cloud init meta-data
-		echo ${NETWORK_DEFS} | yq -P - > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
-		NETWORKCONFIG=$(cat ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml | base64 -w 0 | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64)
+		NETWORKCONFIG=$(echo ${NETWORK_DEFS} | yq -p json -P | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml | base64 -w 0 | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64)
 
 		# Cloud init user-data
 		cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
@@ -859,9 +860,10 @@ EOF
 		IPADDR=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE}  '.info|.[$NAME].ipv4[0]')
 
 		echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${IPADDR}"
-		eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
+		eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin ${SILENT}
+		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
+		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
 
 		# Update /etc/hosts
 		delete_host "${MASTERKUBE_NODE}"
@@ -936,12 +938,10 @@ if [ "${HA_CLUSTER}" = "true" ]; then
 				IPADDR="${IPADDRS[${INDEX}]}"
 
 				echo_title "Start etcd node: ${IPADDR}"
-				
-				eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin ${SILENT}
-
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh --user=${KUBERNETES_USER} --cluster-nodes="${CLUSTER_NODES}" --node-index="${INDEX}" ${SILENT}
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh \
+					--user=${KUBERNETES_USER} \
+					--cluster-nodes="${CLUSTER_NODES}" \
+					--node-index="${INDEX}" ${SILENT}
 
 				touch ${TARGET_CONFIG_LOCATION}/etdc-0${INDEX}-prepared
 			fi
@@ -976,7 +976,7 @@ if [ "${HA_CLUSTER}" = "true" ]; then
 						;;
 				esac
 
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo /usr/local/bin/install-keepalived.sh \
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-keepalived.sh \
 					"${IPADDRS[0]}" \
 					"${KUBERNETES_PASSWORD}" \
 					"$((80-INDEX))" \
@@ -1019,9 +1019,6 @@ do
 		VMUUID=$(get_vmuuid ${MASTERKUBE_NODE})
 
 		echo_title "Prepare VM ${MASTERKUBE_NODE}, UUID=${VMUUID} with IP:${IPADDR}"
-
-		eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin ${SILENT}
 
 		if [ ${INDEX} = 0 ]; then
 			if [ "${HA_CLUSTER}" = "true" ]; then

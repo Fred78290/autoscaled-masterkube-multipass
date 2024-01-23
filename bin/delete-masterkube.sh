@@ -1,25 +1,31 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
 FORCE=NO
-
-source "${CURDIR}/common.sh"
+TRACE=NO
+OVERRIDE_PLATEFORMDEFS=
+OVERRIDE_AWS_PROFILE=
+OVERRIDE_AWS_REGION=
+OVERRIDE_NODEGROUP_NAME=
+OVERRIDE_CONFIGURATION_LOCATION=
 
 pushd ${CURDIR}/../ &>/dev/null
 
-CONFIGURATION_LOCATION=${PWD}
-
-TEMP=$(getopt -o ftg:p:r: --long trace,configuration-location:,defs:,force,node-group:,profile:,region: -n "$0" -- "$@")
+TEMP=$(getopt -o ftg:p:r: --long trace,configuration-location:,defs:,force,node-group:,profile:,region:,plateform: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
 while true; do
 	case "$1" in
 		--defs)
-			PLATEFORMDEFS=$2
-			if [ ! -f ${PLATEFORMDEFS} ]; then
-				echo_red "definitions: ${PLATEFORMDEFS} not found"
+			OVERRIDE_PLATEFORMDEFS=$2
+			if [ ! -f ${OVERRIDE_PLATEFORMDEFS} ]; then
+				echo_red "definitions: ${OVERRIDE_PLATEFORMDEFS} not found"
 				exit 1
 			fi
+			shift 2
+			;;
+		--plateform)
+			PLATEFORM="$2"
 			shift 2
 			;;
 		-f|--force)
@@ -31,21 +37,21 @@ while true; do
 			shift 1
 			;;
 		-p|--profile)
-			AWS_PROFILE="$2"
+			OVERRIDE_AWS_PROFILE="$2"
 			shift 2
 			;;
 		-r|--region)
-			AWS_REGION="$2"
+			OVERRIDE_AWS_REGION="$2"
 			shift 2
 			;;
 		-g|--node-group)
-			NODEGROUP_NAME=$2
+			OVERRIDE_NODEGROUP_NAME=$2
 			shift 2
 			;;
 		--configuration-location)
-			CONFIGURATION_LOCATION=$2
-			if [ ! -d ${CONFIGURATION_LOCATION} ]; then
-				echo_red_bold "kubernetes output : ${CONFIGURATION_LOCATION} not found"
+			OVERRIDE_CONFIGURATION_LOCATION=$2
+			if [ ! -d ${OVERRIDE_CONFIGURATION_LOCATION} ]; then
+				echo_red_bold "kubernetes output : ${OVERRIDE_CONFIGURATION_LOCATION} not found"
 				exit 1
 			fi
 			shift 2
@@ -61,15 +67,37 @@ while true; do
 	esac
 done
 
-source ${PLATEFORMDEFS}
-
 if [ "${TRACE}" = "YES" ]; then
 	set -x
 fi
 
-TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
-TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
-TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+source "${CURDIR}/common.sh"
+
+if [ -n "${OVERRIDE_AWS_PROFILE}" ]; then
+	AWS_PROFILE=${OVERRIDE_AWS_PROFILE}
+fi
+
+if [ -n "${OVERRIDE_AWS_REGION}" ]; then
+	AWS_REGION=${OVERRIDE_AWS_REGION}
+fi
+
+if [ -n "${OVERRIDE_NODEGROUP_NAME}" ]; then
+	NODEGROUP_NAME=${OVERRIDE_NODEGROUP_NAME}
+fi
+
+if [ -n "${OVERRIDE_CONFIGURATION_LOCATION}" ]; then
+	CONFIGURATION_LOCATION=${OVERRIDE_CONFIGURATION_LOCATION}
+
+	TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
+	TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
+	TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+fi
+
+if [ -n "${OVERRIDE_PLATEFORMDEFS}" ]; then
+	PLATEFORMDEFS=${OVERRIDE_PLATEFORMDEFS}
+
+	source ${PLATEFORMDEFS}
+fi
 
 echo_blue_bold "Delete masterkube ${MASTERKUBE} previous instance"
 
@@ -107,17 +135,19 @@ fi
 unregister_dns
 wait_jobs_finish
 
-./bin/kubeconfig-delete.sh ${MASTERKUBE} ${NODEGROUP_NAME} &> /dev/null
+./bin/kubeconfig-delete.sh ${MASTERKUBE} ${NODEGROUP_NAME} &> /dev/null || true
 
 if [ -f ${TARGET_CONFIG_LOCATION}/autoscaler.pid ]; then
 	kill ${TARGET_CONFIG_LOCATION}/autoscaler.pid
 fi
 
-rm -rf ${TARGET_CLUSTER_LOCATION}
-rm -rf ${TARGET_CONFIG_LOCATION}
-rm -rf ${TARGET_DEPLOY_LOCATION}
-
 delete_host "${MASTERKUBE}"
 delete_host "masterkube-${PLATEFORM}"
+
+echo TARGET_CLUSTER_LOCATION=$TARGET_CLUSTER_LOCATION
+exit
+rm -rf ${TARGET_CLUSTER_LOCATION}/*
+rm -rf ${TARGET_CONFIG_LOCATION}/*
+rm -rf ${TARGET_DEPLOY_LOCATION}/*
 
 popd &>/dev/null

@@ -3,6 +3,7 @@
 export CURDIR=$(dirname $0)
 export OUTPUT=${CURDIR}/../config/deploy.log
 export TIMEFORMAT='It takes %R seconds to complete this task...'
+export TRACE=${TRACE:=NO}
 export ARGS=()
 
 OPTIONS=(
@@ -81,6 +82,9 @@ time {
 
 		if [ -z "${ARG}" ]; then
 			break
+		elif [[ "${ARG}" = --trace ]] || [[ "${ARG}" = -x ]]; then
+			TRACE=YES
+			shift
 		elif [[ "${ARG}" = --plateform* ]] || [[ "${ARG}" = -p* ]]; then
 			export PLATEFORM=
 			IFS== read IGNORE PLATEFORM <<<"${ARG}"
@@ -112,6 +116,10 @@ time {
 	done
 
 	eval set -- "${ARGS[@]}"
+
+	if [ "${TRACE}" == "YES" ]; then
+		set -x
+	fi
 
 	if [ -n "${PLATEFORM}" ]; then
 		source ${CURDIR}/common.sh

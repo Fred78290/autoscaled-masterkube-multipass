@@ -1270,7 +1270,10 @@ EOF
 		echo -n ${LAUNCHED_INSTANCE} | jq . > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json
 	fi
 
-	ssh ${SSH_OPTIONS} "${KUBERNETES_USER}@${SSHADDR}" mkdir -p /home/${KUBERNETES_USER}/cluster 2>/dev/null
+	eval ssh ${SSH_OPTIONS} "${KUBERNETES_USER}@${SSHADDR}" mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
+	eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
+	eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
+	eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
 }
 
 #===========================================================================================================================================
@@ -1415,11 +1418,7 @@ function create_load_balancer() {
 				IPADDR=$(get_ssh_ip ${INSTANCE_INDEX})
 
 				echo_title "Start etcd node: ${IPADDR}"
-				
-				eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-				eval scp ${SCP_OPTIONS} cluster/${NODEGROUP_NAME}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin ${SILENT}
-
+				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh \
 					--user=${KUBERNETES_USER} \
 					--cluster-nodes="${MASTER_NODES}" \
@@ -1453,10 +1452,6 @@ function start_kubernes_on_instances() {
 			IPADDR=$(get_ssh_ip ${INDEX})
 
 			echo_title "Prepare VM ${MASTERKUBE_NODE} with IP:${IPADDR}"
-
-			eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-			eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo mv /home/${KUBERNETES_USER}/bin/* /usr/local/bin ${SILENT}
-			eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo chown root:root /usr/local/bin ${SILENT}
 
 			NODEINDEX=$((INDEX - ${CONTROLNODE_INDEX}))
 
@@ -1519,7 +1514,7 @@ function start_kubernes_on_instances() {
 						--cni-plugin="${CNI_PLUGIN}" \
 						--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 
-					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}  ${SILENT}
+					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/  ${SILENT}
 
 					wait_nlb_ready
 
@@ -1583,7 +1578,7 @@ function start_kubernes_on_instances() {
 						--cni-plugin="${CNI_PLUGIN}" \
 						--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 
-					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}  ${SILENT}
+					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
 
 					MASTER_IP=${IPADDR}:6443
 

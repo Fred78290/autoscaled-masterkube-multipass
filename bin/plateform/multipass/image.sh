@@ -203,7 +203,7 @@ else
 	QEMU_BINARY=qemu-system-aarch64
 	MACHINE_TYPE="virt"
 
-	jq --arg BIOS "${PWD}/qemu-efi-aarch64/QEMU_EFI.fd" '.builders[0].qemuargs += [[ "-bios", $BIOS ], [ "-monitor","stdio" ], [ "-display", "cocoa" ]]' \
+	jq --arg BIOS "${PWD}/templates/packer/qemu-efi-aarch64/QEMU_EFI.fd" '.builders[0].qemuargs += [[ "-bios", $BIOS ], [ "-monitor","stdio" ], [ "-display", "cocoa" ]]' \
 		./templates/packer/template.json > ${CACHE}/packer/template.json
 
 	if [ "${OSDISTRO}" == "Darwin" ]; then

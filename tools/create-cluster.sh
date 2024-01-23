@@ -697,7 +697,7 @@ EOF
 
 	fi
 
-	if [ -n "${PROVIDERID}" ]; then
+	if [ -n "${PROVIDERID}" ]; then
 		cat > patch.yaml <<EOF
 spec:
   providerID: '${PROVIDERID}'
@@ -716,7 +716,7 @@ kubectl label nodes ${NODENAME} \
 	"topology.kubernetes.io/zone=${ZONEID}" \
 	"topology.csi.vmware.com/k8s-region=${REGION}" \
 	"topology.csi.vmware.com/k8s-zone=${ZONEID}" \
-	"master=true"
+	"master=true" \
 	--overwrite
 
 kubectl annotate node ${NODENAME} \

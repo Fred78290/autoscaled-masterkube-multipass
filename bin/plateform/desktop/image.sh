@@ -322,6 +322,11 @@ else
 	echo_blue_bold "${SEED_IMAGE} already exists, nothing to do!"
 fi
 
+function dump_vendordata() {
+	echo $1
+	grep 'guestinfo.vendordata ' "/vmware/jammy-kubernetes-k8s-flannel-v1.29.0-containerd-amd64/jammy-kubernetes-k8s-flannel-v1.29.0-containerd-amd64.vmx" | cut -d= -f2 | sed 's/[ "]//g'  | base64 -d - | gunzip -
+}
+
 case "${KUBERNETES_DISTRO}" in
 	k3s|rke2)
 		CREDENTIALS_CONFIG=/var/lib/rancher/credentialprovider/config.yaml
@@ -415,17 +420,25 @@ if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 	exit 1
 fi
 
+dump_vendordata "vmrest_create"
+
 if [ -n "${SECOND_NETWORK_NAME}" ]; then
 	echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${TARGET_IMAGE}"
 
 	vmrest_network_add ${TARGET_IMAGE_UUID} ${SECOND_NETWORK_NAME} > /dev/null
 fi
 
+dump_vendordata "Add second network card"
+
 echo_blue_bold "Power On ${TARGET_IMAGE}"
 vmrest_poweron ${TARGET_IMAGE_UUID} > /dev/null
 
+dump_vendordata "Power On"
+
 echo_blue_bold "Wait for IP from ${TARGET_IMAGE}"
 IPADDR=$(vmrest_waitip ${TARGET_IMAGE_UUID})
+
+read -p "Enter to continue"
 
 echo_blue_bold "Wait ssh ready on ${IPADDR}"
 wait_ssh_ready ${SEED_USER}@${IPADDR}

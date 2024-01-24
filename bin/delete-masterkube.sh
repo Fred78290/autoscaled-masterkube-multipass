@@ -148,15 +148,15 @@ delete_host "${MASTERKUBE}"
 delete_host "masterkube-${PLATEFORM}"
 
 if [ -n "${TARGET_CLUSTER_LOCATION}" ]; then
-	rm -rf ${TARGET_CLUSTER_LOCATION}/*
+	rm -rf ${TARGET_CLUSTER_LOCATION}
 fi
 
 if [ -n "${TARGET_CONFIG_LOCATION}" ]; then
-	rm -rf ${TARGET_CONFIG_LOCATION}/*
+	rm -rf ${TARGET_CONFIG_LOCATION}
 fi
 
 if [ -n "${TARGET_DEPLOY_LOCATION}" ]; then
-	rm -rf ${TARGET_DEPLOY_LOCATION}/*
+	rm -rf ${TARGET_DEPLOY_LOCATION}
 fi
 
 popd &>/dev/null

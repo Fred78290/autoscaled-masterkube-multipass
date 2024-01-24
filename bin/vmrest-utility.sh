@@ -51,11 +51,22 @@ function do_curl() {
 	local METHOD=$1
 	local URL=$2
 
+	if [ "${TRACE_CURL}" == "YES" ]; then
+		echo "--------------------------------------------------------------------" >> ${TRACE_FILE_CURL}
+		echo "# - $(date '+%Y-%m-%d %T') - ${METHOD} ${URL}" >> ${TRACE_FILE_CURL}
+		echo "--------------------------------------------------------------------" >> ${TRACE_FILE_CURL}
+	fi
+
 	if [ ${METHOD} == "POST" ] || [ ${METHOD} == "PUT" ]; then
 		local BODY=
 
 		if [ $# -eq 3 ]; then
 			BODY=$3
+
+			if [ "${TRACE_CURL}" == "YES" ]; then
+				echo "${BODY}" | jq . >> ${TRACE_FILE_CURL}
+				echo "--------------------------------------------------------------------" >> ${TRACE_FILE_CURL}
+			fi
 		fi
 
 		curl -X${METHOD} -sk -H "Accept: application/vnd.vmware.vmw.rest-v1+json" \
@@ -74,12 +85,10 @@ function do_curl() {
 
 function do_post() {
 	if [ "${TRACE_CURL}" == "YES" ]; then
-		TRACE_FILE="utility-$(date +%s).log"
-		echo "POST ${1}" > ${TRACE_FILE}
 		if [ $# -eq 2 ]; then
-			do_curl POST "${1}" "${2}" | jq . | tee -a ${TRACE_FILE}
+			do_curl POST "${1}" "${2}" | jq . | tee -a ${TRACE_FILE_CURL}
 		else
-			do_curl POST "${1}" | jq . | tee -a ${TRACE_FILE}
+			do_curl POST "${1}" | jq . | tee -a ${TRACE_FILE_CURL}
 		fi
 	elif [ $# -eq 2 ]; then
 		do_curl POST "${1}" "${2}"
@@ -90,12 +99,10 @@ function do_post() {
 
 function do_put() {
 	if [ "${TRACE_CURL}" == "YES" ]; then
-		TRACE_FILE="utility-$(date +%s).log"
-		echo "PUT ${1}" > ${TRACE_FILE}
 		if [ $# -eq 2 ]; then
-			do_curl PUT "${1}" "${2}" | jq . | tee -a ${TRACE_FILE}
+			do_curl PUT "${1}" "${2}" | jq . | tee -a ${TRACE_FILE_CURL}
 		else
-			do_curl PUT "${1}" | jq . | tee -a ${TRACE_FILE}
+			do_curl PUT "${1}" | jq . | tee -a ${TRACE_FILE_CURL}
 		fi
 	elif [ $# -eq 2 ]; then
 		do_curl PUT "${1}" "${2}"
@@ -106,9 +113,7 @@ function do_put() {
 
 function do_delete() {
 	if [ "${TRACE_CURL}" == "YES" ]; then
-		TRACE_FILE="utility-$(date +%s).log"
-		echo "DELETE ${1}" > ${TRACE_FILE}
-		do_curl DELETE "${1}" | jq . | tee -a ${TRACE_FILE}
+		do_curl DELETE "${1}" | jq . | tee -a ${TRACE_FILE_CURL}
 	else
 		do_curl DELETE "${1}"
 	fi
@@ -116,9 +121,7 @@ function do_delete() {
 
 function do_get() {
 	if [ "${TRACE_CURL}" == "YES" ]; then
-		TRACE_FILE="utility-$(date +%s).log"
-		echo "GET ${1}" > ${TRACE_FILE}
-		do_curl GET "${1}" | jq . | tee -a ${TRACE_FILE}
+		do_curl GET "${1}" | jq . | tee -a ${TRACE_FILE_CURL}
 	else
 		do_curl GET "${1}"
 	fi
@@ -264,7 +267,7 @@ function vmrest_create() {
 	local NUM_VCPUS=$2
 	local MEMSIZE=$3
 	local VMNAME=$4
-	local DISK_SIZE_GB=$5
+	local DISK_SIZE_MB=$5
 	local GUESTINFO_METADATA=$6
 	local GUESTINFO_USERDATA=$7
 	local GUESTINFO_VENDORDATA=$8
@@ -274,15 +277,13 @@ function vmrest_create() {
 
 	local AUTOSTART=$9
 
-	DISK_SIZE_GB=$((DISK_SIZE_GB * 1024))
-
 	local BODY=$(cat << EOF
 {
 	"template": "${TARGET_IMAGE_UUID}",
 	"name": "${VMNAME}",
 	"vcpus": ${NUM_VCPUS},
 	"memory": ${MEMSIZE},
-	"diskSizeInMB": ${DISK_SIZE_GB},
+	"diskSizeInMB": ${DISK_SIZE_MB},
 	"linked": false,
 	"register": ${REGISTER_VM},
 	"autostart": ${AUTOSTART},

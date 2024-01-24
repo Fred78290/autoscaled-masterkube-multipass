@@ -507,10 +507,6 @@ TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
 TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
 TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
-mkdir -p ${TARGET_CONFIG_LOCATION}
-mkdir -p ${TARGET_DEPLOY_LOCATION}
-mkdir -p ${TARGET_CLUSTER_LOCATION}
-
 if [ "${EXTERNAL_ETCD}" = "true" ]; then
 	EXTERNAL_ETCD_ARGS="--use-external-etcd"
 	ETCD_DST_DIR="/etc/etcd/ssl"
@@ -612,16 +608,21 @@ else
 	TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 fi
 
-MACHINES_TYPES=$(jq --argjson VOLUME_SIZE ${VOLUME_SIZE} --arg VOLUME_TYPE ${VOLUME_TYPE} 'with_entries(.value += {"diskType": $VOLUME_TYPE, "diskSize": $VOLUME_SIZE})' templates/setup/aws/machines.json)
-
+# Delete previous existing version
+if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
+	delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
+	if [ "${DELETE_CLUSTER}" = "YES" ]; then
+		exit
+	fi
 # Check if we can resume the creation process
-if [ "${DELETE_CLUSTER}" = "YES" ]; then
-	delete-masterkube.sh --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
-	exit
 elif [ ! -f ${TARGET_CONFIG_LOCATION}/buildenv ] && [ "${RESUME}" = "YES" ]; then
 	echo_red "Unable to resume, building env is not found"
 	exit -1
 fi
+
+mkdir -p ${TARGET_CONFIG_LOCATION}
+mkdir -p ${TARGET_DEPLOY_LOCATION}
+mkdir -p ${TARGET_CLUSTER_LOCATION}
 
 # If we use AWS CNI, install eni-max-pods.txt definition file
 if [ ${CNI_PLUGIN} = "aws" ]; then
@@ -859,19 +860,12 @@ if [ -z "${TARGET_IMAGE_AMI}" ]; then
 	exit -1
 fi
 
-# Delete previous existing version
-if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
-	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-	delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
-elif [ "${UPGRADE_CLUSTER}" == "NO" ]; then
-	echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-else
+if [ "${UPGRADE_CLUSTER}" == "YES" ]; then
 	echo_title "Upgrade ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	./bin/upgrade-cluster.sh
 	exit
-fi
-
-if [ "${RESUME}" = "NO" ]; then
+elif [ "${RESUME}" = "NO" ]; then
+	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	if [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
 		AWS_ROUTE53_PUBLIC_ZONE_ID=$(aws route53 list-hosted-zones-by-name --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --dns-name ${PUBLIC_DOMAIN_NAME} | jq --arg DNSNAME "${PUBLIC_DOMAIN_NAME}." -r '.HostedZones[]|select(.Name == $DNSNAME)|.Id//""' | sed -E 's/\/hostedzone\/(\w+)/\1/')
 		if [ -z "${AWS_ROUTE53_PUBLIC_ZONE_ID}" ]; then
@@ -887,6 +881,7 @@ if [ "${RESUME}" = "NO" ]; then
 
 	update_build_env
 else
+	echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	source ${TARGET_CONFIG_LOCATION}/buildenv
 fi
 

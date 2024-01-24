@@ -7,6 +7,7 @@ else
 fi
 
 export TRACE_CURL=NO
+export TRACE_FILE_CURL="utility-$(date +%s).log"
 
 CMD_MANDATORIES="helm kubectl vmrun vmrest jq yq cfssl ovftool kubernetes-desktop-autoscaler-utility vmware-vdiskmanager"
 
@@ -103,7 +104,7 @@ export NET_IP=${NET_IP}
 export NET_MASK_CIDR=${NET_MASK_CIDR}
 export NET_MASK=${NET_MASK}
 export NETWORK_PRIVATE_ROUTES=(${NETWORK_PRIVATE_ROUTES[@]})
-export NETWORK_PUBLIC_ROUTES=(${NETWORK_PUBLIC_ROUTES})
+export NETWORK_PUBLIC_ROUTES=(${NETWORK_PUBLIC_ROUTES[@]})
 export NFS_SERVER_ADDRESS=${NFS_SERVER_ADDRESS}
 export NFS_SERVER_PATH=${NFS_SERVER_PATH}
 export NFS_STORAGE_CLASS=${NFS_STORAGE_CLASS}

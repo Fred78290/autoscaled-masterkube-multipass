@@ -496,16 +496,24 @@ TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
 TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
 TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
-mkdir -p ${TARGET_CONFIG_LOCATION}
-mkdir -p ${TARGET_DEPLOY_LOCATION}
-mkdir -p ${TARGET_CLUSTER_LOCATION}
-
 if [ "${EXTERNAL_ETCD}" = "true" ]; then
 	EXTERNAL_ETCD_ARGS="--use-external-etcd"
 	ETCD_DST_DIR="/etc/etcd/ssl"
 else
 	EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
 	ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
+fi
+
+# Check variables coherence
+if [ "${HA_CLUSTER}" = "true" ]; then
+	CONTROLNODES=3
+	if [ ${USE_KEEPALIVED} = "YES" ]; then
+		FIRSTNODE=1
+	fi
+else
+	CONTROLNODES=1
+	USE_KEEPALIVED=NO
+	EXTERNAL_ETCD=false
 fi
 
 # Check if passord is defined
@@ -560,23 +568,21 @@ else
 	TARGET_IMAGE="${ROOT_IMG_NAME}-k8s-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 fi
 
+# Delete previous existing version
+if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
+	delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
+	if [ "${DELETE_CLUSTER}" = "YES" ]; then
+		exit
+	fi
 # Check if we can resume the creation process
-if [ "${DELETE_CLUSTER}" = "YES" ]; then
-	delete-masterkube.sh --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
-	exit
 elif [ ! -f ${TARGET_CONFIG_LOCATION}/buildenv ] && [ "${RESUME}" = "YES" ]; then
 	echo_red "Unable to resume, building env is not found"
 	exit -1
 fi
 
-# Check variables coherence
-if [ "${HA_CLUSTER}" = "true" ]; then
-	if [ ${USE_KEEPALIVED} = "YES" ]; then
-		FIRSTNODE=1
-	fi
-else
-	USE_KEEPALIVED=NO
-fi
+mkdir -p ${TARGET_CONFIG_LOCATION}
+mkdir -p ${TARGET_DEPLOY_LOCATION}
+mkdir -p ${TARGET_CLUSTER_LOCATION}
 
 # If CERT doesn't exist, create one autosigned
 if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
@@ -635,21 +641,15 @@ fi
 # Extract the domain name from CERT
 DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
 
-# Delete previous existing version
-if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
-	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-	delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
-elif [ "${UPGRADE_CLUSTER}" == "NO" ]; then
-	echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-else
+if [ "${UPGRADE_CLUSTER}" == "YES" ]; then
 	echo_title "Upgrade ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	./bin/upgrade-cluster.sh
 	exit
-fi
-
-if [ "${RESUME}" = "NO" ]; then
+elif [ "${RESUME}" = "NO" ]; then
+	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	update_build_env
 else
+	echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	source ${TARGET_CONFIG_LOCATION}/buildenv
 fi
 
@@ -809,7 +809,7 @@ EOF
 
 		# Cloud init meta-data
 		echo "#cloud-config" > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
-		echo ${NETWORK_DEFS} | yq -p json P - | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml > /dev/null
+		echo ${NETWORK_DEFS} | yq -p json -P - | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml > /dev/null
 
 		# Cloud init user-data
 		cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
@@ -842,7 +842,7 @@ EOF
 		# Clone my template
 		MASTERKUBE_NODE_UUID=$(vmrest_create ${TARGET_IMAGE_UUID} ${NUM_VCPUS} ${MEMSIZE} ${MASTERKUBE_NODE} ${DISK_SIZE} "${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64" "${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.base64" "${TARGET_CONFIG_LOCATION}/vendordata.base64" false ${AUTOSTART})
 
-		if [ -z "${MASTERKUBE_NODE_UUID}" ]; then
+		if [ -z "${MASTERKUBE_NODE_UUID}" ] || [ "${MASTERKUBE_NODE_UUID}" == "ERROR" ]; then
 			echo_red_bold "Failed to clone ${TARGET_IMAGE} to ${MASTERKUBE_NODE}"
 			exit 1
 		else

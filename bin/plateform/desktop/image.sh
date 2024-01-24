@@ -398,7 +398,16 @@ gzip -c9 < "${CACHE}/meta-data" | base64 -w 0 > ${CACHE}/metadata.base64
 gzip -c9 < "${CACHE}/user-data" | base64 -w 0 > ${CACHE}/userdata.base64
 gzip -c9 < "${CACHE}/vendor-data" | base64 -w 0 > ${CACHE}/vendordata.base64
 
-TARGET_IMAGE_UUID=$(vmrest_create ${SEEDIMAGE_UUID} 2 2048 ${TARGET_IMAGE} 0 "${CACHE}/metadata.base64" "${CACHE}/userdata.base64" "${CACHE}/vendordata.base64" true false)
+TARGET_IMAGE_UUID=$(vmrest_create ${SEEDIMAGE_UUID} \
+	2 \
+	2048 \
+	${TARGET_IMAGE} \
+	0 \
+	"${CACHE}/metadata.base64" \
+	"${CACHE}/userdata.base64" \
+	"${CACHE}/vendordata.base64" \
+	true \
+	false)
 
 if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 	echo_red_bold "Unable to clone ${SEED_IMAGE} to ${TARGET_IMAGE}"

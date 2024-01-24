@@ -496,16 +496,24 @@ TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
 TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
 TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
-mkdir -p ${TARGET_CONFIG_LOCATION}
-mkdir -p ${TARGET_DEPLOY_LOCATION}
-mkdir -p ${TARGET_CLUSTER_LOCATION}
-
 if [ "${EXTERNAL_ETCD}" = "true" ]; then
 	EXTERNAL_ETCD_ARGS="--use-external-etcd"
 	ETCD_DST_DIR="/etc/etcd/ssl"
 else
 	EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
 	ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
+fi
+
+# Check variables coherence
+if [ "${HA_CLUSTER}" = "true" ]; then
+	CONTROLNODES=3
+	if [ ${USE_KEEPALIVED} = "YES" ]; then
+		FIRSTNODE=1
+	fi
+else
+	CONTROLNODES=1
+	USE_KEEPALIVED=NO
+	EXTERNAL_ETCD=false
 fi
 
 # Check if passord is defined
@@ -562,23 +570,21 @@ fi
 
 TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}.img"
 
-# Check if we can resume the creation process
-if [ "${DELETE_CLUSTER}" = "YES" ]; then
+# Delete previous existing version
+if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
 	delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
-	exit
+	if [ "${DELETE_CLUSTER}" = "YES" ]; then
+		exit
+	fi
+# Check if we can resume the creation process
 elif [ ! -f ${TARGET_CONFIG_LOCATION}/buildenv ] && [ "${RESUME}" = "YES" ]; then
 	echo_red "Unable to resume, building env is not found"
 	exit -1
 fi
 
-# Check variables coherence
-if [ "${HA_CLUSTER}" = "true" ]; then
-	if [ ${USE_KEEPALIVED} = "YES" ]; then
-		FIRSTNODE=1
-	fi
-else
-	USE_KEEPALIVED=NO
-fi
+mkdir -p ${TARGET_CONFIG_LOCATION}
+mkdir -p ${TARGET_DEPLOY_LOCATION}
+mkdir -p ${TARGET_CLUSTER_LOCATION}
 
 # If CERT doesn't exist, create one autosigned
 if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
@@ -637,21 +643,15 @@ fi
 # Extract the domain name from CERT
 DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
 
-# Delete previous existing version
-if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
-	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-	delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
-elif [ "${UPGRADE_CLUSTER}" == "NO" ]; then
-	echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-else
+if [ "${UPGRADE_CLUSTER}" == "YES" ]; then
 	echo_title "Upgrade ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	./bin/upgrade-cluster.sh
 	exit
-fi
-
-if [ "${RESUME}" = "NO" ]; then
+elif [ "${RESUME}" = "NO" ]; then
+	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	update_build_env
 else
+	echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	source ${TARGET_CONFIG_LOCATION}/buildenv
 fi
 

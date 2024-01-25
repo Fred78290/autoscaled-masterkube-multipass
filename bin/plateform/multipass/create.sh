@@ -586,6 +586,7 @@ mkdir -p ${TARGET_CONFIG_LOCATION}
 mkdir -p ${TARGET_DEPLOY_LOCATION}
 mkdir -p ${TARGET_CLUSTER_LOCATION}
 
+echo SSL_LOCATION=${SSL_LOCATION}
 # If CERT doesn't exist, create one autosigned
 if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
 	if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then

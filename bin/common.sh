@@ -168,12 +168,6 @@ export TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}
 export TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
 export TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
-if [ -e ${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
-    SSL_LOCATION=${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}
-elif [ -e $HOME/.acme.sh/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
-    SSL_LOCATION=$HOME/.acme.sh/${PUBLIC_DOMAIN_NAME}
-fi
-
 export PLATEFORMDEFS=${CURDIR}/plateform/${PLATEFORM}/vars.defs
 
 # Check if passord is defined
@@ -549,6 +543,20 @@ mkdir -p ${CACHE}
 source ${CURDIR}/plateform/${PLATEFORM}/plateform.sh
 
 source ${PLATEFORMDEFS}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+
+if [ -f ${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
+    SSL_LOCATION=${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}
+elif [ -f $HOME/.acme.sh/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
+    SSL_LOCATION=$HOME/.acme.sh/${PUBLIC_DOMAIN_NAME}
+elif [ -f ${HOME}/Library/etc/ssl/${NET_DOMAIN}/cert.pem ]; then
+    SSL_LOCATION=${HOME}/Library/etc/ssl/${NET_DOMAIN}
+elif [ -f $HOME/.acme.sh/${NET_DOMAIN}/cert.pem ]; then
+    SSL_LOCATION=$HOME/.acme.sh/${NET_DOMAIN}
+fi
 
 #===========================================================================================================================================
 #

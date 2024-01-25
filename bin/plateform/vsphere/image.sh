@@ -19,6 +19,7 @@ PRIMARY_NETWORK_NAME="${GOVC_NETWORK}"
 SECOND_NETWORK_ADAPTER=vmxnet3
 SECOND_NETWORK_NAME=
 TARGET_IMAGE=
+FOLDER_OPTIONS=
 
 OPTIONS=(
 	"distribution:"
@@ -147,7 +148,7 @@ if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 		govc import.spec ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova \
 			| jq \
 				--arg GOVC_NETWORK "${PRIMARY_NETWORK_NAME}" \
-				'.NetworkMapping = [ { Name: ${GOVC_NETWORK}, Network: $GOVC_NETWORK } ]' \
+				'.NetworkMapping = [ { Name: $GOVC_NETWORK, Network: $GOVC_NETWORK } ]' \
 			> ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.spec
 		
 		cat ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.spec \

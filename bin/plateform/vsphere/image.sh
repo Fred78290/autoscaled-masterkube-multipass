@@ -237,14 +237,14 @@ EOF
 		ssh -t "${SEED_USER}@${IPADDR}" <<EOF
 		sudo cloud-init clean
 		sudo cloud-init clean -l
-		sudo shutdown -h now
+		exit
 EOF
 
 		# Shutdown the guest
 		govc vm.power -persist-session=false -s "${SEED_IMAGE}"
 
 		echo_blue_bold "Wait ${SEED_IMAGE} to shutdown"
-		while [ $(govc vm.info -json "${SEED_IMAGE}" | jq .virtualMachines[0].runtime.powerState | tr -d '"') == "poweredOn" ]
+		while [ $(govc vm.info -json "${SEED_IMAGE}" | jq -r '.virtualMachines[0].runtime.powerState') == "poweredOn" ]
 		do
 			echo_blue_dot
 			sleep 1

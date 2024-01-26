@@ -127,13 +127,13 @@ VCENTER=${VCENTER[${#VCENTER[@]} - 1]}
 USERDATA=$(base64 <<EOF
 #cloud-config
 password: ${BOOTSTRAP_PASSWORD}
+ssh_pwauth: true
 chpasswd: 
   expire: false
   users:
-	- name: ubuntu
-	  password: ${KUBERNETES_PASSWORD}
-	  type: text
-ssh_pwauth: true
+    - name: ubuntu
+      password: ${KUBERNETES_PASSWORD}
+      type: text
 EOF
 )
 
@@ -198,7 +198,7 @@ if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 		if [ -n "${PRIMARY_NETWORK_ADAPTER}" ];then
 			echo_blue_bold "Change primary network card ${PRIMARY_NETWORK_NAME} to ${PRIMARY_NETWORK_ADAPTER} on ${SEED_IMAGE}"
 
-			govc vm.network.change -vm "${SEED_IMAGE}" -net="${PRIMARY_NETWORK_NAME}" -net.adapter="${PRIMARY_NETWORK_ADAPTER}"
+			govc vm.network.change -vm "${SEED_IMAGE}" -net "${PRIMARY_NETWORK_NAME}" -net.adapter "${PRIMARY_NETWORK_ADAPTER}" || true
 		fi
 
 		if [ -n "${SECOND_NETWORK_NAME}" ]; then
@@ -236,7 +236,7 @@ EOF
 		echo_blue_bold "clean cloud-init"
 		ssh -t "${SEED_USER}@${IPADDR}" <<EOF
 		sudo cloud-init clean
-		cloud-init clean -l
+		sudo cloud-init clean -l
 		sudo shutdown -h now
 EOF
 

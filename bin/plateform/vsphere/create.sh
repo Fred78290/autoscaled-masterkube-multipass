@@ -43,6 +43,8 @@ function usage() {
 EOF
 }
 
+FOLDER_OPTIONS=
+
 OPTIONS+=(
 	"nfs-server-adress:"
 	"nfs-server-mount:"

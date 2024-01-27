@@ -5,6 +5,30 @@ apt update
 apt upgrade -y
 echo
 
+echo "==============================================================================================================================="
+echo "= Install aws cli"
+echo "==============================================================================================================================="
+
+mkdir -p /tmp/aws-install
+
+pushd /tmp/aws-install
+
+if [ "${SEED_ARCH}" == "arm64" ];  then
+    echo "= Install aws cli arm64"
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+else
+    echo "= Install aws cli amd64"
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+fi
+
+unzip awscliv2.zip > /dev/null
+
+./aws/install
+
+popd
+
+rm -rf /tmp/aws-install
+
 mkdir -p /etc/kubernetes
 
 echo "net.bridge.bridge-nf-call-ip6tables = 1" >> /etc/sysctl.conf
@@ -62,7 +86,7 @@ providers:
       - "*.dkr.ecr.us-iso-east-1.c2s.ic.gov"
       - "*.dkr.ecr.us-isob-east-1.sc2s.sgov.gov"
     defaultCacheDuration: "12h"
-    apiVersion: credentialprovider.kubelet.k8s.io/${KUBELET_CREDS_VERSION}
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
     args:
       - get-credentials
     env:

@@ -22,6 +22,20 @@ function wait_instance_status() {
     done
 }
 
+function delete_instance_id() {
+    local INSTANCE_ID=$1
+
+    aws ec2 stop-instances --force --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${INSTANCE_ID}" &>/dev/null
+
+    wait_instance_status $INSTANCE_ID 80
+
+    aws ec2 terminate-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${INSTANCE_ID}" &>/dev/null
+
+    wait_instance_status $INSTANCE_ID 48
+
+    echo_blue_bold "Terminated instance: ${INSTANCE_ID}"
+}
+
 function delete_instance() {
     local INSTANCE_NAME=$1
 
@@ -32,16 +46,6 @@ function delete_instance() {
         echo_blue_bold "Delete VM: ${MASTERKUBE_NODE}"
         delete_instance_id "${INSTANCE_ID}" &
     fi
-
-    aws ec2 stop-instances --force --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${INSTANCE_ID}" &>/dev/null
-
-    wait_instance_status ${INSTANCE_ID} 80
-
-    aws ec2 terminate-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${INSTANCE_ID}" &>/dev/null
-
-    wait_instance_status ${INSTANCE_ID} 48
-
-    echo_blue_bold "Terminated instance: ${INSTANCE_ID}"
 }
 
 function delete_vm_by_name() {
@@ -76,7 +80,7 @@ function unregister_dns() {
 
             aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} \
                 --hosted-zone-id ${ZONEID} \
-                --change-batch file://${FILE} &> /dev/null
+                --change-batch file://${FILE} &> /dev/null || true
             delete_host "${DNSNAME}"
         fi
     done
@@ -87,7 +91,8 @@ function unregister_dns() {
         if [ -f ${FILE} ]; then
             ENI=$(cat ${FILE} | jq -r '.NetworkInterfaceId')
             echo_blue_bold "Delete ENI: ${ENI}"
-            aws ec2 delete-network-interface --profile ${AWS_PROFILE} --region ${AWS_REGION} --network-interface-id ${ENI} &> /dev/null
+            aws ec2 delete-network-interface --profile ${AWS_PROFILE} \
+                --region ${AWS_REGION} --network-interface-id ${ENI} &> /dev/null || true
         fi
     done
 

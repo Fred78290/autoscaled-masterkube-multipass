@@ -671,7 +671,8 @@ fi
 
 # Grab domain name from route53
 if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
-	ROUTE53_ZONE_NAME=$(aws route53 get-hosted-zone --id  ${AWS_ROUTE53_PRIVATE_ZONE_ID} --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} 2>/dev/null| jq -r '.HostedZone.Name // ""')
+	ROUTE53_ZONE_NAME=$(aws route53 get-hosted-zone --id  ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
+		--profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} 2>/dev/null| jq -r '.HostedZone.Name // ""')
 
 	if [ -z "${ROUTE53_ZONE_NAME}" ]; then
 		echo_red_bold "The zone: ${AWS_ROUTE53_PRIVATE_ZONE_ID} does not exist, exit"
@@ -1214,9 +1215,11 @@ EOF
 		# Record kubernetes node in Route53 DNS
 		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 
-			echo ${ROUTE53_ENTRY} | jq --arg HOSTNAME "${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}" '.Changes[0].ResourceRecordSet.Name = $HOSTNAME' >  ${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json
+			echo ${ROUTE53_ENTRY} | jq --arg HOSTNAME "${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}" \
+				'.Changes[0].ResourceRecordSet.Name = $HOSTNAME' >  ${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json
 
-			aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
+			aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} \
+				--hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
 				--change-batch file://${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json > /dev/null
 
 		elif [ ${INDEX} -ge ${CONTROLNODE_INDEX} ] && [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
@@ -1297,7 +1300,7 @@ function register_nlb_dns() {
 	local PRIVATE_NLB_DNS=$1
 	local PUBLIC_NLB_DNS=$2
 
-	if [ -n ${AWS_ROUTE53_PRIVATE_ZONE_ID} ]; then
+	if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 		echo_title "Register dns ${MASTERKUBE} in route53: ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
 
 		cat > ${TARGET_CONFIG_LOCATION}/dns-nlb.json <<EOF
@@ -1321,7 +1324,9 @@ function register_nlb_dns() {
 }
 EOF
 
-		aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
+		aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} \
+			--region ${AWS_REGION} \
+			--hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
 			--change-batch file://${TARGET_CONFIG_LOCATION}/dns-nlb.json > /dev/null
 
 		add_host "${PRIVATE_NLB_DNS} ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}"
@@ -1622,7 +1627,7 @@ function create_network_interfaces() {
 	local INDEX=$1
 	local ENI_NAME=
 
-	if [ $@ -gt 1 ]; then
+	if [ $# -gt 1 ]; then
 		ENI_NAME=$2
 	fi
 
@@ -1841,7 +1846,7 @@ done
 
 if [ "${USE_NLB}" = "NO" ] || [ "${HA_CLUSTER}" = "false" ]; then
 	# Register in Route53 IP addresses point in private IP
-	if [ -n ${AWS_ROUTE53_PRIVATE_ZONE_ID} ]; then
+	if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 		echo ${PRIVATE_ROUTE53_REGISTER} | jq . > ${TARGET_CONFIG_LOCATION}/dns-nlb.json
 		aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} \
 			--hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \

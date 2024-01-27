@@ -1059,7 +1059,7 @@ do
 					--cluster-nodes="${CLUSTER_NODES}" \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
-					--cni=${CNI_PLUGIN} \
+					--cni-plugin=${CNI_PLUGIN} \
 					--net-if=${NET_IF} \
 					--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 
@@ -1095,7 +1095,7 @@ do
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--tls-san="${CERT_SANS}" \
 					--ha-cluster=true \
-					--cni=${CNI_PLUGIN} \
+					--cni-plugin=${CNI_PLUGIN} \
 					--net-if=${NET_IF} \
 					--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 

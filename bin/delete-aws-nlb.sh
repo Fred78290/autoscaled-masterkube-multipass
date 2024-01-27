@@ -2,6 +2,7 @@
 set -e
 
 CURDIR=$(dirname $0)
+PLATEFORM=aws
 
 source "${CURDIR}/common.sh"
 

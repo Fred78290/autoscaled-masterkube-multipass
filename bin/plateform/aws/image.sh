@@ -220,6 +220,7 @@ apt update
 apt upgrade -y
 apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
 snap install yq
+
 EOF
 
 cat ${CURDIR}/prepare-image.sh >> "${CACHE}/prepare-image.sh"

@@ -130,9 +130,9 @@ fi
 if [ "${FORCE}" = "YES" ]; then
 	delete_all_vms
 elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
-	WORKERNODES=$(kubectl get node -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config | jq -r '.items |reverse | .[] | select(.metadata.labels["node-role.kubernetes.io/worker"]) | .metadata.name')
+	NODES=$(kubectl get node -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config | jq -r '.items |reverse | .[] | select(.metadata.labels["node-role.kubernetes.io/worker"]) | .metadata.name')
 
-	for NODE in ${WORKERNODES}
+	for NODE in ${NODES}
 	do
 		delete_vm_by_name ${NODE} || true
 	done

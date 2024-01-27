@@ -322,7 +322,7 @@ EOF
 
 	openssl x509 -pubkey -in /var/lib/rancher/rke2/server/tls/server-ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > ${CLUSTER_DIR}/ca.cert
 
-	sed -i -e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" -e "s/default/k8s-${HOSTNAME}-admin@${NODEGROUP_NAME}/g" ${CLUSTER_DIR}/config
+	sed -i -e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" -e "s/default/kubernetes-admin@${NODEGROUP_NAME}/g" ${CLUSTER_DIR}/config
 
 	rm -rf ${CLUSTER_DIR}/kubernetes/pki/temporary-certs
 
@@ -383,7 +383,7 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 
 	openssl x509 -pubkey -in /var/lib/rancher/k3s/server/tls/server-ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > ${CLUSTER_DIR}/ca.cert
 
-	sed -i -e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" -e "s/default/k8s-${HOSTNAME}-admin@${NODEGROUP_NAME}/g" ${CLUSTER_DIR}/config
+	sed -i -e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" -e "s/default/kubernetes-admin@${NODEGROUP_NAME}/g" ${CLUSTER_DIR}/config
 
 	rm -rf ${CLUSTER_DIR}/kubernetes/pki/temporary-certs
 
@@ -592,7 +592,9 @@ EOF
 	cp -i /etc/kubernetes/admin.conf ${HOME}/.kube/config
 	chown $(id -u):$(id -g) ${HOME}/.kube/config
 
-	cp /etc/kubernetes/admin.conf ${CLUSTER_DIR}/config
+	cat /etc/kubernetes/admin.conf | sed \
+		-e "s/kubernetes-admin@${NODEGROUP_NAME}/${NODEGROUP_NAME}/g" \
+		-e "s/kubernetes-admin/kubernetes-admin@${NODEGROUP_NAME}/g" > ${CLUSTER_DIR}/config
 
 	KUBECONFIG=/etc/kubernetes/admin.conf
 
@@ -613,10 +615,11 @@ EOF
 
 	chmod -R uog+r ${CLUSTER_DIR}/*
 
-	# Password for AWS cni plugin
-	kubectl create secret docker-registry aws-registry --docker-server=602401143452.dkr.ecr.us-west-2.amazonaws.com --docker-username=AWS --docker-password=${ECR_PASSWORD}
-
 	if [ "${CNI_PLUGIN}" = "aws" ]; then
+		# Password for AWS cni plugin
+		if [ -n "${ECR_PASSWORD}" ]; then
+			kubectl create secret docker-registry aws-registry --docker-server=602401143452.dkr.ecr.us-west-2.amazonaws.com --docker-username=AWS --docker-password=${ECR_PASSWORD}
+		fi
 
 		echo "Install AWS network"
 

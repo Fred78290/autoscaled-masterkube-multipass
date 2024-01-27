@@ -1209,5 +1209,3 @@ echo $(eval "cat <<EOF
 $(<${PWD}/templates/setup/${PLATEFORM}/provider.json)
 EOF") | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
 
-source ./bin/create-deployment.sh
-

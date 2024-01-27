@@ -89,10 +89,6 @@ fi
 
 if [ -n "${OVERRIDE_CONFIGURATION_LOCATION}" ]; then
 	CONFIGURATION_LOCATION=${OVERRIDE_CONFIGURATION_LOCATION}
-
-	TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
-	TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
-	TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 fi
 
 if [ -n "${OVERRIDE_PLATEFORMDEFS}" ]; then
@@ -101,13 +97,13 @@ if [ -n "${OVERRIDE_PLATEFORMDEFS}" ]; then
 	source ${PLATEFORMDEFS}
 fi
 
+TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
+TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
+TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+
 echo_blue_bold "Delete masterkube ${MASTERKUBE} previous instance"
 
-if [ -f ${TARGET_CONFIG_LOCATION}/buildenv ]; then
-	source ${TARGET_CONFIG_LOCATION}/buildenv
-fi
-
-if [ "${FORCE}" = "YES" ]; then
+function delete_all_vms() {
 	TOTALNODES=$((WORKERNODES + ${CONTROLNODES}))
 
 	for NODEINDEX in $(seq 0 ${TOTALNODES})
@@ -123,7 +119,16 @@ if [ "${FORCE}" = "YES" ]; then
 
 		delete_vm_by_name ${MASTERKUBE_NODE} || true
 	done
+}
 
+if [ -f ${TARGET_CONFIG_LOCATION}/buildenv ]; then
+	source ${TARGET_CONFIG_LOCATION}/buildenv
+else
+	FORCE=YES
+fi
+
+if [ "${FORCE}" = "YES" ]; then
+	delete_all_vms
 elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
 	WORKERNODES=$(kubectl get node -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config | jq -r '.items |reverse | .[] | select(.metadata.labels["node-role.kubernetes.io/worker"]) | .metadata.name')
 
@@ -133,12 +138,13 @@ elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
 	done
 
 	delete_vm_by_name ${MASTERKUBE} || true
+	delete_all_vms
 fi
 
 unregister_dns
 wait_jobs_finish
 
-./bin/kubeconfig-delete.sh ${MASTERKUBE} ${NODEGROUP_NAME} &> /dev/null || true
+./bin/kubeconfig-delete.sh ${NODEGROUP_NAME} &> /dev/null || true
 
 if [ -f ${TARGET_CONFIG_LOCATION}/autoscaler.pid ]; then
 	kill ${TARGET_CONFIG_LOCATION}/autoscaler.pid

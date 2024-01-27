@@ -122,8 +122,9 @@ time {
 	fi
 
 	if [ -n "${PLATEFORM}" ]; then
-		source ${CURDIR}/common.sh
+		source "${CURDIR}/common.sh"
 		source "${CURDIR}/plateform/${PLATEFORM}/create.sh"
+		source "${CURDIR}/create-deployment.sh"
 	else
 		echo "PLATEFORM not defined, exit"
 	fi

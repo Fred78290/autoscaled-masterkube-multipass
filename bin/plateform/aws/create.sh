@@ -2022,5 +2022,3 @@ do
 done
 
 echo "${PROVIDER_CONFIG}" | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
-
-source ./bin/create-deployment.sh

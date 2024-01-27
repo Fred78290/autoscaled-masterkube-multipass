@@ -107,7 +107,7 @@ kubectl create configmap config -n ${NODEGROUP_NAME} --dry-run=client -o yaml \
 
 # Save deployment template
 pushd ${TARGET_DEPLOY_LOCATION} &>/dev/null
-	for DIR in $(ls -1 -d */ | tr -d '/')
+	for DIR in $((ls -1 -d */ 2>/dev/null || true) | tr -d '/')
 	do
 		kubectl create configmap ${DIR} -n ${NODEGROUP_NAME} --dry-run=client -o yaml \
 			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config --from-file ${DIR} | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -

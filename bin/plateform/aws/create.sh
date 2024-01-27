@@ -18,6 +18,9 @@ OVERRIDE_SEED_IMAGE=
 PUBLIC_SUBNET_NLB_TARGET=
 PRIVATE_SUBNET_NLB_TARGET=
 ACM_CERTIFICATE_TAGGING=
+CLUSTER_NODES=
+CONTROLPLANE_INSTANCEID_NLB_TARGET=
+ETCD_ENDPOINT=
 
 function usage() {
 	common_usage
@@ -1617,7 +1620,11 @@ function create_network_interfaces() {
 	# Create ENI to capture IP addresses before launch instances
 
 	local INDEX=$1
-	local ENI_NAME=$2
+	local ENI_NAME=
+
+	if [ $@ -gt 1 ]; then
+		ENI_NAME=$2
+	fi
 
 	read NODEINDEX SUFFIX MASTERKUBE_NODE <<< "$(get_instance_name ${INDEX})"
 
@@ -1866,10 +1873,6 @@ if [ "${USE_NLB}" = "NO" ] || [ "${HA_CLUSTER}" = "false" ]; then
 		fi
 	fi
 fi
-
-CLUSTER_NODES=
-CONTROLPLANE_INSTANCEID_NLB_TARGET=
-ETCD_ENDPOINT=
 
 EVAL=$(sed -i -e '/CLUSTER_NODES/d' -e '/NLB_DNS/d' -e '/MASTER_NODES/d' ${TARGET_CONFIG_LOCATION}/buildenv)
 

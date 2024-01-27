@@ -8,6 +8,9 @@
 
 set -eu
 
+CLUSTER_NODES=
+ETCD_ENDPOINT=
+
 function usage() {
 	common_usage
 	cat <<EOF
@@ -903,9 +906,6 @@ do
 done
 
 wait_jobs_finish
-
-CLUSTER_NODES=
-ETCD_ENDPOINT=
 
 if [ "${HA_CLUSTER}" = "true" ]; then
 	for INDEX in $(seq 1 ${CONTROLNODES})

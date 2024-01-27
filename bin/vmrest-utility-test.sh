@@ -2,7 +2,7 @@
 set -e
 
 CURDIR=$(dirname $0)
-
+PLATEFORM=desktop
 pushd ${CURDIR}
 CURDIR=${PWD}
 popd

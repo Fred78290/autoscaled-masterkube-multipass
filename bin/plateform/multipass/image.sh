@@ -123,6 +123,7 @@ users:
   - name: ${KUBERNETES_USER}
     groups: users, admin
     lock_passwd: false
+    sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     plain_text_passwd: ${KUBERNETES_PASSWORD}
     ssh_authorized_keys:

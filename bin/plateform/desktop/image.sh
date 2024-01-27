@@ -102,6 +102,9 @@ while true ; do
 	esac
 done
 
+SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
+SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
+
 if [ -z "${TARGET_IMAGE}" ]; then
 	TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
 fi
@@ -364,6 +367,7 @@ ssh_authorized_keys:
 users:
   - name: ${KUBERNETES_USER}
     groups: users, admin
+    sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: false
     shell: /bin/bash
     plain_text_passwd: ${KUBERNETES_PASSWORD}
@@ -432,11 +436,11 @@ echo_blue_bold "Wait for IP from ${TARGET_IMAGE}"
 IPADDR=$(vmrest_waitip ${TARGET_IMAGE_UUID})
 
 echo_blue_bold "Wait ssh ready on ${IPADDR}"
-wait_ssh_ready ${SEED_USER}@${IPADDR}
+wait_ssh_ready ${KUBERNETES_USER}@${IPADDR}
 
-scp ${SCP_OPTIONS} "${CACHE}/prepare-image.sh" "${SEED_USER}@${IPADDR}:~"
+scp ${SCP_OPTIONS} "${CACHE}/prepare-image.sh" "${KUBERNETES_USER}@${IPADDR}:~"
 
-ssh -t "${SEED_USER}@${IPADDR}" sudo ./prepare-image.sh
+ssh -t "${KUBERNETES_USER}@${IPADDR}" sudo ./prepare-image.sh
 
 vmrest_poweroff "${TARGET_IMAGE_UUID}" "soft" > /dev/null
 

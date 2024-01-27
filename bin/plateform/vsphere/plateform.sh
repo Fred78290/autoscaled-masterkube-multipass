@@ -1,7 +1,6 @@
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl govc"
 VC_NETWORK_PRIVATE="VM Private"
 VC_NETWORK_PUBLIC="VM Network"
-SEED_ARCH=amd64
 
 if [ "${OSDISTRO}" == "Darwin" ]; then
     VMWAREWM=".vmwarevm"

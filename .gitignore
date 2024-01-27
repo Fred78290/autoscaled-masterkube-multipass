@@ -18,7 +18,7 @@ kubernetes/*
 config/*
 etc/ssl/*
 
-bin/**/*.defs
+bin/**/*.def
 
 *.log
 

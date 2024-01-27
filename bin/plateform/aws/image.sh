@@ -101,6 +101,9 @@ while true ; do
 	esac
 done
 
+SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
+SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
+
 mkdir -p ${CACHE}
 
 if [ -z "${SEED_IMAGE}" ]; then
@@ -162,7 +165,8 @@ if [ -z ${KEYEXISTS} ]; then
 		echo_red_bold "${SSH_PUBLIC_KEY} doesn't exists. FATAL"
 		exit -1
 	fi
-	aws ec2 import-key-pair --profile ${AWS_PROFILE} --region ${AWS_REGION} --key-name ${SSH_KEYNAME} --public-key-material "file://${SSH_PUBLIC_KEY}"
+	aws ec2 import-key-pair --profile ${AWS_PROFILE} --region ${AWS_REGION} \
+		--key-name ${SSH_KEYNAME} --public-key-material "file://${SSH_PUBLIC_KEY}"
 fi
 
 case "${KUBERNETES_DISTRO}" in
@@ -228,6 +232,24 @@ else
 	PUBLIC_IP_OPTIONS=--no-associate-public-ip-address
 fi
 
+SSH_KEY="$(cat ${SSH_PUBLIC_KEY})"
+
+cat > "${CACHE}/user-data.yaml" <<EOF
+#cloud-config
+timezone: ${TZ}
+ssh_authorized_keys:
+  - ${SSH_KEY}
+users:
+  - name: ${KUBERNETES_USER}
+    groups: users, admin
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    shell: /bin/bash
+    plain_text_passwd: ${KUBERNETES_PASSWORD}
+    ssh_authorized_keys:
+      - ${SSH_KEY}
+EOF
+
 echo_blue_bold "Launch instance ${SEED_IMAGE} to ${TARGET_IMAGE}"
 LAUNCHED_INSTANCE=$(aws ec2 run-instances \
 	--profile ${AWS_PROFILE} \
@@ -238,6 +260,7 @@ LAUNCHED_INSTANCE=$(aws ec2 run-instances \
 	--key-name ${SSH_KEYNAME} \
 	--subnet-id ${SUBNET_ID} \
 	--security-group-ids ${SECURITY_GROUPID} \
+	--user-data "file://${CACHE}/user-data.yaml" \
 	--block-device-mappings "file://${CACHE}/mapping.json" \
 	--tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${TARGET_IMAGE}}]" \
 	${PUBLIC_IP_OPTIONS})
@@ -274,14 +297,14 @@ echo_blue_dot_title "Wait for ${TARGET_IMAGE} ssh ready for on ${IP_TYPE} IP=${I
 while :
 do
 	echo_blue_dot
-	scp ${SSH_OPTIONS} -o ConnectTimeout=1 "${CACHE}/prepare-image.sh" "${SEED_USER}@${IPADDR}":~ 2>/dev/null && break
+	scp ${SCP_OPTIONS} -o ConnectTimeout=1 "${CACHE}/prepare-image.sh" "${KUBERNETES_USER}@${IPADDR}":~ 2>/dev/null && break
 	sleep 1
 done
 
 echo
 
-ssh ${SSH_OPTIONS} -t "${SEED_USER}@${IPADDR}" sudo ./prepare-image.sh
-ssh ${SSH_OPTIONS} -t "${SEED_USER}@${IPADDR}" rm ./prepare-image.sh
+ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo ./prepare-image.sh
+ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" rm ./prepare-image.sh
 
 aws ec2 stop-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${LAUNCHED_ID}" &> /dev/null
 

@@ -109,6 +109,9 @@ while true ; do
 	esac
 done
 
+SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
+SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
+
 if [ -z "${TARGET_IMAGE}" ]; then
 	TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
 fi
@@ -243,7 +246,7 @@ EOF
 		# Shutdown the guest
 		govc vm.power -persist-session=false -s "${SEED_IMAGE}"
 
-		echo_blue_bold "Wait ${SEED_IMAGE} to shutdown"
+		echo_blue_dot_title "Wait ${SEED_IMAGE} to shutdown"
 		while [ $(govc vm.info -json "${SEED_IMAGE}" | jq -r '.virtualMachines[0].runtime.powerState') == "poweredOn" ]
 		do
 			echo_blue_dot
@@ -297,6 +300,7 @@ ssh_authorized_keys:
 users:
   - name: ${KUBERNETES_USER}
     groups: users, admin
+    sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: false
     shell: /bin/bash
     plain_text_passwd: ${KUBERNETES_PASSWORD}
@@ -361,9 +365,9 @@ govc vm.power -on "${TARGET_IMAGE}"
 echo_blue_bold "Wait for IP from ${TARGET_IMAGE}"
 IPADDR=$(govc vm.ip -wait 5m "${TARGET_IMAGE}")
 
-scp "${CACHE}/prepare-image.sh" "${SEED_USER}@${IPADDR}:~"
+scp ${SCP_OPTIONS} "${CACHE}/prepare-image.sh" "${KUBERNETES_USER}@${IPADDR}:~"
 
-ssh -t "${SEED_USER}@${IPADDR}" sudo ./prepare-image.sh
+ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo ./prepare-image.sh
 
 govc vm.power -persist-session=false -s=true "${TARGET_IMAGE}"
 

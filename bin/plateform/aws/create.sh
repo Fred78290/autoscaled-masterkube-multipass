@@ -416,6 +416,9 @@ while true; do
 	esac
 done
 
+SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
+SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
+
 if [ "${VERBOSE}" == "YES" ]; then
 	SILENT=
 else

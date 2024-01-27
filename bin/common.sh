@@ -51,17 +51,17 @@ export EXPOSE_PUBLIC_CLUSTER=false
 export EXTERNAL_ETCD_ARGS=
 export EXTERNAL_ETCD=false
 export FIRSTNODE=0
-export GOVC_DATACENTER=
-export GOVC_DATASTORE=
-export GOVC_FOLDER=
-export GOVC_HOST=
-export GOVC_INSECURE=
-export GOVC_NETWORK=
-export GOVC_PASSWORD=
-export GOVC_RESOURCE_POOL=
-export GOVC_URL=
-export GOVC_USERNAME=
-export GOVC_VIM_VERSION="6.0"
+export GOVC_DATACENTER=${GOVC_DATACENTER:=}
+export GOVC_DATASTORE=${GOVC_DATASTORE:=}
+export GOVC_FOLDER=${GOVC_FOLDER:=}
+export GOVC_HOST=${GOVC_HOST:=}
+export GOVC_INSECURE=${GOVC_INSECURE:=}
+export GOVC_NETWORK=${GOVC_NETWORK:=}
+export GOVC_PASSWORD=${GOVC_PASSWORD:=}
+export GOVC_RESOURCE_POOL=${GOVC_RESOURCE_POOL:=}
+export GOVC_URL=${GOVC_URL:=}
+export GOVC_USERNAME=${GOVC_USERNAME:=}
+export GOVC_VIM_VERSION=${GOVC_VIM_VERSION:='6.0'}
 export GRPC_PROVIDER=externalgrpc
 export HA_CLUSTER=false
 export KUBECONFIG=${HOME}/.kube/config
@@ -111,7 +111,7 @@ export SCALEDOWNDELAYAFTERFAILURE="1m"
 export SCALEDOWNENABLED="true"
 export SCALEDOWNUNEEDEDTIME="1m"
 export SCALEDOWNUNREADYTIME="1m"
-export SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
+export SEED_ARCH=amd64
 export SEED_IMAGE="${DISTRO}-server-cloudimg-seed"
 export SEED_USER=ubuntu
 export SILENT="&> /dev/null"
@@ -168,7 +168,7 @@ export TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}
 export TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
 export TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
-export PLATEFORMDEFS=${CURDIR}/plateform/${PLATEFORM}/vars.defs
+export PLATEFORMDEFS=${CURDIR}/plateform/${PLATEFORM}/vars.def
 
 # Check if passord is defined
 if [ -z ${KUBERNETES_PASSWORD} ]; then

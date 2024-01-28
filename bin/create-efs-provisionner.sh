@@ -7,20 +7,20 @@ if [ -n "${AWS_EFS_DOMAIN}" ]; then
 	mkdir -p ${ETC_DIR}
 cat > ${ETC_DIR}/aws-efs-csi.yaml <<EOF
 storageClasses:
- - name: aws-efs
-   annotations:
-	 storageclass.kubernetes.io/is-default-class: "true"
-   mountOptions:
-   - tls
-   parameters:
-	 provisioningMode: efs-ap
-	 fileSystemId: ${EFSID[0]}
-	 directoryPerms: "700"
-	 gidRangeStart: "1000"
-	 gidRangeEnd: "2000"
-	 basePath: "/${NODEGROUP_NAME}"
-   reclaimPolicy: Delete
-   volumeBindingMode: Immediate
+  - name: aws-efs
+    reclaimPolicy: Delete
+    volumeBindingMode: Immediate
+    annotations:
+      storageclass.kubernetes.io/is-default-class: "true"
+    mountOptions:
+      - tls
+    parameters:
+      provisioningMode: efs-ap
+      fileSystemId: ${EFSID[0]}
+      directoryPerms: "700"
+      gidRangeStart: "1000"
+      gidRangeEnd: "2000"
+      basePath: "/${NODEGROUP_NAME}"
 EOF
 
 	helm repo add aws-efs-csi-driver https://kubernetes-sigs.github.io/aws-efs-csi-driver

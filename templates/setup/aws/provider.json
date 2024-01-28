@@ -15,7 +15,7 @@
 		}
 	],
 	"network": {
-		"route53": "${AWS_ROUTE53_ZONE_ID}",
+		"route53": "${AWS_ROUTE53_PRIVATE_ZONE_ID}",
 		"privateZoneName": "${PRIVATE_DOMAIN_NAME}",
 		"accessKey": "${AWS_ROUTE53_ACCESSKEY}",
 		"secretKey": "${AWS_ROUTE53_SECRETKEY}",

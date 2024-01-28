@@ -25,24 +25,24 @@ esac
 
 
 if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-	cat >> ${ETC_DIR}/aws-cloud-controller.yaml <<EOF
+	cat > ${ETC_DIR}/aws-cloud-controller.yaml <<EOF
 args:
-	- --v=2
-	- --cloud-provider=aws
-	- --configure-cloud-routes=false
+  - --v=2
+  - --cloud-provider=aws
+  - --configure-cloud-routes=false
 image:
-	tag: ${AWS_CONTROLLER_VERSION}
+  tag: ${AWS_CONTROLLER_VERSION}
 nodeSelector:
-	node-role.kubernetes.io/control-plane: "true"
+  node-role.kubernetes.io/control-plane: "true"
 EOF
 	else
 		cat > ${ETC_DIR}/aws-cloud-controller.yaml <<EOF
 args:
-	- --v=2
-	- --cloud-provider=aws
-	- --configure-cloud-routes=false
+  - --v=2
+  - --cloud-provider=aws
+  - --configure-cloud-routes=false
 image:
-	tag: ${AWS_CONTROLLER_VERSION}
+  tag: ${AWS_CONTROLLER_VERSION}
 EOF
 	fi
 

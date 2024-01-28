@@ -40,24 +40,24 @@ echo_title "Save templates into cluster"
 # Save template
 kubectl create ns ${NODEGROUP_NAME} --kubeconfig=${TARGET_CLUSTER_LOCATION}/config --dry-run=client -o yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
+if [ ${PLATEFORM} == "vsphere" ]; then
+	echo_title "Create VSphere CSI provisionner"
+	create-vsphere-provisionner.sh
+elif [ ${PLATEFORM} == "aws" ]; then
+	echo_title "Create AWS controller"
+	create-aws-controller.sh
+
+	echo_title "Create EBS provisionner"
+	create-ebs-provisionner.sh
+
+	echo_title "Create EFS provisionner"
+	create-efs-provisionner.sh
+fi
+
 if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
 	# Create Pods
 	echo_title "Create autoscaler"
 	create-autoscaler.sh ${LAUNCH_CA}
-
-	if [ ${PLATEFORM} == "vsphere" ]; then
-		echo_title "Create VSphere CSI provisionner"
-		create-vsphere-provisionner.sh
-	elif [ ${PLATEFORM} == "aws" ]; then
-		echo_title "Create AWS controller"
-		create-aws-controller.sh
-
-		echo_title "Create EBS provisionner"
-		create-ebs-provisionner.sh
-
-		echo_title "Create EFS provisionner"
-		create-efs-provisionner.sh
-	fi
 
 	if [ ${PLATEFORM} != "aws" ]; then
 		echo_title "Create MetalLB"

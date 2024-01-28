@@ -41,10 +41,11 @@ PRIVATE_DOMAIN_NAME=
 SERVICE_NETWORK_CIDR="10.96.0.0/12"
 TOKEN_TLL="0s"
 ZONEID=office
+FILL_ETC_HOSTS=YES
 
 export KUBECONFIG=
 
-TEMP=$(getopt -o xm:g:r:i:c:n:k: --long cloud-provider:,plateform:,tls-san:,delete-credentials-provider:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace:,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
+TEMP=$(getopt -o xm:g:r:i:c:n:k: --long fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,delete-credentials-provider:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace:,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -77,6 +78,10 @@ while true; do
 		;;
 	--delete-credentials-provider)
 		DELETE_CREDENTIALS_CONFIG=$2
+		shift 2
+		;;
+	--fill-etc-hosts)
+		FILL_ETC_HOSTS=$2
 		shift 2
 		;;
 	--k8s-distribution)
@@ -160,7 +165,7 @@ while true; do
 		shift 2
 		;;
 	--private-zone-id)
-		AWS_ROUTE53_ZONE_ID="$2"
+		AWS_ROUTE53_PRIVATE_ZONE_ID="$2"
 		shift 2
 		;;
 	--private-zone-name)
@@ -196,6 +201,11 @@ while true; do
 	esac
 done
 
+if [ -z "${NODEGROUP_NAME}" ]; then
+	echo "NODEGROUP_NAME not defined"
+	exit 1
+fi
+
 if [ ${PLATEFORM} == "aws" ]; then
 	REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
 	LOCALHOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)
@@ -207,7 +217,7 @@ if [ ${PLATEFORM} == "aws" ]; then
 	ZONEID=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
 	DNS_SERVER=$(echo ${VPC_IPV4_CIDR_BLOCK} | tr './' ' '| awk '{print $1"."$2"."$3".2"}')
 	AWS_DOMAIN=${LOCALHOSTNAME#*.*}
-	AWS_ROUTE53_ZONE_ID=
+	AWS_ROUTE53_PRIVATE_ZONE_ID=
 	APISERVER_ADVERTISE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 	PROVIDERID=aws://${ZONEID}/${INSTANCEID}
 else
@@ -219,24 +229,21 @@ else
 	if [ "${CLOUD_PROVIDER}" == "external" ]; then
 		PROVIDERID=${PLATEFORM}://${INSTANCEID}
 	fi
+fi
 
-	if [ "${HA_CLUSTER}" = "true" ]; then
-		for CLUSTER_NODE in ${CLUSTER_NODES[*]}
-		do
-			IFS=: read HOST IP <<< "${CLUSTER_NODE}"
+if [ ${FILL_ETC_HOSTS} == "YES" ]; then
+	for CLUSTER_NODE in ${CLUSTER_NODES[*]}
+	do
+		IFS=: read HOST IP <<< "${CLUSTER_NODE}"
+		if [ -n "${IP}" ]; then
 			sed -i "/${HOST}/d" /etc/hosts
 			echo "${IP}   ${HOST} ${HOST%%.*}" >> /etc/hosts
-		done
-	fi
+		fi
+	done
 fi
 
 if [ -z "${LOAD_BALANCER_IP}" ]; then
 	LOAD_BALANCER_IP=(${APISERVER_ADVERTISE_ADDRESS})
-fi
-
-if [ -z "${NODEGROUP_NAME}" ]; then
-	echo "NODEGROUP_NAME not defined"
-	exit 1
 fi
 
 # Hack because k3s and rke2 1.28.4 don't set the good feature gates

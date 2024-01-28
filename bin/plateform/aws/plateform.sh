@@ -9,8 +9,8 @@ CONTROL_PLANE_MACHINE="t3a.medium"
 NGINX_MACHINE="t3a.small"
 WORKER_NODE_MACHINE="t3a.medium"
 
-export SEED_IMAGE_AMD64="ami-0333305f9719618c7"
-export SEED_IMAGE_ARM64="ami-03d568a0c334477dd"
+SEED_IMAGE_AMD64="ami-0333305f9719618c7"
+SEED_IMAGE_ARM64="ami-03d568a0c334477dd"
 
 function wait_instance_status() {
     local INSTANCE_ID=$1
@@ -36,25 +36,33 @@ function delete_instance_id() {
     echo_blue_bold "Terminated instance: ${INSTANCE_ID}"
 }
 
+function describe_living_instance() {
+    aws ec2  describe-instances \
+        --profile ${AWS_PROFILE} \
+        --region ${AWS_REGION} \
+        --filters "Name=tag:Name,Values=$1" \
+        | jq -r '.Reservations[].Instances[]|select(.State.Code == 16)'
+}
+
 function delete_instance() {
     local INSTANCE_NAME=$1
 
-    local INSTANCE=$(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=tag:Name,Values=${INSTANCE_NAME}" | jq -r '.Reservations[].Instances[]|select(.State.Code == 16)')
+    local INSTANCE=$(describe_living_instance "${INSTANCE_NAME}")
     local INSTANCE_ID=$(echo ${INSTANCE} | jq -r '.InstanceId // ""')
 
     if [ -n "${INSTANCE_ID}" ]; then
-        echo_blue_bold "Delete VM: ${MASTERKUBE_NODE}"
+        echo_blue_bold "Delete VM: ${INSTANCE_NAME}"
         delete_instance_id "${INSTANCE_ID}" &
     fi
 }
 
 function delete_vm_by_name() {
     local INSTANCE_NAME=$1
-    local INSTANCE=$(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=tag:Name,Values=${INSTANCE_NAME}" | jq -r '.Reservations[].Instances[]|select(.State.Code == 16)')
+    local INSTANCE=$(describe_living_instance "${INSTANCE_NAME}")
     local INSTANCE_ID=$(echo ${INSTANCE} | jq -r '.InstanceId // ""')
 
     if [ -n "${INSTANCE_ID}" ]; then
-        echo_blue_bold "Delete VM: ${MASTERKUBE_NODE}"
+        echo_blue_bold "Delete VM: ${INSTANCE_NAME}"
         delete_instance_id "${INSTANCE_ID}" &
     fi
 }
@@ -75,10 +83,12 @@ function unregister_dns() {
             if [[ "${DNSNAME}" == *.${PUBLIC_DOMAIN_NAME} ]]; then
                 ZONEID=${AWS_ROUTE53_PUBLIC_ZONE_ID}
             else
-                ZONEID=${AWS_ROUTE53_ZONE_ID}
+                ZONEID=${AWS_ROUTE53_PRIVATE_ZONE_ID}
             fi
 
-            aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} \
+            aws route53 change-resource-record-sets \
+                --profile ${AWS_PROFILE_ROUTE53} \
+                --region ${AWS_REGION} \
                 --hosted-zone-id ${ZONEID} \
                 --change-batch file://${FILE} &> /dev/null || true
             delete_host "${DNSNAME}"
@@ -91,8 +101,10 @@ function unregister_dns() {
         if [ -f ${FILE} ]; then
             ENI=$(cat ${FILE} | jq -r '.NetworkInterfaceId')
             echo_blue_bold "Delete ENI: ${ENI}"
-            aws ec2 delete-network-interface --profile ${AWS_PROFILE} \
-                --region ${AWS_REGION} --network-interface-id ${ENI} &> /dev/null || true
+            aws ec2 delete-network-interface \
+                --profile ${AWS_PROFILE} \
+                --region ${AWS_REGION} \
+                --network-interface-id ${ENI} &> /dev/null || true
         fi
     done
 
@@ -100,16 +112,20 @@ function unregister_dns() {
         echo_blue_bold "Delete DNS ${MASTERKUBE} in godaddy"
 
         if [ "${USE_NLB}" = "YES" ]; then
-            curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/CNAME/${MASTERKUBE}" > /dev/null
+            curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
+                "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/CNAME/${MASTERKUBE}" > /dev/null
         else
-            curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/A/${MASTERKUBE}" > /dev/null
+            curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
+                "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/A/${MASTERKUBE}" > /dev/null
         fi
 
         echo_blue_bold "Delete DNS ${DASHBOARD_HOSTNAME} in godaddy"
-        curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/CNAME/${DASHBOARD_HOSTNAME}" > /dev/null
+        curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
+            "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/CNAME/${DASHBOARD_HOSTNAME}" > /dev/null
 
         echo_blue_bold "Delete DNS helloworld-aws in godaddy"
-        curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/CNAME/helloworld-aws" > /dev/null
+        curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
+            "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/CNAME/helloworld-aws" > /dev/null
     fi
 }
 

@@ -37,41 +37,41 @@ cat > /etc/keepalived/keepalived.conf <<EOF
 ! /etc/keepalived/keepalived.conf
 ! Configuration File for keepalived
 global_defs {
-	router_id LVS_DEVEL
-	vrrp_skip_check_adv_addr
-	vrrp_garp_interval 0
-	vrrp_gna_interval 0
+  router_id LVS_DEVEL
+  vrrp_skip_check_adv_addr
+  vrrp_garp_interval 0
+  vrrp_gna_interval 0
 }
 
 vrrp_script check_apiserver {
-	script "/etc/keepalived/check_apiserver.sh"
-	interval 3
-	weight -2
-	fall 10
-	rise 2
+  script "/etc/keepalived/check_apiserver.sh"
+  interval 3
+  weight -2
+  fall 10
+  rise 2
 }
 
 vrrp_instance VI_1 {
-	state ${KEEPALIVED_STATUS}
-	interface eth1
-	virtual_router_id 151
-	priority ${KEEPALIVED_PRIORITY}
-	advert_int 1
-	unicast_src_ip ${KEEPALIVED_MCAST}
-	authentication {
-		auth_type PASS
-		auth_pass ${KEEPALIVED_PASSWORD}
-	}
-	unicast_peer {
-		${KEEPALIVED_PEER1}
-		${KEEPALIVED_PEER2}
-	}
-	virtual_ipaddress {
-		${APISERVER_VIP}/24
-	}
-	track_script {
-		check_apiserver
-	}
+  state ${KEEPALIVED_STATUS}
+  interface eth1
+  virtual_router_id 151
+  priority ${KEEPALIVED_PRIORITY}
+  advert_int 1
+  unicast_src_ip ${KEEPALIVED_MCAST}
+  authentication {
+    auth_type PASS
+    auth_pass ${KEEPALIVED_PASSWORD}
+  }
+  unicast_peer {
+    ${KEEPALIVED_PEER1}
+    ${KEEPALIVED_PEER2}
+  }
+  virtual_ipaddress {
+    ${APISERVER_VIP}/24
+  }
+  track_script {
+    check_apiserver
+  }
 }
 EOF
 

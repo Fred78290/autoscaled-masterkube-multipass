@@ -40,6 +40,7 @@ case ${KUBERNETES_MINOR_RELEASE} in
 	29)
 		CLUSTER_AUTOSCALER_VERSION=v1.29.0
 		CLOUD_AUTOSCALER_VERSION=v1.29.0
+		;;
 	*)
 		echo "Former version aren't supported by cloud autoscaler"
 		exit 1

@@ -2,7 +2,7 @@
 CERT_SANS=
 CLOUD_PROVIDER=
 CLUSTER_DIR=/etc/cluster
-CLUSTER_NODES=
+CLUSTER_NODES=()
 CONTROL_PLANE_ENDPOINT_ADDR=
 CONTROL_PLANE_ENDPOINT=
 DELETE_CREDENTIALS_CONFIG=NO
@@ -22,8 +22,9 @@ NODENAME=${HOSTNAME}
 REGION=home
 TOKEN=$(cat ./cluster/token)
 ZONEID=office
+FILL_ETC_HOSTS=YES
 
-TEMP=$(getopt -o i:g:c:n: --long cloud-provider:,plateform:,tls-san:,delete-credentials-provider:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,csi-region:,csi-zone:,vm-uuid: -n "$0" -- "$@")
+TEMP=$(getopt -o i:g:c:n: --long fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,delete-credentials-provider:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,csi-region:,csi-zone:,vm-uuid: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -78,6 +79,14 @@ while true; do
 		DELETE_CREDENTIALS_CONFIG=$2
 		shift 2
 		;;
+	--fill-etc-hosts)
+		FILL_ETC_HOSTS=$2
+		shift 2
+		;;
+	-n|--cluster-nodes)
+		IFS=, read -a CLUSTER_NODES <<< "$2"
+		shift 2
+		;;
 	--k8s-distribution)
 		case "$2" in
 			kubeadm|k3s|rke2)
@@ -93,10 +102,6 @@ while true; do
 # Plateform specific
 	-c|--control-plane-endpoint)
 		IFS=: read CONTROL_PLANE_ENDPOINT CONTROL_PLANE_ENDPOINT_ADDR <<< "$2"
-		shift 2
-		;;
-	-n|--cluster-nodes)
-		CLUSTER_NODES="$2"
 		shift 2
 		;;
 	--net-if)
@@ -131,7 +136,7 @@ done
 if [ ${PLATEFORM} == "aws" ]; then
 	LOCALHOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)
 	INSTANCEID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-	ZONEID=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)
+	ZONEID=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
 	REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
 	INSTANCENAME=$(aws ec2  describe-instances --region ${REGION} --instance-ids ${INSTANCEID} | jq -r '.Reservations[0].Instances[0].Tags[]|select(.Key == "Name")|.Value')
 	APISERVER_ADVERTISE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
@@ -144,15 +149,19 @@ else
 	if [ "${CLOUD_PROVIDER}" == "external" ]; then
 		PROVIDERID=${PLATEFORM}://${INSTANCEID}
 	fi
+fi
 
+if [ ${FILL_ETC_HOSTS} == "YES" ]; then
 	sed -i "/${CONTROL_PLANE_ENDPOINT}/d" /etc/hosts
 	echo "${CONTROL_PLANE_ENDPOINT_ADDR}   ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 
-	for CLUSTER_NODE in $(echo -n ${CLUSTER_NODES} | tr ',' ' ')
+	for CLUSTER_NODE in ${CLUSTER_NODES[*]}
 	do
 		IFS=: read HOST IP <<< "${CLUSTER_NODE}"
-		sed -i "/${HOST}/d" /etc/hosts
-		echo "${IP}   ${HOST}" >> /etc/hosts
+		if [ -n "${IP}" ]; then
+			sed -i "/${HOST}/d" /etc/hosts
+			echo "${IP}   ${HOST}" >> /etc/hosts
+		fi
 	done
 fi
 

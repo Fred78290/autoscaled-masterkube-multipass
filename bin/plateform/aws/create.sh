@@ -21,6 +21,7 @@ ACM_CERTIFICATE_TAGGING=
 CLUSTER_NODES=
 CONTROLPLANE_INSTANCEID_NLB_TARGET=
 ETCD_ENDPOINT=
+FILL_ETC_HOSTS=YES
 
 function usage() {
 	common_usage
@@ -419,6 +420,51 @@ while true; do
 	esac
 done
 
+export AWS_DEFAULT_REGION=${AWS_REGION}
+
+function zoneid_by_name() {
+	aws route53 list-hosted-zones-by-name --profile ${AWS_PROFILE_ROUTE53} --dns-name $1 \
+		| jq --arg DNSNAME "${PUBLIC_DOMAIN_NAME}." -r '.HostedZones[]|select(.Name == $DNSNAME)|.Id//""' \
+		| sed -E 's/\/hostedzone\/(\w+)/\1/'
+}
+
+function get_instance_profile() {
+	aws iam get-instance-profile \
+	--profile ${AWS_PROFILE} \
+		--instance-profile-name $1 2> /dev/null | jq -r '.InstanceProfile.Arn // ""'
+}
+
+function create_instance_profile() {
+	local MASTER_PROFILE_NAME=$1
+	local POLICY_NAME=$2
+	local ROLE_POLICY=$3
+	local POLICY_DOCUMENT=$4
+
+	aws iam create-role \
+		--profile ${AWS_PROFILE}\
+		--role-name ${MASTER_PROFILE_NAME} \
+		--assume-role-policy-document file://${ROLE_POLICY} &> /dev/null
+
+	aws iam put-role-policy \
+		--profile ${AWS_PROFILE} \
+		--role-name ${MASTER_PROFILE_NAME} \
+		--policy-name kubernetes-master-permissions \
+		--policy-document file://${POLICY_DOCUMENT} &> /dev/null
+	
+	aws iam create-instance-profile \
+		--profile ${AWS_PROFILE} \
+		--instance-profile-name ${MASTER_PROFILE_NAME} &> /dev/null
+	
+	aws iam add-role-to-instance-profile \
+		--profile ${AWS_PROFILE} \
+		--instance-profile-name ${MASTER_PROFILE_NAME} \
+		--role-name ${MASTER_PROFILE_NAME} &> /dev/null
+
+	aws iam get-instance-profile \
+		--profile ${AWS_PROFILE} \
+		--instance-profile-name ${MASTER_PROFILE_NAME} | jq -r '.InstanceProfile.Arn // ""'
+}
+
 SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 
@@ -641,38 +687,51 @@ fi
 
 # If no master instance profile defined, use the default
 if [ -z ${MASTER_INSTANCE_PROFILE_ARN} ]; then
-	MASTER_INSTANCE_PROFILE_ARN=$(aws iam get-instance-profile --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-profile-name ${MASTER_PROFILE_NAME} 2> /dev/null | jq -r '.InstanceProfile.Arn // ""')
+	MASTER_INSTANCE_PROFILE_ARN=$(get_instance_profile ${MASTER_PROFILE_NAME})
 
 	# If not found, create it
 	if [ -z ${MASTER_INSTANCE_PROFILE_ARN} ]; then
-		aws iam create-role --profile ${AWS_PROFILE} --region ${AWS_REGION} --role-name ${MASTER_PROFILE_NAME} --assume-role-policy-document file://templates/profile/master/trusted.json &> /dev/null
-		aws iam put-role-policy --profile ${AWS_PROFILE} --region ${AWS_REGION} --role-name ${MASTER_PROFILE_NAME} --policy-name kubernetes-master-permissions --policy-document file://templates/profile/master/permissions.json &> /dev/null
-		aws iam create-instance-profile --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-profile-name ${MASTER_PROFILE_NAME} &> /dev/null
-		aws iam add-role-to-instance-profile --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-profile-name ${MASTER_PROFILE_NAME} --role-name ${MASTER_PROFILE_NAME} &> /dev/null
-
-		MASTER_INSTANCE_PROFILE_ARN=$(aws iam get-instance-profile --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-profile-name ${MASTER_PROFILE_NAME} | jq -r '.InstanceProfile.Arn // ""')
+		MASTER_INSTANCE_PROFILE_ARN=$(create_instance_profile ${MASTER_PROFILE_NAME} \
+			kubernetes-master-permissions \
+			templates/profile/master/trusted.json \
+			templates/profile/master/permissions.json)
 	fi
 fi
 
 # If no worker instance profile defined, use the default
 if [ -z ${WORKER_INSTANCE_PROFILE_ARN} ]; then
-	WORKER_INSTANCE_PROFILE_ARN=$(aws iam get-instance-profile --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-profile-name ${WORKER_PROFILE_NAME} 2> /dev/null | jq -r '.InstanceProfile.Arn // ""')
+	WORKER_INSTANCE_PROFILE_ARN=$(get_instance_profile ${WORKER_PROFILE_NAME})
 
 	# If not found, create it
 	if [ -z ${WORKER_INSTANCE_PROFILE_ARN} ]; then
-		aws iam create-role --profile ${AWS_PROFILE} --region ${AWS_REGION} --role-name ${WORKER_PROFILE_NAME} --assume-role-policy-document file://templates/profile/worker/trusted.json &> /dev/null
-		aws iam put-role-policy --profile ${AWS_PROFILE} --region ${AWS_REGION} --role-name ${WORKER_PROFILE_NAME} --policy-name kubernetes-worker-permissions --policy-document file://templates/profile/worker/permissions.json &> /dev/null
-		aws iam create-instance-profile --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-profile-name ${WORKER_PROFILE_NAME} &> /dev/null
-		aws iam add-role-to-instance-profile --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-profile-name ${WORKER_PROFILE_NAME} --role-name ${WORKER_PROFILE_NAME} &> /dev/null
-
-		WORKER_INSTANCE_PROFILE_ARN=$(aws iam get-instance-profile --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-profile-name ${WORKER_PROFILE_NAME} | jq -r '.InstanceProfile.Arn // ""')
+		WORKER_INSTANCE_PROFILE_ARN=$(create_instance_profile ${MASTER_PROFILE_NAME} \
+			kubernetes-worker-permissions \
+			templates/profile/worker/trusted.json \
+			templates/profile/worker/permissions.json)
 	fi
 fi
 
 # Grab domain name from route53
-if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+if [ -z "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+	if [ -n "${PRIVATE_DOMAIN_NAME}" ]; then
+		AWS_ROUTE53_PRIVATE_ZONE_ID=$(zoneid_by_name ${PRIVATE_DOMAIN_NAME})
+
+		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+			echo_blue_bold "AWS_ROUTE53_PRIVATE_ZONE_ID will be set to ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
+		elif [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
+			echo_blue_bold "AWS_ROUTE53_PRIVATE_ZONE_ID try to be set to ${PUBLIC_DOMAIN_NAME}"
+			AWS_ROUTE53_PRIVATE_ZONE_ID=$(zoneid_by_name ${PUBLIC_DOMAIN_NAME})
+			PRIVATE_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
+		fi
+
+		if [ -z "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+			echo_red_bold "AWS_ROUTE53_PRIVATE_ZONE_ID is not defined, exit"
+			exit 1
+		fi
+	fi
+else
 	ROUTE53_ZONE_NAME=$(aws route53 get-hosted-zone --id  ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
-		--profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} 2>/dev/null| jq -r '.HostedZone.Name // ""')
+		--profile ${AWS_PROFILE_ROUTE53} 2>/dev/null| jq -r '.HostedZone.Name // ""')
 
 	if [ -z "${ROUTE53_ZONE_NAME}" ]; then
 		echo_red_bold "The zone: ${AWS_ROUTE53_PRIVATE_ZONE_ID} does not exist, exit"
@@ -680,21 +739,22 @@ if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 	fi
 
 	ROUTE53_ZONE_NAME=${ROUTE53_ZONE_NAME%?}
-fi
+	FILL_ETC_HOSTS=NO
 
-# Grab private domain name
-if [ -z "${PRIVATE_DOMAIN_NAME}" ]; then
-	if [ -z "${ROUTE53_ZONE_NAME}" ] && [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
-		echo_red_bold "PRIVATE_DOMAIN_NAME is not defined, exit"
-		exit 1
-	fi
+	# Grab private domain name
+	if [ -z "${PRIVATE_DOMAIN_NAME}" ]; then
+		if [ -z "${ROUTE53_ZONE_NAME}" ] && [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
+			echo_red_bold "PRIVATE_DOMAIN_NAME is not defined, exit"
+			exit 1
+		fi
 
-	if [ -n "${ROUTE53_ZONE_NAME}" ]; then
-		echo_blue_bold "PRIVATE_DOMAIN_NAME will be set to ${ROUTE53_ZONE_NAME}"
-		PRIVATE_DOMAIN_NAME=${ROUTE53_ZONE_NAME}
-	else
-		echo_blue_bold "PRIVATE_DOMAIN_NAME will be set to ${PUBLIC_DOMAIN_NAME}"
-		PRIVATE_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
+		if [ -n "${ROUTE53_ZONE_NAME}" ]; then
+			echo_blue_bold "PRIVATE_DOMAIN_NAME will be set to ${ROUTE53_ZONE_NAME}"
+			PRIVATE_DOMAIN_NAME=${ROUTE53_ZONE_NAME}
+		else
+			echo_blue_bold "PRIVATE_DOMAIN_NAME will be set to ${PUBLIC_DOMAIN_NAME}"
+			PRIVATE_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
+		fi
 	fi
 fi
 
@@ -703,9 +763,16 @@ IFS=, read -a VPC_PUBLIC_SUBNET_IDS <<< "${VPC_PUBLIC_SUBNET_ID}"
 
 for SUBNET in ${VPC_PUBLIC_SUBNET_IDS[*]}
 do
-	TAGGED=$(aws ec2 describe-subnets --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=subnet-id,Values=${SUBNET}" | jq -r ".Subnets[].Tags[]|select(.Key == \"kubernetes.io/cluster/${NODEGROUP_NAME}\")|.Value")
+	TAGGED=$(aws ec2 describe-subnets \
+		--profile ${AWS_PROFILE} \
+		--filters "Name=subnet-id,Values=${SUBNET}" \
+		| jq -r ".Subnets[].Tags[]|select(.Key == \"kubernetes.io/cluster/${NODEGROUP_NAME}\")|.Value")
+
 	if [ -z ${TAGGED} ]; then
-		aws ec2 create-tags --profile ${AWS_PROFILE} --region ${AWS_REGION} --resources ${SUBNET} --tags "Key=kubernetes.io/cluster/${NODEGROUP_NAME},Value=owned" 2> /dev/null
+		aws ec2 create-tags \
+			--profile ${AWS_PROFILE} \
+			--resources ${SUBNET} \
+			--tags "Key=kubernetes.io/cluster/${NODEGROUP_NAME},Value=owned" 2> /dev/null
 	fi
 
 	if [ -z "${PUBLIC_SUBNET_NLB_TARGET}" ]; then
@@ -726,12 +793,15 @@ IFS=, read -a VPC_PRIVATE_SUBNET_IDS <<< "${VPC_PRIVATE_SUBNET_ID}"
 
 for SUBNET in ${VPC_PRIVATE_SUBNET_IDS[*]}
 do
-	NETINFO=$(aws ec2 describe-subnets --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=subnet-id,Values=${SUBNET}")
+	NETINFO=$(aws ec2 describe-subnets --profile ${AWS_PROFILE} --filters "Name=subnet-id,Values=${SUBNET}")
 	TAGGED=$(echo "${NETINFO}" | jq -r ".Subnets[].Tags[]|select(.Key == \"kubernetes.io/cluster/${NODEGROUP_NAME}\")|.Value")
 	BASE_IP=$(echo "${NETINFO}" | jq -r .Subnets[].CidrBlock | sed -E 's/(\w+\.\w+\.\w+).\w+\/\w+/\1/')
 
 	if [ -z ${TAGGED} ]; then
-		aws ec2 create-tags --profile ${AWS_PROFILE} --region ${AWS_REGION} --resources ${SUBNET} --tags "Key=kubernetes.io/cluster/${NODEGROUP_NAME},Value=owned" 2> /dev/null
+		aws ec2 create-tags \
+			--profile ${AWS_PROFILE} \
+			--resources ${SUBNET} \
+			--tags "Key=kubernetes.io/cluster/${NODEGROUP_NAME},Value=owned" 2> /dev/null
 	fi
 
 	if [ -z "${PRIVATE_SUBNET_NLB_TARGET}" ]; then
@@ -747,12 +817,15 @@ elif [ ${#VPC_PRIVATE_SUBNET_IDS[@]} = 2 ]; then
 	VPC_PRIVATE_SUBNET_IDS+=(${VPC_PRIVATE_SUBNET_IDS[1]})
 fi
 
-KEYEXISTS=$(aws ec2 describe-key-pairs --profile ${AWS_PROFILE} --region ${AWS_REGION} --key-names "${SSH_KEYNAME}" | jq -r '.KeyPairs[].KeyName // ""')
+KEYEXISTS=$(aws ec2 describe-key-pairs --profile ${AWS_PROFILE} --key-names "${SSH_KEYNAME}" | jq -r '.KeyPairs[].KeyName // ""')
 ECR_PASSWORD=$(aws ecr get-login-password  --profile ${AWS_PROFILE} --region us-west-2)
 
 if [ -z ${KEYEXISTS} ]; then
 	echo_grey "SSH Public key doesn't exist"
-	aws ec2 import-key-pair --profile ${AWS_PROFILE} --region ${AWS_REGION} --key-name ${SSH_KEYNAME} --public-key-material "file://${SSH_PUBLIC_KEY}"
+	aws ec2 import-key-pair \
+		--profile ${AWS_PROFILE} \
+		--key-name ${SSH_KEYNAME} \
+		--public-key-material "file://${SSH_PUBLIC_KEY}"
 else
 	echo_grey "SSH Public key already exists"
 fi
@@ -779,7 +852,7 @@ if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
 	exit 1
 fi
 
-TARGET_IMAGE_AMI=$(aws ec2 describe-images --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=name,Values=${TARGET_IMAGE}" | jq -r '.Images[0].ImageId // ""')
+TARGET_IMAGE_AMI=$(aws ec2 describe-images --profile ${AWS_PROFILE} --filters "Name=name,Values=${TARGET_IMAGE}" | jq -r '.Images[0].ImageId // ""')
 
 # Extract the domain name from CERT
 ACM_DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
@@ -799,7 +872,10 @@ if [ "${DOMAIN_NAME}" != "${PRIVATE_DOMAIN_NAME}" ] && [ "${DOMAIN_NAME}" != "${
 fi
 
 # ACM Keep the wildcard
-ACM_CERTIFICATE_ARN=$(aws acm list-certificates --profile ${AWS_PROFILE} --region ${AWS_REGION} --include keyTypes=RSA_1024,RSA_2048,EC_secp384r1,EC_prime256v1,EC_secp521r1,RSA_3072,RSA_4096 \
+ACM_CERTIFICATE_TAGGING=
+ACM_CERTIFICATE_ARN=$(aws acm list-certificates \
+	--profile ${AWS_PROFILE} \
+	--include keyTypes=RSA_1024,RSA_2048,EC_secp384r1,EC_prime256v1,EC_secp521r1,RSA_3072,RSA_4096 \
 	| jq -r --arg DOMAIN_NAME "${ACM_DOMAIN_NAME}" '.CertificateSummaryList[]|select(.DomainName == $DOMAIN_NAME)|.CertificateArn // ""')
 
 if [ -z "${ACM_CERTIFICATE_ARN}" ] || [ ${ACM_CERTIFICATE_FORCE} == "YES" ]; then
@@ -809,8 +885,10 @@ if [ -z "${ACM_CERTIFICATE_ARN}" ] || [ ${ACM_CERTIFICATE_FORCE} == "YES" ]; the
 		ACM_CERTIFICATE_TAGGING="--tags Key=Name,Value=${ACM_DOMAIN_NAME}"
 	fi
 
-	ACM_CERTIFICATE_ARN=$(aws acm import-certificate ${ACM_CERTIFICATE_ARN} ${ACM_CERTIFICATE_TAGGING} \
-		--profile ${AWS_PROFILE} --region ${AWS_REGION} \
+	ACM_CERTIFICATE_ARN=$(aws acm import-certificate \
+		${ACM_CERTIFICATE_ARN} \
+		${ACM_CERTIFICATE_TAGGING} \
+		--profile ${AWS_PROFILE} \
 		--certificate fileb://${SSL_LOCATION}/cert.pem \
 		--private-key fileb://${SSL_LOCATION}/privkey.pem | jq -r '.CertificateArn // ""')
 
@@ -860,7 +938,9 @@ if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
 	exit 0
 fi
 
-TARGET_IMAGE_AMI=$(aws ec2 describe-images --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=name,Values=${TARGET_IMAGE}" | jq -r '.Images[0].ImageId // ""')
+TARGET_IMAGE_AMI=$(aws ec2 describe-images \
+	--profile ${AWS_PROFILE} \
+	--filters "Name=name,Values=${TARGET_IMAGE}" | jq -r '.Images[0].ImageId // ""')
 
 if [ -z "${TARGET_IMAGE_AMI}" ]; then
 	echo_red "AMI ${TARGET_IMAGE} not found"
@@ -874,7 +954,7 @@ if [ "${UPGRADE_CLUSTER}" == "YES" ]; then
 elif [ "${RESUME}" = "NO" ]; then
 	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 	if [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
-		AWS_ROUTE53_PUBLIC_ZONE_ID=$(aws route53 list-hosted-zones-by-name --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --dns-name ${PUBLIC_DOMAIN_NAME} | jq --arg DNSNAME "${PUBLIC_DOMAIN_NAME}." -r '.HostedZones[]|select(.Name == $DNSNAME)|.Id//""' | sed -E 's/\/hostedzone\/(\w+)/\1/')
+		AWS_ROUTE53_PUBLIC_ZONE_ID=$(zoneid_by_name ${PUBLIC_DOMAIN_NAME})
 		if [ -z "${AWS_ROUTE53_PUBLIC_ZONE_ID}" ]; then
 			echo_red_bold "No Route53 for PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}"
 		else
@@ -1036,7 +1116,10 @@ function create_vm() {
 
 	read NODEINDEX SUFFIX MASTERKUBE_NODE <<< "$(get_instance_name ${INDEX})"
 
-	LAUNCHED_INSTANCE=$(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=tag:Name,Values=${MASTERKUBE_NODE}" | jq -r '.Reservations[].Instances[]|select(.State.Code == 16)' )
+	LAUNCHED_INSTANCE=$(aws ec2  describe-instances \
+		--profile ${AWS_PROFILE} \
+		--filters "Name=tag:Name,Values=${MASTERKUBE_NODE}" \
+		| jq -r '.Reservations[].Instances[]|select(.State.Code == 16)' )
 
 	if [ -z $(echo ${LAUNCHED_INSTANCE} | jq '.InstanceId') ]; then
 		# Cloud init user-data
@@ -1166,12 +1249,14 @@ EOF
 
 		echo_blue_bold "Wait for ${MASTERKUBE_NODE} instanceID ${LAUNCHED_ID} to boot"
 
-		while [ ! $(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${LAUNCHED_ID}" | jq -r '.Reservations[0].Instances[0].State.Code') -eq 16 ];
+		while [ ! $(aws ec2  describe-instances --profile ${AWS_PROFILE} --instance-ids "${LAUNCHED_ID}" | jq -r '.Reservations[0].Instances[0].State.Code') -eq 16 ];
 		do
 			sleep 1
 		done
 
-		LAUNCHED_INSTANCE=$(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids ${LAUNCHED_ID} | jq .Reservations[0].Instances[0])
+		LAUNCHED_INSTANCE=$(aws ec2  describe-instances \
+			--profile ${AWS_PROFILE} \
+			--instance-ids ${LAUNCHED_ID} | jq .Reservations[0].Instances[0])
 
 		IPADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateIpAddress // ""')
 		PUBADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PublicIpAddress // ""')
@@ -1185,7 +1270,10 @@ EOF
 
 		if [ "${PUBLICIP}" = "true" ] || [ -z ${NETWORK_INTERFACE_ID} ]; then
 			NETWORK_INTERFACE_ID=$(echo ${LAUNCHED_INSTANCE} | jq -r '.NetworkInterfaces[0].NetworkInterfaceId // ""')
-			ENI=$(aws ec2 describe-network-interfaces --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters Name=network-interface-id,Values=${NETWORK_INTERFACE_ID} 2> /dev/null | jq -r '.NetworkInterfaces[0]//""')
+			ENI=$(aws ec2 describe-network-interfaces \
+				--profile ${AWS_PROFILE} \
+				--filters Name=network-interface-id,Values=${NETWORK_INTERFACE_ID} 2> /dev/null \
+				| jq -r '.NetworkInterfaces[0]//""')
 			echo ${ENI} | jq . > ${TARGET_CONFIG_LOCATION}/eni-${SUFFIX}.json
 		fi
 
@@ -1218,7 +1306,8 @@ EOF
 			echo ${ROUTE53_ENTRY} | jq --arg HOSTNAME "${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}" \
 				'.Changes[0].ResourceRecordSet.Name = $HOSTNAME' >  ${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json
 
-			aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} \
+			aws route53 change-resource-record-sets \
+				--profile ${AWS_PROFILE_ROUTE53} \
 				--hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
 				--change-batch file://${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json > /dev/null
 
@@ -1230,7 +1319,8 @@ EOF
 
 				# Register kubernetes nodes in route53
 				echo ${ROUTE53_ENTRY} | jq --arg HOSTNAME "${MASTERKUBE_NODE}.${PUBLIC_DOMAIN_NAME}" '.Changes[0].ResourceRecordSet.Name = $HOSTNAME' > ${TARGET_CONFIG_LOCATION}/dns-public-${SUFFIX}.json
-				aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} \
+				aws route53 change-resource-record-sets \
+					--profile ${AWS_PROFILE_ROUTE53} \
 					--hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
 					--change-batch file://${TARGET_CONFIG_LOCATION}/dns-public-${SUFFIX}.json > /dev/null
 
@@ -1357,7 +1447,7 @@ EOF
 }
 EOF
 
-			aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} --hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
+			aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
 				--change-batch file://${TARGET_CONFIG_LOCATION}/dns-public.json > /dev/null
 
 		elif [ -n "${CERT_GODADDY_API_KEY}" ]; then
@@ -1376,7 +1466,10 @@ function create_load_balancer() {
 	if [ "${HA_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "YES" ]; then
 		echo_title "Create NLB ${MASTERKUBE}"
 
-		TARGET_VPC=$(aws ec2 describe-subnets --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters "Name=subnet-id,Values=${VPC_PRIVATE_SUBNET_ID}" | jq -r ".Subnets[0].VpcId")
+		TARGET_VPC=$(aws ec2 describe-subnets \
+			--profile ${AWS_PROFILE} \
+			--filters "Name=subnet-id,Values=${VPC_PRIVATE_SUBNET_ID}" \
+			| jq -r ".Subnets[0].VpcId")
 
 		eval create-aws-nlb.sh \
 			--profile=${AWS_PROFILE} \
@@ -1482,11 +1575,14 @@ function start_kubernes_on_instances() {
 					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
 						--plateform=${PLATEFORM} \
 						--cloud-provider=external \
+						--control-plane-endpoint=${CONTROL_PLANE_ENDPOINT} \
+						--cluster-nodes="${CLUSTER_NODES}" \
 						--k8s-distribution=${KUBERNETES_DISTRO} \
 						--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 						--join-master=${MASTER_IP} \
 						--tls-san="${CERT_SANS}" \
 						--use-external-etcd=${EXTERNAL_ETCD} \
+						--fill-etc-hosts=${FILL_ETC_HOSTS} \
 						--node-group=${NODEGROUP_NAME} \
 						--node-index=${NODEINDEX} ${SILENT}
 
@@ -1518,6 +1614,7 @@ function start_kubernes_on_instances() {
 						--etcd-endpoint="${ETCD_ENDPOINT}" \
 						--ha-cluster=true \
 						--cni-plugin="${CNI_PLUGIN}" \
+						--fill-etc-hosts=${FILL_ETC_HOSTS} \
 						--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 
 					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/  ${SILENT}
@@ -1536,6 +1633,8 @@ function start_kubernes_on_instances() {
 					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
 						--plateform=${PLATEFORM} \
 						--cloud-provider=external \
+						--control-plane-endpoint=${CONTROL_PLANE_ENDPOINT} \
+						--cluster-nodes="${CLUSTER_NODES}" \
 						--k8s-distribution=${KUBERNETES_DISTRO} \
 						--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 						--max-pods=${MAX_PODS} \
@@ -1544,6 +1643,7 @@ function start_kubernes_on_instances() {
 						--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
 						--control-plane=true \
 						--use-external-etcd=${EXTERNAL_ETCD} \
+						--fill-etc-hosts=${FILL_ETC_HOSTS} \
 						--node-group=${NODEGROUP_NAME} \
 						--node-index=${NODEINDEX} ${SILENT}
 
@@ -1582,6 +1682,7 @@ function start_kubernes_on_instances() {
 						--node-group=${NODEGROUP_NAME} \
 						--node-index=${NODEINDEX} \
 						--cni-plugin="${CNI_PLUGIN}" \
+						--fill-etc-hosts=${FILL_ETC_HOSTS} \
 						--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 
 					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
@@ -1597,6 +1698,8 @@ function start_kubernes_on_instances() {
 					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
 						--plateform=${PLATEFORM} \
 						--cloud-provider=external \
+						--control-plane-endpoint=${CONTROL_PLANE_ENDPOINT} \
+						--cluster-nodes="${CLUSTER_NODES}" \
 						--k8s-distribution=${KUBERNETES_DISTRO} \
 						--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 						--tls-san="${CERT_SANS}" \
@@ -1604,6 +1707,7 @@ function start_kubernes_on_instances() {
 						--join-master=${MASTER_IP} \
 						--control-plane=false \
 						--use-external-etcd=${EXTERNAL_ETCD} \
+						--fill-etc-hosts=${FILL_ETC_HOSTS} \
 						--node-group=${NODEGROUP_NAME} \
 						--node-index=${NODEINDEX} ${SILENT}
 
@@ -1671,7 +1775,10 @@ function create_network_interfaces() {
 	if [ ${PUBLICIP} != "true" ]; then
 		if [ -f ${TARGET_CONFIG_LOCATION}/eni-${SUFFIX}.json ]; then
 			INFID=$(cat ${TARGET_CONFIG_LOCATION}/eni-${SUFFIX}.json | jq -r '.NetworkInterfaceId')
-			ENI=$(aws ec2 describe-network-interfaces --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters Name=network-interface-id,Values=${INFID} 2> /dev/null | jq -r '.NetworkInterfaces[0]//""')
+			ENI=$(aws ec2 describe-network-interfaces \
+				--profile ${AWS_PROFILE} \
+				--filters Name=network-interface-id,Values=${INFID} 2> /dev/null \
+				| jq -r '.NetworkInterfaces[0]//""')
 
 			if [ -z "${ENI}" ]; then
 				echo_red_bold "Reserved ENI ${ENI_NAME} not found, network-interface-id=${INFID}, recreate it"
@@ -1681,13 +1788,19 @@ function create_network_interfaces() {
 
 		if [ ! -f ${TARGET_CONFIG_LOCATION}/eni-${SUFFIX}.json ]; then
 
-			ENI=$(aws ec2 describe-network-interfaces --profile ${AWS_PROFILE} --region ${AWS_REGION} --filters Name=tag:Name,Values=${ENI_NAME} | jq -r '.NetworkInterfaces[0]//""')
+			ENI=$(aws ec2 describe-network-interfaces \
+				--profile ${AWS_PROFILE} \
+				--filters Name=tag:Name,Values=${ENI_NAME} \
+				| jq -r '.NetworkInterfaces[0]//""')
 
 			if [ -z "${ENI}" ]; then
 				# ENI doesn't exist
 				echo_blue_bold "Create Reserved ENI ${ENI_NAME}, subnetid=${SUBNETID}, security group=${SGID}"
 
-				ENI=$(aws ec2 create-network-interface --profile ${AWS_PROFILE} --region ${AWS_REGION} --subnet-id ${SUBNETID} --groups ${SGID} \
+				ENI=$(aws ec2 create-network-interface \
+					--profile ${AWS_PROFILE} \
+					--subnet-id ${SUBNETID} \
+					--groups ${SGID} \
 					--description "Reserved ENI node[${INDEX}]" | jq '.NetworkInterface')
 
 				INFID=$(echo ${ENI} | jq -r '.NetworkInterfaceId')
@@ -1848,7 +1961,7 @@ if [ "${USE_NLB}" = "NO" ] || [ "${HA_CLUSTER}" = "false" ]; then
 	# Register in Route53 IP addresses point in private IP
 	if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 		echo ${PRIVATE_ROUTE53_REGISTER} | jq . > ${TARGET_CONFIG_LOCATION}/dns-nlb.json
-		aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} \
+		aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} \
 			--hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
 			--change-batch file://${TARGET_CONFIG_LOCATION}/dns-nlb.json > /dev/null
 
@@ -1863,7 +1976,7 @@ if [ "${USE_NLB}" = "NO" ] || [ "${HA_CLUSTER}" = "false" ]; then
 		
 			# Register in Route53 IP addresses point in public IP
 			echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg HOSTNAME "${MASTERKUBE}.${PUBLIC_DOMAIN_NAME}" '.Changes[0].ResourceRecordSet.Name = $HOSTNAME' > ${TARGET_CONFIG_LOCATION}/dns-public.json
-			aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} --region ${AWS_REGION} \
+			aws route53 change-resource-record-sets --profile ${AWS_PROFILE_ROUTE53} \
 				--hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
 				--change-batch file://${TARGET_CONFIG_LOCATION}/dns-public.json > /dev/null
 
@@ -2019,10 +2132,14 @@ fi
 cp ${PWD}/templates/setup/${PLATEFORM}/machines.json ${TARGET_CONFIG_LOCATION}/machines.json
 
 echo $(eval "cat <<EOF
-$(<${PWD}/templates/setup/autoscaler.json)
+$(<${PWD}/templates/setup/${PLATEFORM}/autoscaler.json)
 EOF") | jq . > ${TARGET_CONFIG_LOCATION}/autoscaler.json
 
-PROVIDER_CONFIG=$(cat ../template/setup/provider.json)
+echo $(eval "cat <<EOF
+$(<${PWD}/templates/setup/${PLATEFORM}/provider.json)
+EOF") | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
+
+PROVIDER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
 IFS=, read -a VPC_PRIVATE_SUBNET_IDS <<< "${VPC_PRIVATE_SUBNET_ID}"
 for SUBNET in ${VPC_PRIVATE_SUBNET_IDS[*]}
 do

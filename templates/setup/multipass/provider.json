@@ -21,27 +21,17 @@
 		"interfaces": [
 			{
 				"primary": true,
-				"exists": true,
+				"exists": false,
 				"network": "${VC_NETWORK_PRIVATE}",
-				"nic": "eth0:1",
-				"type": "nat",
+				"nic": "eth1",
+				"type": "manual",
+				"mac-address": "generate",
 				"dhcp": ${SCALEDNODES_DHCP},
 				"use-dhcp-routes": ${USE_DHCP_ROUTES_PRIVATE},
 				"address": "${NODE_IP}",
 				"gateway": "${NET_GATEWAY}",
 				"netmask": "${NET_MASK}",
 				"routes": ${PRIVATE_ROUTES_DEFS}
-			},
-			{
-				"primary": false,
-				"exists": false,
-				"network": "${VC_NETWORK_PUBLIC}",
-				"nic": "eth1",
-				"type": "manual",
-				"mac-address": "generate",
-				"dhcp": true,
-				"use-dhcp-routes": ${USE_DHCP_ROUTES_PUBLIC},
-				"routes": ${PUBLIC_ROUTES_DEFS}
 			}
 		]
 	}

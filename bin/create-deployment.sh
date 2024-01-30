@@ -54,11 +54,13 @@ elif [ ${PLATEFORM} == "aws" ]; then
 	create-efs-provisionner.sh
 fi
 
-if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
-	# Create Pods
+if [ ${LAUNCH_CA} != "NO" ]; then
 	echo_title "Create autoscaler"
 	create-autoscaler.sh ${LAUNCH_CA}
+fi
 
+if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
+	# Create Pods
 	if [ ${PLATEFORM} != "aws" ]; then
 		echo_title "Create MetalLB"
 		create-metallb.sh

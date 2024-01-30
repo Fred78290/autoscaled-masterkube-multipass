@@ -25,7 +25,7 @@ function usage() {
 --use-keepalived | -u                          # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
 
   # Flags to configure network in ${PLATEFORM}
---public-address=<value>                       # The public address to expose kubernetes endpoint, default ${PUBLIC_IP}
+--public-address=<value>                       # The public address to expose kubernetes endpoint[ipv4/cidr, DHCP, NONE], default ${PUBLIC_IP}
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
 --vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
 --vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, default ${VC_NETWORK_PUBLIC}
@@ -681,10 +681,11 @@ gzip -c9 <${TARGET_CONFIG_LOCATION}/vendordata.yaml | base64 -w 0 | tee > ${TARG
 IPADDRS=()
 NODE_IP=${NET_IP}
 
-if [ "${PUBLIC_IP}" != "DHCP" ]; then
+if [ "${PUBLIC_IP}" != "DHCP" ] && [ "${PUBLIC_IP}" != "NONE" ]; then
 	IFS=/ read PUBLIC_NODE_IP PUBLIC_MASK_CIDR <<< "${PUBLIC_IP}"
+	PUBLIC_NETMASK=$(cidr_to_netmask ${PUBLIC_MASK_CIDR})
 else
-	PUBLIC_NODE_IP=DHCP
+	PUBLIC_NODE_IP=${PUBLIC_IP}
 fi
 
 # No external elb, use keep alived
@@ -694,10 +695,7 @@ if [[ ${FIRSTNODE} > 0 ]]; then
 
 	IPADDRS+=(${NODE_IP})
 	NODE_IP=$(nextip ${NODE_IP})
-
-	if [ "${PUBLIC_IP}" != "DHCP" ]; then
-		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
-	fi
+	PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
 fi
 
 if [ ${HA_CLUSTER} = "true" ]; then
@@ -713,12 +711,48 @@ PRIVATE_ROUTES_DEFS=$(build_routes ${NETWORK_PRIVATE_ROUTES[@]})
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function get_vm_name() {
+	local NODEINDEX=$1
+
+	if [ ${NODEINDEX} = 0 ]; then
+		MASTERKUBE_NODE="${MASTERKUBE}"
+	elif [[ ${NODEINDEX} > ${CONTROLNODES} ]]; then
+		NODEINDEX=$((INDEX - ${CONTROLNODES}))
+		MASTERKUBE_NODE="${NODEGROUP_NAME}-worker-0${NODEINDEX}"
+	else
+		MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${NODEINDEX}"
+	fi
+
+	echo -n ${MASTERKUBE_NODE}
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function get_machine_type() {
+	local NODEINDEX=$1
+	local MACHINE_TYPE=
+
+	if [ ${NODEINDEX} = 0 ] && [ ${HA_CLUSTER} = "true" ]; then
+		# node 0 is ELB on HA mode
+		MACHINE_TYPE=${NGINX_MACHINE}
+	elif [ ${NODEINDEX} -gt ${CONTROLNODES} ]; then
+		MACHINE_TYPE=${WORKER_NODE_MACHINE}
+	else
+		MACHINE_TYPE=${CONTROL_PLANE_MACHINE}
+	fi
+
+	echo -n ${MACHINE_TYPE}
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function create_vm() {
 	local INDEX=$1
 	local PUBLIC_NODE_IP=$2
 	local NODE_IP=$3
-	local MACHINE_TYPE=${CONTROL_PLANE_MACHINE}
-	local NODEINDEX=${INDEX}
+	local MACHINE_TYPE=
 	local MASTERKUBE_NODE=
 	local MASTERKUBE_NODE_UUID=
 	local IPADDR=
@@ -727,25 +761,32 @@ function create_vm() {
 	local NUM_VCPUS=
 	local MEMSIZE=
 
-	if [ ${NODEINDEX} = 0 ]; then
-		# node 0 is ELB on HA mode
-		if [ ${HA_CLUSTER} = "true" ]; then
-			MACHINE_TYPE=${NGINX_MACHINE}
-		fi
-
-		MASTERKUBE_NODE="${MASTERKUBE}"
-	elif [[ ${NODEINDEX} > ${CONTROLNODES} ]]; then
-		NODEINDEX=$((INDEX - ${CONTROLNODES}))
-		MASTERKUBE_NODE="${NODEGROUP_NAME}-worker-0${NODEINDEX}"
-		MACHINE_TYPE=${WORKER_NODE_MACHINE}
-	else
-		MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${NODEINDEX}"
-	fi
-
+	MACHINE_TYPE=$(get_machine_type ${INDEX})
+	MASTERKUBE_NODE=$(get_vm_name ${INDEX})
 	MASTERKUBE_NODE_UUID=$(get_vmuuid ${MASTERKUBE_NODE})
 
 	if [ -z "${MASTERKUBE_NODE_UUID}" ]; then
-		if [ "${PUBLIC_NODE_IP}" = "DHCP" ]; then
+		if [ "${PUBLIC_NODE_IP}" = "NONE" ]; then
+			NETWORK_DEFS=$(cat <<EOF
+			{
+				"instance-id": "$(uuidgen)",
+				"local-hostname": "${MASTERKUBE_NODE}",
+				"hostname": "${MASTERKUBE_NODE}.${NET_DOMAIN}",
+				"network": {
+					"version": 2,
+					"ethernets": {
+						"eth0": {
+							"gateway4": "${NET_GATEWAY}",
+							"addresses": [
+								"${NODE_IP}/${NET_MASK_CIDR}"
+							]
+						}
+					}
+				}
+			}
+EOF
+)
+		elif [ "${PUBLIC_NODE_IP}" = "DHCP" ]; then
 			NETWORK_DEFS=$(cat <<EOF
 			{
 				"instance-id": "$(uuidgen)",
@@ -803,12 +844,18 @@ EOF
 )
 		fi
 
-		if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
-			NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PUBLIC_ROUTES_DEFS}" '.network.ethernets.eth0.routes = $ROUTES')
-		fi
+		if [ "${PUBLIC_NODE_IP}" = "NONE" ]; then
+			if [ ${#NETWORK_PRIVATE_ROUTES[@]} -gt 0 ]; then
+				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PRIVATE_ROUTES_DEFS}" '.network.ethernets.eth0.routes = $ROUTES')
+			fi
+		else
+			if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
+				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PUBLIC_ROUTES_DEFS}" '.network.ethernets.eth0.routes = $ROUTES')
+			fi
 
-		if [ ${#NETWORK_PRIVATE_ROUTES[@]} -gt 0 ]; then
-			NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PRIVATE_ROUTES_DEFS}" '.network.ethernets.eth1.routes = $ROUTES')
+			if [ ${#NETWORK_PRIVATE_ROUTES[@]} -gt 0 ]; then
+				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PRIVATE_ROUTES_DEFS}" '.network.ethernets.eth1.routes = $ROUTES')
+			fi
 		fi
 
 		echo ${NETWORK_DEFS} | jq . > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.json
@@ -899,17 +946,12 @@ do
 	if [[ "${HA_CLUSTER}" == "false" ]] && [[ ${INDEX} = 0 ]]; then
 		NODE_IP=$(nextip ${NODE_IP})
 		NODE_IP=$(nextip ${NODE_IP})
-		if [ "${PUBLIC_IP}" != "DHCP" ]; then
-			PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
-			PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
-		fi
+		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
+		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
 	fi
 
 	NODE_IP=$(nextip ${NODE_IP})
-
-	if [ "${PUBLIC_IP}" != "DHCP" ]; then
-		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
-	fi
+	PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
 done
 
 wait_jobs_finish
@@ -1013,15 +1055,7 @@ CERT_SANS=$(collect_cert_sans "${IPADDRS[0]}" "${CLUSTER_NODES}" "${MASTERKUBE}.
 
 for INDEX in $(seq ${FIRSTNODE} ${TOTALNODES})
 do
-	NODEINDEX=${INDEX}
-	if [ ${NODEINDEX} = 0 ]; then
-		MASTERKUBE_NODE="${MASTERKUBE}"
-	elif [[ ${NODEINDEX} > ${CONTROLNODES} ]]; then
-		NODEINDEX=$((INDEX - ${CONTROLNODES}))
-		MASTERKUBE_NODE="${NODEGROUP_NAME}-worker-0${NODEINDEX}"
-	else
-		MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${NODEINDEX}"
-	fi
+	MASTERKUBE_NODE=$(get_vm_name ${INDEX})
 
 	if [ -f ${TARGET_CONFIG_LOCATION}/kubeadm-0${INDEX}-prepared ]; then
 		echo_title "Already prepared VM ${MASTERKUBE_NODE}"
@@ -1058,7 +1092,7 @@ do
 					--tls-san="${CERT_SANS}" \
 					--cluster-nodes="${CLUSTER_NODES}" \
 					--node-group=${NODEGROUP_NAME} \
-					--node-index=${NODEINDEX} \
+					--node-index=${INDEX} \
 					--cni-plugin=${CNI_PLUGIN} \
 					--net-if=${NET_IF} \
 					--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
@@ -1088,7 +1122,7 @@ do
 					--container-runtime=${CONTAINER_ENGINE} \
 					--use-external-etcd=${EXTERNAL_ETCD} \
 					--node-group=${NODEGROUP_NAME} \
-					--node-index=${NODEINDEX} \
+					--node-index=${INDEX} \
 					--load-balancer-ip=${IPADDRS[0]} \
 					--cluster-nodes="${CLUSTER_NODES}" \
 					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[1]}" \
@@ -1113,27 +1147,27 @@ do
 
 				echo -n ${IPADDRS[0]}:6443 > ${TARGET_CLUSTER_LOCATION}/manager-ip
 			elif [[ ${INDEX} > ${CONTROLNODES} ]] || [ "${HA_CLUSTER}" = "false" ]; then
-					echo_blue_bold "Join node ${MASTERKUBE_NODE} instance worker node, kubernetes version=${KUBERNETES_VERSION}"
+				echo_blue_bold "Join node ${MASTERKUBE_NODE} instance worker node, kubernetes version=${KUBERNETES_VERSION}"
 
-					eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
+				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 
-					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
-						--plateform=${PLATEFORM} \
-						--cloud-provider=${CLOUD_PROVIDER} \
-						--k8s-distribution=${KUBERNETES_DISTRO} \
-						--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
-						--csi-region=${REGION} \
-						--csi-zone=${ZONEID} \
-						--max-pods=${MAX_PODS} \
-						--vm-uuid=${VMUUID} \
-						--use-external-etcd=${EXTERNAL_ETCD} \
-						--node-group=${NODEGROUP_NAME} \
-						--node-index=${NODEINDEX} \
-						--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
-						--tls-san="${CERT_SANS}" \
-						--etcd-endpoint="${ETCD_ENDPOINT}" \
-						--net-if=${NET_IF} \
-						--cluster-nodes="${CLUSTER_NODES}" ${SILENT}
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
+					--plateform=${PLATEFORM} \
+					--cloud-provider=${CLOUD_PROVIDER} \
+					--k8s-distribution=${KUBERNETES_DISTRO} \
+					--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
+					--csi-region=${REGION} \
+					--csi-zone=${ZONEID} \
+					--max-pods=${MAX_PODS} \
+					--vm-uuid=${VMUUID} \
+					--use-external-etcd=${EXTERNAL_ETCD} \
+					--node-group=${NODEGROUP_NAME} \
+					--node-index=${NODEINDEX} \
+					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
+					--tls-san="${CERT_SANS}" \
+					--etcd-endpoint="${ETCD_ENDPOINT}" \
+					--net-if=${NET_IF} \
+					--cluster-nodes="${CLUSTER_NODES}" ${SILENT}
 			else
 				echo_blue_bold "Join node ${MASTERKUBE_NODE} instance master node, kubernetes version=${KUBERNETES_VERSION}"
 

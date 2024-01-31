@@ -25,29 +25,31 @@
 		},
 		"interfaces": [
 			{
-				"primary": false,
-				"exists": true,
-				"network": "${VC_NETWORK_PUBLIC}",
-				"adapter": "vmxnet3",
-				"mac-address": "generate",
-				"nic": "eth0",
-				"dhcp": true,
-				"use-dhcp-routes": ${USE_DHCP_ROUTES_PUBLIC},
-				"routes": ${PUBLIC_ROUTES_DEFS}
-			},
-			{
+				"enabled": true,
 				"primary": true,
 				"exists": true,
 				"network": "${VC_NETWORK_PRIVATE}",
 				"adapter": "vmxnet3",
 				"mac-address": "generate",
-				"nic": "eth1",
+				"nic": "eth0",
 				"dhcp": ${SCALEDNODES_DHCP},
 				"use-dhcp-routes": ${USE_DHCP_ROUTES_PRIVATE},
 				"address": "${NODE_IP}",
 				"gateway": "${NET_GATEWAY}",
 				"netmask": "${NET_MASK}",
 				"routes": ${PRIVATE_ROUTES_DEFS}
+			},
+			{
+				"enabled": ${VC_NETWORK_PUBLIC_ENABLED},
+				"primary": false,
+				"exists": false,
+				"network": "${VC_NETWORK_PUBLIC}",
+				"adapter": "vmxnet3",
+				"mac-address": "generate",
+				"nic": "eth1",
+				"dhcp": true,
+				"use-dhcp-routes": ${USE_DHCP_ROUTES_PUBLIC},
+				"routes": ${PUBLIC_ROUTES_DEFS}
 			}
 		]
 	}

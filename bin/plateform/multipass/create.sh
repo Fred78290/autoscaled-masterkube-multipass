@@ -25,10 +25,10 @@ function usage() {
 --use-keepalived | -u                          # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
 
   # Flags to configure network in ${PLATEFORM}
---public-address=<value>                       # The public address to expose kubernetes endpoint, default ${PUBLIC_IP}
+--public-address=<value>                       # The public address to expose kubernetes endpoint[ipv4/cidr, DHCP, NONE], default ${PUBLIC_IP}
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
 --vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
---vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, default ${VC_NETWORK_PUBLIC}
+--vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default ${VC_NETWORK_PUBLIC}
 --net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${NET_IP}
 --net-gateway=<value>                          # Override the IP gateway, default ${NET_GATEWAY}
 --net-dns=<value>                              # Override the IP DNS, default ${NET_DNS}
@@ -45,6 +45,8 @@ function usage() {
 --nfs-storage-class                            # The storage class name to use, default ${NFS_STORAGE_CLASS}
 EOF
 }
+
+FOLDER_OPTIONS=
 
 OPTIONS+=(
 	"nfs-server-adress:"
@@ -556,22 +558,25 @@ fi
 echo_blue_bold "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
 
 VC_NETWORK_PRIVATE_TYPE=$(get_net_type ${VC_NETWORK_PRIVATE})
-VC_NETWORK_PUBLIC_TYPE=$(get_net_type ${VC_NETWORK_PUBLIC})
-
-if [ -z "${VC_NETWORK_PUBLIC_TYPE}" ]; then
-	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PUBLIC}"
-	exit 1
-fi
 
 if [ -z "${VC_NETWORK_PRIVATE_TYPE}" ]; then
 	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PRIVATE}"
 	exit 1
 fi
 
+if [ -n "${VC_NETWORK_PUBLIC}" ]; then
+	VC_NETWORK_PUBLIC_TYPE=$(get_net_type ${VC_NETWORK_PUBLIC})
+	
+	if [ -z "${VC_NETWORK_PUBLIC_TYPE}" ]; then
+		echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PUBLIC}"
+		exit 1
+	fi
+fi
+
 if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 	TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}"
 else
-	TARGET_IMAGE="${ROOT_IMG_NAME}-k8s-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
+	TARGET_IMAGE="${ROOT_IMG_NAME}-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 fi
 
 TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}.img"
@@ -683,7 +688,11 @@ gzip -c9 <${TARGET_CONFIG_LOCATION}/vendordata.yaml | base64 -w 0 | tee > ${TARG
 IPADDRS=()
 NODE_IP=${NET_IP}
 
-if [ "${PUBLIC_IP}" != "DHCP" ] && [ "${PUBLIC_IP}" != "NONE" ]; then
+if [ -z "${VC_NETWORK_PUBLIC}" ]; then
+	PUBLIC_IP=NONE
+	PUBLIC_NODE_IP=NONE
+	VC_NETWORK_PUBLIC_ENABLED=false
+elif [ "${PUBLIC_IP}" != "DHCP" ] && [ "${PUBLIC_IP}" != "NONE" ]; then
 	IFS=/ read PUBLIC_NODE_IP PUBLIC_MASK_CIDR <<< "${PUBLIC_IP}"
 	PUBLIC_NETMASK=$(cidr_to_netmask ${PUBLIC_MASK_CIDR})
 else
@@ -789,6 +798,7 @@ function create_vm() {
 		}
 EOF
 )
+
 		if [ ${#NETWORK_PRIVATE_ROUTES[@]} -gt 0 ]; then
 			NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PRIVATE_ROUTES_DEFS}" '.network.ethernets.eth1.routes = $ROUTES')
 		fi
@@ -1183,14 +1193,3 @@ EOF") | jq . > ${TARGET_CONFIG_LOCATION}/autoscaler.json
 echo $(eval "cat <<EOF
 $(<${PWD}/templates/setup/${PLATEFORM}/provider.json)
 EOF") | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
-
-if [ "${PUBLIC_IP}" != "DHCP" ] && [ "${PUBLIC_IP}" != "NONE" ]; then
-	PROVIDER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
-
-	echo ${PROVIDER_CONFIG} | jq --arg VC_NETWORK_PUBLIC "${VC_NETWORK_PUBLIC}" \
-		--arg PUBLIC_NODE_IP "${PUBLIC_NODE_IP}" \
-		--arg PUBLIC_NETMASK "${PUBLIC_NETMASK}" \
-		--argjson PUBLIC_ROUTES_DEFS "${PUBLIC_ROUTES_DEFS}" \
-		'.|.network.interfaces += [ { "primary": false, "exists": true, "network": $VC_NETWORK_PUBLIC, "nic": "eth0:1", "type": "nat", "dhcp": true, "address": $PUBLIC_NODE_IP, "netmask": $PUBLIC_NETMASK, "routes": $PUBLIC_ROUTES_DEFS }]' \
-	> ${TARGET_CONFIG_LOCATION}/provider.json
-fi

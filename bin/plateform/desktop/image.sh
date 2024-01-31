@@ -424,10 +424,10 @@ if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 	exit 1
 fi
 
-if [ -n "${SECOND_NETWORK_NAME}" ]; then
-	echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${TARGET_IMAGE}"
-	vmrest_network_add ${TARGET_IMAGE_UUID} ${SECOND_NETWORK_NAME} > /dev/null
-fi
+#if [ -n "${SECOND_NETWORK_NAME}" ]; then
+#	echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${TARGET_IMAGE}"
+#	vmrest_network_add ${TARGET_IMAGE_UUID} ${SECOND_NETWORK_NAME} > /dev/null
+#fi
 
 echo_blue_bold "Power On ${TARGET_IMAGE}"
 vmrest_poweron ${TARGET_IMAGE_UUID} > /dev/null

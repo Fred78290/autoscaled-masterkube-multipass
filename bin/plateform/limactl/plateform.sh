@@ -1,14 +1,7 @@
-if [ "${OSDISTRO}" == "Darwin" ]; then
-    VMWAREWM=".vmwarevm"
-    PATH=${HOME}/Library/DesktopAutoscalerUtility:${PATH}
-else
-    VMWAREWM=""
-    PATH=${HOME}/.local/vmware:${PATH}
-fi
-
 export TRACE_CURL=NO
 export TRACE_FILE_CURL="utility-$(date +%s).log"
 
+LIMA__ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n aarch64 || echo -n x86_64)
 CMD_MANDATORIES="helm kubectl vmrun vmrest jq yq cfssl ovftool kubernetes-desktop-autoscaler-utility vmware-vdiskmanager"
 
 AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)

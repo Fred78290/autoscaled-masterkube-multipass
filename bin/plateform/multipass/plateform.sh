@@ -1,11 +1,3 @@
-if [ "${OSDISTRO}" == "Darwin" ]; then
-    VMWAREWM=".vmwarevm"
-    PATH=${HOME}/Library/DesktopAutoscalerUtility:${PATH}
-else
-    VMWAREWM=""
-    PATH=${HOME}/.local/vmware:${PATH}
-fi
-
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl kubernetes-desktop-autoscaler-utility packer qemu-img"
 
 AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)

@@ -589,6 +589,7 @@ fi
 mkdir -p ${TARGET_CONFIG_LOCATION}
 mkdir -p ${TARGET_DEPLOY_LOCATION}
 mkdir -p ${TARGET_CLUSTER_LOCATION}
+mkdir -p ${TARGET_CONFIG_LOCATION}/cidata
 
 # If CERT doesn't exist, create one autosigned
 if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
@@ -676,8 +677,6 @@ system_info:
 	name: ${KUBERNETES_USER}
 EOF
 
-gzip -c9 <${TARGET_CONFIG_LOCATION}/vendordata.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/vendordata.base64
-
 IPADDRS=()
 NODE_IP=${NET_IP}
 
@@ -760,6 +759,10 @@ function create_vm() {
 	local DISK_SIZE=
 	local NUM_VCPUS=
 	local MEMSIZE=
+
+	mkdir -p ${TARGET_CONFIG_LOCATION}/cidata-${INDEX}
+
+	cp ${TARGET_CONFIG_LOCATION}/vendordata.yaml ${TARGET_CONFIG_LOCATION}/cidata-${INDEX}/vendor-data
 
 	MACHINE_TYPE=$(get_machine_type ${INDEX})
 	MASTERKUBE_NODE=$(get_vm_name ${INDEX})
@@ -858,14 +861,12 @@ EOF
 			fi
 		fi
 
-		echo ${NETWORK_DEFS} | jq . > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.json
-
 		# Cloud init meta-data
-		echo "#cloud-config" > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml
-		echo ${NETWORK_DEFS} | yq -p json -P - | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml > /dev/null
+		echo "#cloud-config" > ${TARGET_CONFIG_LOCATION}/cidata-${INDEX}/network-config
+		echo ${NETWORK_DEFS} | yq -p json -P - | tee ${TARGET_CONFIG_LOCATION}/cidata-${INDEX}/network-config > /dev/null
 
 		# Cloud init user-data
-		cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
+		cat > ${TARGET_CONFIG_LOCATION}/cidata-${INDEX}/user-data <<EOF
 #cloud-config
 package_update: true
 package_upgrade: true
@@ -878,14 +879,63 @@ runcmd:
 - echo "Create ${MASTERKUBE_NODE}" > /var/log/masterkube.log
 EOF
 
-		gzip -c9 <${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.json | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64
-		gzip -c9 <${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.base64
-
 		read MEMSIZE NUM_VCPUS DISK_SIZE <<<"$(jq -r --arg MACHINE ${MACHINE_TYPE} '.[$MACHINE]|.memsize,.vcpus,.disksize' templates/setup/${PLATEFORM}/machines.json | tr '\n' ' ')"
 
 		if [ -z "${MEMSIZE}" ] || [ -z "${NUM_VCPUS}" ] || [ -z "${DISK_SIZE}" ]; then
 			echo_red_bold "MACHINE_TYPE=${MACHINE_TYPE} MEMSIZE=${MEMSIZE} NUM_VCPUS=${NUM_VCPUS} DISK_SIZE=${DISK_SIZE} not correctly defined"
 			exit 1
+		fi
+
+		cat > ${TARGET_CONFIG_LOCATION}/config-${INDEX} <<EOF
+# ===================================================================== #
+# BASIC CONFIGURATION
+# ===================================================================== #
+# "default" corresponds to the host architecture.
+arch: $LIMA_ARCH
+
+# An image must support systemd and cloud-init.
+# Ubuntu and Fedora are known to work.
+# Default: none (must be specified)
+images:
+  # Try to use a local image first.
+  - location: ${TARGET_IMAGE}
+    arch: $LIMA_ARCH
+
+# CPUs: if you see performance issues, try limiting cpus to 1.
+# Default: 4
+# TODO: change the memory
+cpus: ${NUM_VCPUS}
+
+# Memory size
+# TODO: change the memory
+memory: "${MEMSIZE}GiB"
+
+# Disk size
+# TODO: change the storage size
+disk: "${DISK_SIZE}MiB"
+
+# ===================================================================== #
+# FURTHER ADVANCED CONFIGURATION
+# ===================================================================== #
+
+firmware:
+  # Use legacy BIOS instead of UEFI.
+  # Default: false
+  legacyBIOS: false
+
+video:
+  # QEMU display, e.g., "none", "cocoa", "sdl".
+  # As of QEMU v5.2, enabling this is known to have negative impact
+  # on performance on macOS hosts: https://gitlab.com/qemu-project/qemu/-/issues/334
+  # Default: "none"
+  display: none
+
+EOF
+
+		if [ ${OSDISTRO} == "Darwin" ]; then
+			hdiutil makehybrid -o ${TARGET_CONFIG_LOCATION}/cidata-${INDEX}.iso ${TARGET_CONFIG_LOCATION}/cidata-${INDEX} -iso -joliet 
+		else
+			mkisofs -o ${TARGET_CONFIG_LOCATION}/cidata-${INDEX}.iso ${TARGET_CONFIG_LOCATION}/cidata-${INDEX}
 		fi
 
 		echo_line

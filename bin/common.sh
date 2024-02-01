@@ -84,7 +84,7 @@ export MINNODES=0
 export NET_DNS=10.0.0.1
 export NET_DOMAIN=home
 export NET_GATEWAY=10.0.0.1
-export NET_IF=eth1
+export NET_IF=eth0
 export NET_IP=192.168.1.20
 export NET_MASK_CIDR=24
 export NET_MASK=255.255.255.0
@@ -130,6 +130,7 @@ export TARGET_IMAGE_AMI=
 export TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${SEED_ARCH}-${CONTAINER_ENGINE}"
 export TRANSPORT="tcp"
 export UNREMOVABLENODERECHECKTIMEOUT="1m"
+export UPDATE_PACKAGE=false
 export UPGRADE_CLUSTER=NO
 export USE_DHCP_ROUTES_PRIVATE=true
 export USE_DHCP_ROUTES_PUBLIC=true
@@ -486,9 +487,27 @@ function collect_cert_sans() {
 	echo -n "${TLS_SNA[*]}" | tr ' ' ','
 }
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function cidr_to_netmask() {
     value=$(( 0xffffffff ^ ((1 << (32 - $1)) - 1) ))
     echo "$(( (value >> 24) & 0xff )).$(( (value >> 16) & 0xff )).$(( (value >> 8) & 0xff )).$(( value & 0xff ))"
+}
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function ipv4() {
+	local INF=$1
+	local LOCAL_IPADDR=
+
+	if [ "${OSDISTRO}" == "Darwin" ]; then
+		read -a LOCAL_IPADDR <<< "$(ifconfig ${INF} | grep -m 1 "inet\s" | sed -n 1p)"
+	else
+		read -a LOCAL_IPADDR <<< "$(ip addr show ${INF} | grep -m 1 "inet\s" | tr '/' ' ' | cut -d ' ' -f 2 3)"
+	fi
+
+	echo -n "${LOCAL_IPADDR[1]}"
 }
 #===========================================================================================================================================
 #

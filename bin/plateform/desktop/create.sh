@@ -669,8 +669,8 @@ echo "${KUBERNETES_PASSWORD}" >${TARGET_CONFIG_LOCATION}/kubernetes-password.txt
 # Cloud init vendor-data
 cat >${TARGET_CONFIG_LOCATION}/vendordata.yaml <<EOF
 #cloud-config
-package_update: true
-package_upgrade: true
+package_update: ${UPDATE_PACKAGE}
+package_upgrade: ${UPDATE_PACKAGE}
 timezone: ${TZ}
 ssh_authorized_keys:
   - ${SSH_KEY}
@@ -814,7 +814,7 @@ EOF
 					--arg NET_GATEWAY ${NET_GATEWAY} \
 					--arg NODE_IP "${PUBLIC_NODE_IP}/${PUBLIC_MASK_CIDR}" \
 					--arg NET_DNS ${NET_DNS} \
-					'.|.network.ethernets += { "eth1": { "gateway4": $NET_GATEWAY, "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $NET_DNS ] } }')
+					'.|.network.ethernets += { "eth1": { "gateway4": $NET_GATEWAY, "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $NET_DNS ] } }}')
 			fi
 
 			if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
@@ -831,8 +831,8 @@ EOF
 		# Cloud init user-data
 		cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
 #cloud-config
-package_update: true
-package_upgrade: true
+package_update: ${UPDATE_PACKAGE}
+package_upgrade: ${UPDATE_PACKAGE}
 timezone: ${TZ}
 growpart:
   mode: auto
@@ -885,8 +885,9 @@ EOF
 					exit 1
 				fi
 
-				echo_title "Wait ssh ready on ${IPADDR}"
+				echo_title "Wait ssh ready on ${KUBERNETES_USER}@${IPADDR}"
 				wait_ssh_ready ${KUBERNETES_USER}@${IPADDR}
+
 				echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${IPADDR}"
 				eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
@@ -911,7 +912,7 @@ do
 
 	IPADDRS+=(${NODE_IP})
 
-		# Reserve 2 ip for potentiel HA cluster
+	# Reserve 2 ip for potentiel HA cluster
 	if [[ "${HA_CLUSTER}" == "false" ]] && [[ ${INDEX} = 0 ]]; then
 		NODE_IP=$(nextip ${NODE_IP})
 		NODE_IP=$(nextip ${NODE_IP})

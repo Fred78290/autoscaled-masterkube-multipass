@@ -2,7 +2,12 @@ export VMREST_URL=http://localhost:8697
 export VMREST_USERNAME=
 export VMREST_PASSWORD=
 export VMREST_INSECURE=true
-export VMREST_FOLDER="${HOME}/Virtual Machines.localized"
+
+if [ "$(uname -s)" == "Darwin" ]; then
+	VMREST_FOLDER="${HOME}/Virtual Machines.localized"
+else
+	VMREST_FOLDER="/vmware"
+fi
 
 export AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)
 

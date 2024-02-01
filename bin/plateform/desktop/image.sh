@@ -124,8 +124,8 @@ EOF
 
 cat > "${CACHE}/vendor-data" <<EOF
 #cloud-config
-package_upgrade: true
-package_update: true
+package_upgrade: false
+package_update: false
 packages:
   - jq
   - socat
@@ -284,7 +284,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 			exit -1
 		fi
 
-		echo_blue_bold "Wait ssh ready for ${IPADDR}"
+		echo_blue_bold "Wait ssh ready for ${SEED_USER}@${IPADDR}"
 		wait_ssh_ready ${SEED_USER}@${IPADDR}
 
 		echo_blue_bold "Update seed image ${SEED_IMAGE}"
@@ -435,7 +435,7 @@ vmrest_poweron ${TARGET_IMAGE_UUID} > /dev/null
 echo_blue_bold "Wait for IP from ${TARGET_IMAGE}"
 IPADDR=$(vmrest_waitip ${TARGET_IMAGE_UUID})
 
-echo_blue_bold "Wait ssh ready on ${IPADDR}"
+echo_blue_bold "Wait ssh ready on ${KUBERNETES_USER}@${IPADDR}"
 wait_ssh_ready ${KUBERNETES_USER}@${IPADDR}
 
 scp ${SCP_OPTIONS} "${CACHE}/prepare-image.sh" "${KUBERNETES_USER}@${IPADDR}:~"

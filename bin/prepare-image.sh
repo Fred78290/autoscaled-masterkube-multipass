@@ -142,7 +142,7 @@ EnvironmentFile=-/etc/systemd/system/k3s.server.env
 EnvironmentFile=-/etc/systemd/system/k3s.agent.env
 EnvironmentFile=-/etc/systemd/system/k3s.disabled.env
 ExecStart=
-ExecStart=/usr/local/bin/k3s $K3S_MODE $K3S_ARGS $K3S_SERVER_ARGS $K3S_AGENT_ARGS $K3S_DISABLE_ARGS $KUBELET_ARGS \
+ExecStart=/usr/local/bin/k3s $K3S_MODE $K3S_ARGS $K3S_SERVER_ARGS $K3S_AGENT_ARGS $K3S_DISABLE_ARGS $KUBELET_ARGS
 
 EOF
 

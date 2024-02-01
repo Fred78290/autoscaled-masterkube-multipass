@@ -165,3 +165,45 @@ function get_vmuuid() {
 function get_net_type() {
     echo -n $(vmrest_get_net_type $1)
 }
+
+function get_vmnet_subnet() {
+	local VMNETNUM=$1
+	local OSDISTRO="$(uname -s)"
+
+	VMNETNUM=${VMNETNUM:5}
+
+	if [ "${OSDISTRO}" == "Darwin" ]; then
+		NETWORKING_CONF="/Library/Preferences/VMware Fusion/networking"
+	else
+		NETWORKING_CONF="/etc/vmware/networking"
+	fi
+
+	set +u
+
+	$(grep VNET "${NETWORKING_CONF}" | sed -e 's/ /=/g' -e 's/answer=/export /g')
+
+	VNET_HOSTONLY_SUBNET=VNET_${VMNETNUM}_HOSTONLY_SUBNET
+	eval VNET_HOSTONLY_SUBNET=\$$VNET_HOSTONLY_SUBNET
+
+	VNET_DHCP=VNET_${VMNETNUM}_DHCP
+	eval VNET_DHCP=\$$VNET_DHCP
+
+	if [ "${VNET_DHCP}" == "yes" ]; then
+		VNET_HOSTONLY_SUBNET=${VNET_HOSTONLY_SUBNET%.*}
+	else
+		local INF=$(grep add_bridge_mapping "${NETWORKING_CONF}" | grep " ${VMNETNUM}" | cut -d ' ' -f 2)
+
+		if [ "${OSDISTRO}" == "Darwin" ]; then
+			read -a LOCAL_IPADDR <<< "$(ifconfig ${INF} | grep -m 1 "inet\s" | sed -n 1p)"
+		else
+			read -a LOCAL_IPADDR <<< "$(ip addr show ${INF} | grep -m 1 "inet\s" | tr '/' ' ')"
+		fi
+		
+		VNET_HOSTONLY_SUBNET="${LOCAL_IPADDR[1]}"
+		VNET_HOSTONLY_SUBNET=${VNET_HOSTONLY_SUBNET%.*}
+	fi
+
+	set -u
+
+	echo -n ${VNET_HOSTONLY_SUBNET}
+}

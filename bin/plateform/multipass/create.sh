@@ -671,8 +671,8 @@ echo "${KUBERNETES_PASSWORD}" >${TARGET_CONFIG_LOCATION}/kubernetes-password.txt
 # Cloud init vendor-data
 cat >${TARGET_CONFIG_LOCATION}/vendordata.yaml <<EOF
 #cloud-config
-package_update: true
-package_upgrade: true
+package_update: ${UPDATE_PACKAGE}
+package_upgrade: ${UPDATE_PACKAGE}
 timezone: ${TZ}
 ssh_authorized_keys:
   - ${SSH_KEY}
@@ -821,8 +821,8 @@ EOF
 		# Cloud init user-data
 		cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
 #cloud-config
-package_update: true
-package_upgrade: true
+package_update: ${UPDATE_PACKAGE}
+package_upgrade: ${UPDATE_PACKAGE}
 timezone: ${TZ}
 growpart:
   mode: auto

@@ -1337,15 +1337,8 @@ EOF
 
 		echo -n ${LAUNCHED_INSTANCE} | jq . > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json
 
-		echo_blue_bold "Wait for ssh ready on ${MASTERKUBE_NODE}, private-ip=${IPADDR}, ssh-ip=${SSHADDR}, public-ip=${PUBADDR}"
-
-		sleep 5
-
-		while :
-		do
-			ssh ${SSH_OPTIONS} -o ConnectTimeout=1 "${KUBERNETES_USER}@${SSHADDR}" sudo hostnamectl set-hostname "${MASTERKUBE_NODE}" 2>/dev/null && break
-			sleep 1
-		done
+		echo_title "Wait ssh ready on ${KUBERNETES_USER}@${SSHADDR}"
+		wait_ssh_ready ${KUBERNETES_USER}@${SSHADDR}
 
 		echo_blue_bold "SSH is ready on ${MASTERKUBE_NODE}, private-ip=${IPADDR}, ssh-ip=${SSHADDR}, public-ip=${PUBADDR}"
 	else

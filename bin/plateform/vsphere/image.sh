@@ -151,7 +151,7 @@ if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 		govc import.spec ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova \
 			| jq \
 				--arg GOVC_NETWORK "${PRIMARY_NETWORK_NAME}" \
-				'.NetworkMapping = [ { Name: $GOVC_NETWORK, Network: $GOVC_NETWORK } ]' \
+				'.NetworkMapping = [ { Name: "VM Network", Network: $GOVC_NETWORK } ]' \
 			> ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.spec
 		
 		cat ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.spec \

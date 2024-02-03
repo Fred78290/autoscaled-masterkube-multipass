@@ -64,12 +64,14 @@ During the process the script will create many files located in
 | `--memory-total` | Minimum and maximum number of gigabytes of memory in cluster, in the format <min>:<max>. Cluster autoscaler will not scale the cluster beyond these numbers. | 0:24 |
 | `--max-autoprovisioned-node-group-count` | The maximum number of autoprovisioned groups in the cluster | 1 |
 | `--scale-down-enabled` | Should CA scale down the cluster | true |
+| `--scale-down-utilization-threshold` | The maximum value between the sum of cpu requests and sum of memory requests of all pods running on the node divided by node's corresponding allocatable resource, below which a node can be considered for scale down. This value is a floating point number that can range between zero and one. | 0.5 |
+| `--scale-down-gpu-utilization-threshold` | Sum of gpu requests of all pods running on the node divided by node's allocatable resource, below which a node can be considered for scale down. Utilization calculation only cares about gpu resource for accelerator node. cpu and memory utilization will be ignored. | 0.5 |
 | `--scale-down-delay-after-add` | How long after scale up that scale down evaluation resumes | 1 minutes |
 | `--scale-down-delay-after-delete` | How long after node deletion that scale down evaluation resumes, defaults to scan-interval | 1 minutes |
 | `--scale-down-delay-after-failure` | How long after scale down failure that scale down evaluation resumes | 1 minutes |
 | `--scale-down-unneeded-time` | How long a node should be unneeded before it is eligible for scale down | 1 minutes |
 | `--scale-down-unready-time` | How long an unready node should be unneeded before it is eligible for scale down | 1 minutes |
-| `--unremovable-node-recheck-timeout` | The timeout before we check again a node that couldn't be removed before | 1 minutes
+| `--unremovable-node-recheck-timeout` | The timeout before we check again a node that couldn't be removed before | 1 minutes |
 
 ## Raise autoscaling
 

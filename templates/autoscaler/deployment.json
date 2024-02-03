@@ -90,7 +90,7 @@
 							"--config=/etc/cluster/autoscaler.json",
 							"--machines=/etc/cluster/machines.json",
 							"--provider=${PLATEFORM}",
-							"--provider-congig=/etc/cluster/provider.json",
+							"--provider-config=/etc/cluster/provider.json",
 							"--save=/var/run/cluster-autoscaler/state.json",
 							"--log-level=info"
 						],
@@ -148,6 +148,8 @@
 							"--memory-total=${MEMORYTOTAL}",
 							"--node-autoprovisioning-enabled",
 							"--max-autoprovisioned-node-group-count=${MAXAUTOPROVISIONNEDNODEGROUPCOUNT}",
+							"--scale-down-utilization-threshold=${SCALEDOWNUTILIZATIONTHRESHOLD}",
+							"--scale-down-gpu-utilization-threshold=${SCALEDOWNGPUUTILIZATIONTHRESHOLD}",
 							"--scale-down-enabled=${SCALEDOWNENABLED}",
 							"--scale-down-delay-after-add=${SCALEDOWNDELAYAFTERADD}",
 							"--scale-down-delay-after-delete=${SCALEDOWNDELAYAFTERDELETE}",

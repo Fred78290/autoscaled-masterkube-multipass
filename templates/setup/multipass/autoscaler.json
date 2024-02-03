@@ -55,5 +55,11 @@
 		"wait-ssh-ready-seconds": 180,
 		"user": "${KUBERNETES_USER}",
 		"ssh-private-key": "${SSH_PRIVATE_KEY_LOCAL}"
+	},
+	"autoscaling-options": {
+		"scaleDownUtilizationThreshold": ${SCALEDOWNUTILIZATIONTHRESHOLD},
+		"scaleDownGpuUtilizationThreshold": ${SCALEDOWNGPUUTILIZATIONTHRESHOLD},
+		"scaleDownUnneededTime": "${SCALEDOWNUNEEDEDTIME}",
+		"scaleDownUnreadyTime": "${SCALEDOWNUNREADYTIME}",
 	}
 }

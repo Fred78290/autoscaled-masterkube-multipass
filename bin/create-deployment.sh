@@ -1,25 +1,36 @@
 # Recopy config file on master node
 EXTERNAL_DNS_TARGET="${MASTERKUBE}.${DOMAIN_NAME}"
 
+mkdir -p ${TARGET_DEPLOY_LOCATION}/configmap
+mkdir -p ${TARGET_DEPLOY_LOCATION}/secrets
+
 kubectl create configmap config-cluster-autoscaler -n kube-system --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	--from-file ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} \
 	--from-file ${TARGET_CONFIG_LOCATION}/provider.json \
 	--from-file ${TARGET_CONFIG_LOCATION}/machines.json \
-	--from-file ${TARGET_CONFIG_LOCATION}/autoscaler.json | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+	--from-file ${TARGET_CONFIG_LOCATION}/autoscaler.json \
+	| tee ${TARGET_DEPLOY_LOCATION}/configmap/config-cluster-autoscaler.yaml \
+	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 kubectl create configmap kubernetes-pki -n kube-system --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--from-file ${TARGET_CLUSTER_LOCATION}/kubernetes/pki | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+	--from-file ${TARGET_CLUSTER_LOCATION}/kubernetes/pki \
+	| tee ${TARGET_DEPLOY_LOCATION}/configmap/kubernetes-pki.yaml \
+	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 if [ "${EXTERNAL_ETCD}" = "true" ]; then
 	kubectl create secret generic etcd-ssl -n kube-system --dry-run=client -o yaml \
 		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-		--from-file ${TARGET_CLUSTER_LOCATION}/etcd/ssl | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+		--from-file ${TARGET_CLUSTER_LOCATION}/etcd/ssl \
+		| tee ${TARGET_DEPLOY_LOCATION}/secrets/etcd-ssl.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 else
 	kubectl create secret generic etcd-ssl -n kube-system --dry-run=client -o yaml \
 		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-		--from-file ${TARGET_CLUSTER_LOCATION}/kubernetes/pki/etcd | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+		--from-file ${TARGET_CLUSTER_LOCATION}/kubernetes/pki/etcd \
+		| tee ${TARGET_DEPLOY_LOCATION}/secrets/etcd-ssl.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 fi
 
 if [ ${PLATEFORM} == "multipass" ] || [ ${PLATEFORM} == "desktop" ]; then
@@ -28,10 +39,12 @@ if [ ${PLATEFORM} == "multipass" ] || [ ${PLATEFORM} == "desktop" ]; then
 		--from-file $(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientKey) \
 		--from-file $(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientCertificate) \
 		--from-file $(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .Certificate) \
+		| tee ${TARGET_DEPLOY_LOCATION}/secrets/autoscaler-utility-cert.yaml \
 		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 else
 	kubectl create secret generic autoscaler-utility-cert -n kube-system --dry-run=client -o yaml \
 		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		| tee ${TARGET_DEPLOY_LOCATION}/secrets/autoscaler-utility-cert.yaml \
 		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 fi
 
@@ -101,17 +114,24 @@ fi
 # Add cluster config in configmap
 kubectl create configmap cluster -n ${NODEGROUP_NAME} --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--from-file ${TARGET_CLUSTER_LOCATION}/ | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+	--from-file ${TARGET_CLUSTER_LOCATION}/ \
+	| tee ${TARGET_DEPLOY_LOCATION}/configmap/cluster.yaml \
+	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 kubectl create configmap config -n ${NODEGROUP_NAME} --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--from-file ${TARGET_CONFIG_LOCATION} | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+	--from-file ${TARGET_CONFIG_LOCATION} \
+	| tee ${TARGET_DEPLOY_LOCATION}/configmap/config.yaml \
+	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 # Save deployment template
 pushd ${TARGET_DEPLOY_LOCATION} &>/dev/null
 	for DIR in $((ls -1 -d */ 2>/dev/null || true) | tr -d '/')
 	do
 		kubectl create configmap ${DIR} -n ${NODEGROUP_NAME} --dry-run=client -o yaml \
-			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config --from-file ${DIR} | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+			--from-file ${DIR} \
+			| tee ${TARGET_DEPLOY_LOCATION}/configmap/${DIR}.yaml \
+			| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 	done
 popd &>/dev/null

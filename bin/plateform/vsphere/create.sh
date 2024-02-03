@@ -318,6 +318,14 @@ while true; do
 		SCALEDOWNDELAYAFTERFAILURE="$2"
 		shift 2
 		;;
+	--scale-down-utilization-threshold)
+		SCALEDOWNUTILIZATIONTHRESHOLD="$2"
+		shift 2
+		;;
+	--scale-down-gpu-utilization-threshold)
+		SCALEDOWNGPUUTILIZATIONTHRESHOLD="$2"
+		shift 2
+		;;
 	--scale-down-unneeded-time)
 		SCALEDOWNUNEEDEDTIME="$2"
 		shift 2
@@ -874,7 +882,7 @@ EOF
 		if [ -n "${VC_NETWORK_PUBLIC}" ]; then
 			echo_blue_bold "Add second network card ${VC_NETWORK_PUBLIC} on ${MASTERKUBE_NODE}"
 
-			govc vm.network.add -vm "${MASTERKUBE_NODE}" -net="${VC_NETWORK_PUBLIC}" -net.adapter="${vmxnet3}"
+			govc vm.network.add -vm "${MASTERKUBE_NODE}" -net="${VC_NETWORK_PUBLIC}" -net.adapter="vmxnet3"
 		fi
 
 		echo_title "Power On ${MASTERKUBE_NODE}"

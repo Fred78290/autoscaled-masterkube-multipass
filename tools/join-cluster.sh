@@ -246,25 +246,32 @@ EOF
 elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 	ANNOTE_MASTER=true
 
-	if [ -z "${PROVIDERID}" ]; then
-		echo "K3S_ARGS='--kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --server=https://${MASTER_IP} --token=${TOKEN}'" > /etc/systemd/system/k3s.service.env
-	else
-		echo "K3S_ARGS='--kubelet-arg=provider-id=${PROVIDERID} --kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --server=https://${MASTER_IP} --token=${TOKEN}'" > /etc/systemd/system/k3s.service.env
+	K3S_MODE=agent
+	K3S_ARGS="--kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --server=https://${MASTER_IP} --token=${TOKEN}"
+	K3S_DISABLE_ARGS=--disable-apiserver-lb
+	K3S_SERVER_ARGS=
+
+	if [ -n "${PROVIDERID}" ]; then
+		K3S_ARGS="${K3S_ARGS} --kubelet-arg=provider-id=${PROVIDERID}"
 	fi
 
 	if [ "${HA_CLUSTER}" = "true" ]; then
-		echo "K3S_MODE=server" > /etc/default/k3s
+		K3S_MODE=server
+		K3S_DISABLE_ARGS="--disable=servicelb --disable=traefik --disable=metrics-server"
 
 		if [ "${CLOUD_PROVIDER}" == "external" ]; then
-			echo "K3S_DISABLE_ARGS='--disable-cloud-controller --disable=servicelb --disable=traefik --disable=metrics-server'" > /etc/systemd/system/k3s.disabled.env
-		else
-			echo "K3S_DISABLE_ARGS='--disable=servicelb --disable=traefik --disable=metrics-server'" > /etc/systemd/system/k3s.disabled.env
+			K3S_DISABLE_ARGS="${K3S_DISABLE_ARGS} --disable-cloud-controller"
 		fi
 
 		if [ "${EXTERNAL_ETCD}" == "true" ] && [ -n "${ETCD_ENDPOINT}" ]; then
-			echo "K3S_SERVER_ARGS='--datastore-endpoint=${ETCD_ENDPOINT} --datastore-cafile /etc/etcd/ssl/ca.pem --datastore-certfile /etc/etcd/ssl/etcd.pem --datastore-keyfile /etc/etcd/ssl/etcd-key.pem'" > /etc/systemd/system/k3s.server.env
+			K3S_SERVER_ARGS="--datastore-endpoint=${ETCD_ENDPOINT} --datastore-cafile /etc/etcd/ssl/ca.pem --datastore-certfile /etc/etcd/ssl/etcd.pem --datastore-keyfile /etc/etcd/ssl/etcd-key.pem"
 		fi
 	fi
+
+	echo "K3S_MODE=${K3S_MODE}" > /etc/default/k3s
+	echo "K3S_ARGS='${K3S_ARGS}'" > /etc/systemd/system/k3s.service.env
+	echo "K3S_DISABLE_ARGS='${K3S_DISABLE_ARGS}'" > /etc/systemd/system/k3s.disabled.env
+	echo "K3S_SERVER_ARGS='${K3S_SERVER_ARGS}'" > /etc/systemd/system/k3s.server.env
 
 	echo -n "Start k3s service"
 

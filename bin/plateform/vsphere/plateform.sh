@@ -2,14 +2,6 @@ CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl govc"
 VC_NETWORK_PRIVATE="VM Private"
 VC_NETWORK_PUBLIC="VM Network"
 
-if [ "${OSDISTRO}" == "Darwin" ]; then
-    VMWAREWM=".vmwarevm"
-    PATH=${HOME}/Library/DesktopAutoscalerUtility:${PATH}
-else
-    VMWAREWM=""
-    PATH=${HOME}/.local/vmware:${PATH}
-fi
-
 if [ "${GOVC_INSECURE}" == "1" ]; then
 	export INSECURE=true
 else

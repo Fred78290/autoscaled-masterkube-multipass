@@ -30,7 +30,7 @@ export CERT_ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID}
 export CERT_SELFSIGNED=NO
 export CLOUD_IMAGES_UBUNTU=cloud-images.ubuntu.com
 export CLOUD_PROVIDER_CONFIG=
-export CLOUD_PROVIDER=
+export CLOUD_PROVIDER=external
 export CNI_PLUGIN=flannel
 export CNI_VERSION=v1.4.0
 export CONFIGURATION_LOCATION=${PWD}
@@ -81,7 +81,7 @@ export MAXTOTALNODES=${MAXNODES}
 export MEMORYTOTAL="0:48"
 export METALLB_IP_RANGE=10.0.0.100-10.0.0.127
 export MINNODES=0
-export NET_DNS=10.0.0.1
+export NET_DNS=10.0.0.5
 export NET_DOMAIN=home
 export NET_GATEWAY=10.0.0.1
 export NET_IF=eth0
@@ -112,6 +112,8 @@ export SCALEDOWNDELAYAFTERFAILURE="1m"
 export SCALEDOWNENABLED="true"
 export SCALEDOWNUNEEDEDTIME="1m"
 export SCALEDOWNUNREADYTIME="1m"
+export SCALEDOWNUTILIZATIONTHRESHOLD="0.5"
+export SCALEDOWNGPUUTILIZATIONTHRESHOLD="0.5"
 export SEED_ARCH=amd64
 export SEED_IMAGE="${DISTRO}-server-cloudimg-seed"
 export SEED_USER=ubuntu
@@ -172,6 +174,12 @@ export TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}
 export TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
 export PLATEFORMDEFS=${CURDIR}/plateform/${PLATEFORM}/vars.def
+
+if [ "${OSDISTRO}" == "Darwin" ]; then
+    export VMWAREWM=".vmwarevm"
+else
+    export VMWAREWM=""
+fi
 
 # Check if passord is defined
 if [ -z ${KUBERNETES_PASSWORD} ]; then
@@ -255,6 +263,8 @@ Options are:
 --memory-total=<value>                           # autoscaler flag, default: ${MEMORYTOTAL}
 --max-autoprovisioned-node-group-count=<value>   # autoscaler flag, default: ${MAXAUTOPROVISIONNEDNODEGROUPCOUNT}
 --scale-down-enabled=<value>                     # autoscaler flag, default: ${SCALEDOWNENABLED}
+--scale-down-utilization-threshold=<value>       # autoscaler flag, default: ${SCALEDOWNUTILIZATIONTHRESHOLD}
+--scale-down-gpu-utilization-threshold=<value>   # autoscaler flag, default: ${SCALEDOWNGPUUTILIZATIONTHRESHOLD}
 --scale-down-delay-after-add=<value>             # autoscaler flag, default: ${SCALEDOWNDELAYAFTERADD}
 --scale-down-delay-after-delete=<value>          # autoscaler flag, default: ${SCALEDOWNDELAYAFTERDELETE}
 --scale-down-delay-after-failure=<value>         # autoscaler flag, default: ${SCALEDOWNDELAYAFTERFAILURE}

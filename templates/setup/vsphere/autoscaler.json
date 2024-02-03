@@ -1,5 +1,6 @@
 {
-	"use-external-etcd": ${EXTERNAL_ETCD},
+	"use-external-etcd": ${EXTERNAL_ETCD
+	},
 	"src-etcd-ssl-dir": "/etc/etcd/ssl",
 	"dst-etcd-ssl-dir": "${ETCD_DST_DIR}",
 	"distribution": "${KUBERNETES_DISTRO}",
@@ -8,9 +9,12 @@
 	"kubernetes-pki-dstdir": "/etc/kubernetes/pki",
 	"listen": "${LISTEN}",
 	"secret": "${PLATEFORM}",
-	"minNode": ${MINNODES},
-	"maxNode": ${MAXNODES},
-	"maxPods": ${MAX_PODS},
+	"minNode": ${MINNODES
+	},
+	"maxNode": ${MAXNODES
+	},
+	"maxPods": ${MAX_PODS
+	},
 	"maxNode-per-cycle": 2,
 	"node-name-prefix": "autoscaled",
 	"managed-name-prefix": "managed",
@@ -33,7 +37,8 @@
 			"--ignore-preflight-errors=All"
 		],
 		"datastore-endpoint": "${ETCD_ENDPOINT}",
-		"delete-credentials-provider": ${DELETE_CREDENTIALS_CONFIG},
+		"delete-credentials-provider": ${DELETE_CREDENTIALS_CONFIG
+		},
 		"extras-commands": []
 	},
 	"default-machine": "${AUTOSCALE_MACHINE}",
@@ -55,5 +60,11 @@
 		"wait-ssh-ready-seconds": 180,
 		"user": "${KUBERNETES_USER}",
 		"ssh-private-key": "${SSH_PRIVATE_KEY_LOCAL}"
+	},
+	"autoscaling-options": {
+		"scaleDownUtilizationThreshold": ${SCALEDOWNUTILIZATIONTHRESHOLD},
+		"scaleDownGpuUtilizationThreshold": ${SCALEDOWNGPUUTILIZATIONTHRESHOLD},
+		"scaleDownUnneededTime": "${SCALEDOWNUNEEDEDTIME}",
+		"scaleDownUnreadyTime": "${SCALEDOWNUNREADYTIME}",
 	}
 }

@@ -57,6 +57,8 @@ OPTIONS=(
 	"memory-total:"
 	"max-autoprovisioned-node-group-count:"
 	"scale-down-enabled:"
+	"scale-down-utilization-threshold:"
+	"scale-down-gpu-utilization-threshold:"
 	"scale-down-delay-after-add:"
 	"scale-down-delay-after-delete:"
 	"scale-down-delay-after-failure:"

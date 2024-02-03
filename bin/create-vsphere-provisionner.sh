@@ -1,11 +1,6 @@
 #!/bin/bash
 
 # Following from: https://cloud-provider-vsphere.sigs.k8s.io/tutorials/kubernetes-on-vsphere-with-kubeadm.html
-function echo_red_bold() {
-	# echo message in blue and bold
-	>&2 echo -e "\x1B[90m= $(date '+%Y-%m-%d %T') \x1B[31m\x1B[1m\x1B[31m$1\x1B[0m\x1B[39m"
-}
-
 CURDIR=$(dirname $0)
 
 pushd ${CURDIR}/../ &>/dev/null
@@ -19,11 +14,6 @@ fi
 
 IFS=. read VERSION MAJOR MINOR <<<"${KUBERNETES_VERSION%%+*}"
 VSPHERE_CLOUD_RELEASE="${VERSION}.${MAJOR}.0"
-
-if [ "${VSPHERE_CLOUD_RELEASE}" == "v1.29.0" ]; then
-  echo_red_bold "Temp hack, Kubernetes vSphere Cloud Provider ${VSPHERE_CLOUD_RELEASE} not yet released, use 1.28.0"
-  VSPHERE_CLOUD_RELEASE="v1.28.0"
-fi
 
 if [ -z "$(govc role.ls CNS-DATASTORE | grep 'Datastore.FileManagement')" ]; then
 	ROLES="CNS-DATASTORE:Datastore.FileManagement,System.Anonymous,System.Read,System.View
@@ -154,8 +144,40 @@ stringData:
   ${VCENTER}.password: ${GOVC_PASSWORD}
 EOF
 
-sed -e "s/__REPLICAS__/${REPLICAS}/g" -e "s/__ANNOTE_MASTER__/${ANNOTE_MASTER}/g" ${KUBERNETES_TEMPLATE}/vsphere-csi-driver.yaml > ${ETC_DIR}/vsphere-csi-driver.yaml
-sed -e "s/__VSPHERE_CLOUD_RELEASE__/${VSPHERE_CLOUD_RELEASE}/g" -e "s/__ANNOTE_MASTER__/${ANNOTE_MASTER}/g" ${KUBERNETES_TEMPLATE}/vsphere-cloud-controller-manager-ds.yaml > ${ETC_DIR}/vsphere-cloud-controller-manager-ds.yaml
+cat <<EOF >> ${ETC_DIR}/server.conf
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+prompt = no
+[req_distinguished_name]
+CN = vsphere-webhook-svc.vmware-system-csi.svc
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth, serverAuth
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = vsphere-webhook-svc
+DNS.2 = vsphere-webhook-svc.vmware-system-csi
+DNS.3 = vsphere-webhook-svc.vmware-system-csi.svc
+EOF
+
+# Generate the CA cert and private key
+openssl req -nodes -new -x509 -keyout "${ETC_DIR}"/ca.key -days 1800 -out "${ETC_DIR}"/ca.crt -subj "/CN=vSphere CSI Admission Controller Webhook CA"
+openssl genrsa -out "${ETC_DIR}"/webhook-server-tls.key 2048
+openssl req -new -key "${ETC_DIR}"/webhook-server-tls.key \
+	-subj "/CN=${service}.vmware-system-csi.svc" \
+	-config "${ETC_DIR}"/server.conf \
+	| openssl x509 -req -CA "${ETC_DIR}"/ca.crt -CAkey "${ETC_DIR}"/ca.key -days $((validity-1)) -CAcreateserial -out "${ETC_DIR}"/webhook-server-tls.crt -extensions v3_req -extfile "${ETC_DIR}"/server.conf
+
+cat <<EOF >"${ETC_DIR}"/webhook.config
+[WebHookConfig]
+port = "8443"
+cert-file = "/run/secrets/tls/tls.crt"
+key-file = "/run/secrets/tls/tls.key"
+EOF
+
+CA_BUNDLE="$(openssl base64 -A < "${ETC_DIR}/ca.crt")"
 
 kubectl create ns vmware-system-csi --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
@@ -172,13 +194,35 @@ kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	-f ${KUBERNETES_TEMPLATE}/cloud-controller-manager-role-bindings.yaml
 
-kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	-f ${ETC_DIR}/vsphere-cloud-controller-manager-ds.yaml
-
 kubectl create secret generic vsphere-config-secret -n vmware-system-csi --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-  --from-file=${ETC_DIR}/csi-vsphere.conf | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
-
-kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f ${ETC_DIR}/vsphere-csi-driver.yaml
+	--from-file=${ETC_DIR}/csi-vsphere.conf | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f ${ETC_DIR}/vsphere-csi-storage-class.yaml
+
+cat ${KUBERNETES_TEMPLATE}/vsphere-csi-driver.yaml | sed \
+	-e "s/__REPLICAS__/${REPLICAS}/g" \
+	-e "s/__ANNOTE_MASTER__/${ANNOTE_MASTER}/g" \
+	| tee ${ETC_DIR}/vsphere-csi-driver.yaml \
+	| kubectl --kubeconfig=${TARGET_CLUSTER_LOCATION}/config apply -f -
+
+cat ${KUBERNETES_TEMPLATE}/vsphere-cloud-controller-manager-ds.yaml | sed \
+	-e "s/__VSPHERE_CLOUD_RELEASE__/${VSPHERE_CLOUD_RELEASE}/g" \
+	-e "s/__ANNOTE_MASTER__/${ANNOTE_MASTER}/g" \
+	| tee ${ETC_DIR}/vsphere-cloud-controller-manager-ds.yaml \
+	| kubectl --kubeconfig=${TARGET_CLUSTER_LOCATION}/config apply -f -
+
+# create the secret with CA cert and server cert/key
+kubectl create secret generic vsphere-webhook-certs -n vmware-system-csi \
+	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+	--from-file=tls.key="${ETC_DIR}"/webhook-server-tls.key \
+	--from-file=tls.crt="${ETC_DIR}"/webhook-server-tls.crt \
+	--from-file=webhook.config="${ETC_DIR}"/webhook.config \
+	--dry-run=client -o yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+
+cat ${KUBERNETES_TEMPLATE}/validatingwebhook.yaml | sed \
+	-e "s/__REPLICAS__/${REPLICAS}/g" \
+	-e "s/__ANNOTE_MASTER__/${ANNOTE_MASTER}/g" \
+	-e "s/caBundle: .*$/caBundle: ${CA_BUNDLE}/g" \
+	| tee ${ETC_DIR}/validatingwebhook.yaml \
+	| kubectl --kubeconfig=${TARGET_CLUSTER_LOCATION}/config apply -f -

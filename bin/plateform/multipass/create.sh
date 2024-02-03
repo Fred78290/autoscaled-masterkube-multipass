@@ -318,6 +318,14 @@ while true; do
 		SCALEDOWNDELAYAFTERFAILURE="$2"
 		shift 2
 		;;
+	--scale-down-utilization-threshold)
+		SCALEDOWNUTILIZATIONTHRESHOLD="$2"
+		shift 2
+		;;
+	--scale-down-gpu-utilization-threshold)
+		SCALEDOWNGPUUTILIZATIONTHRESHOLD="$2"
+		shift 2
+		;;
 	--scale-down-unneeded-time)
 		SCALEDOWNUNEEDEDTIME="$2"
 		shift 2

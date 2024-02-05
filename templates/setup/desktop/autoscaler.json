@@ -3,7 +3,7 @@
 	"src-etcd-ssl-dir": "/etc/etcd/ssl",
 	"dst-etcd-ssl-dir": "${ETCD_DST_DIR}",
 	"distribution": "${KUBERNETES_DISTRO}",
-	"cloud-provider": "${PLATEFORM}",
+	"plateform": "${PLATEFORM}",
 	"kubernetes-pki-srcdir": "/etc/kubernetes/pki",
 	"kubernetes-pki-dstdir": "/etc/kubernetes/pki",
 	"listen": "${LISTEN}",
@@ -60,6 +60,6 @@
 		"scaleDownUtilizationThreshold": ${SCALEDOWNUTILIZATIONTHRESHOLD},
 		"scaleDownGpuUtilizationThreshold": ${SCALEDOWNGPUUTILIZATIONTHRESHOLD},
 		"scaleDownUnneededTime": "${SCALEDOWNUNEEDEDTIME}",
-		"scaleDownUnreadyTime": "${SCALEDOWNUNREADYTIME}",
+		"scaleDownUnreadyTime": "${SCALEDOWNUNREADYTIME}"
 	}
 }

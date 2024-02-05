@@ -85,6 +85,7 @@ time {
 		if [ -z "${ARG}" ]; then
 			break
 		elif [[ "${ARG}" = --trace ]] || [[ "${ARG}" = -x ]]; then
+			ARGS+=("${ARG}" )
 			TRACE=YES
 			shift
 		elif [[ "${ARG}" = --plateform* ]] || [[ "${ARG}" = -p* ]]; then

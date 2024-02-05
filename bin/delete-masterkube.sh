@@ -127,6 +127,10 @@ else
 	FORCE=YES
 fi
 
+if [ ! -f ${TARGET_CLUSTER_LOCATION}/config ]; then
+	FORCE=YES
+fi
+
 if [ "${FORCE}" = "YES" ]; then
 	delete_all_vms
 elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
@@ -153,16 +157,12 @@ fi
 delete_host "${MASTERKUBE}"
 delete_host "masterkube-${PLATEFORM}"
 
-if [ -n "${TARGET_CLUSTER_LOCATION}" ]; then
-	rm -rf ${TARGET_CLUSTER_LOCATION}
+if [ -n "${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}" ]; then
+	rm -rf "${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}"
 fi
 
-if [ -n "${TARGET_CONFIG_LOCATION}" ]; then
-	rm -rf ${TARGET_CONFIG_LOCATION}
-fi
-
-if [ -n "${TARGET_DEPLOY_LOCATION}" ]; then
-	rm -rf ${TARGET_DEPLOY_LOCATION}
+if [ -n "${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}" ]; then
+	rm -rf "${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}"
 fi
 
 popd &>/dev/null

@@ -500,6 +500,7 @@ nodeRegistration:
 ---
 kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1
+address: ${APISERVER_ADVERTISE_ADDRESS}
 authentication:
   anonymous:
     enabled: false

@@ -104,6 +104,7 @@ while true; do
 		shift 1
 		;;
 	-x|--trace)
+		TRACE_ARGS=--trace
 		set -x
 		shift 1
 		;;
@@ -1573,12 +1574,15 @@ function start_kubernes_on_instances() {
 
 					eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/*  ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 
-					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
+					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
 						--plateform=${PLATEFORM} \
 						--cloud-provider=external \
 						--control-plane-endpoint=${CONTROL_PLANE_ENDPOINT} \
 						--cluster-nodes="${CLUSTER_NODES}" \
 						--k8s-distribution=${KUBERNETES_DISTRO} \
+						--kubernetes-version="${KUBERNETES_VERSION}" \
+						--container-runtime=${CONTAINER_ENGINE} \
+						--cni-plugin=${CNI_PLUGIN} \
 						--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 						--join-master=${MASTER_IP} \
 						--tls-san="${CERT_SANS}" \
@@ -1592,7 +1596,7 @@ function start_kubernes_on_instances() {
 				elif [ ${INDEX} = ${CONTROLNODE_INDEX} ]; then
 					echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} instance master node number ${NODEINDEX} in cluster mode, kubernetes version=${KUBERNETES_VERSION}"
 
-					ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
+					ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
 						--plateform=${PLATEFORM} \
 						--cloud-provider=external \
 						--plateform=${PLATEFORM} \
@@ -1631,12 +1635,15 @@ function start_kubernes_on_instances() {
 
 					eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/*  ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 
-					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
+					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
 						--plateform=${PLATEFORM} \
 						--cloud-provider=external \
 						--control-plane-endpoint=${CONTROL_PLANE_ENDPOINT} \
 						--cluster-nodes="${CLUSTER_NODES}" \
 						--k8s-distribution=${KUBERNETES_DISTRO} \
+						--kubernetes-version="${KUBERNETES_VERSION}" \
+						--container-runtime=${CONTAINER_ENGINE} \
+						--cni-plugin=${CNI_PLUGIN} \
 						--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 						--max-pods=${MAX_PODS} \
 						--join-master=${MASTER_IP} \
@@ -1665,7 +1672,7 @@ function start_kubernes_on_instances() {
 				elif [ ${INDEX} = ${CONTROLNODE_INDEX} ]; then
 					echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} single instance master node number ${NODEINDEX}, kubernetes version=${KUBERNETES_VERSION}"
 
-					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
+					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
 						--plateform=${PLATEFORM} \
 						--cloud-provider=external \
 						--k8s-distribution=${KUBERNETES_DISTRO} \
@@ -1696,12 +1703,15 @@ function start_kubernes_on_instances() {
 
 					eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/*  ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 
-					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
+					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
 						--plateform=${PLATEFORM} \
 						--cloud-provider=external \
 						--control-plane-endpoint=${CONTROL_PLANE_ENDPOINT} \
 						--cluster-nodes="${CLUSTER_NODES}" \
 						--k8s-distribution=${KUBERNETES_DISTRO} \
+						--kubernetes-version="${KUBERNETES_VERSION}" \
+						--container-runtime=${CONTAINER_ENGINE} \
+						--cni-plugin=${CNI_PLUGIN} \
 						--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 						--tls-san="${CERT_SANS}" \
 						--max-pods=${MAX_PODS} \

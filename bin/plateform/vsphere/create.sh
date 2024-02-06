@@ -95,6 +95,7 @@ while true; do
 		shift 1
 		;;
 	-x|--trace)
+		TRACE_ARGS=--trace
 		set -x
 		shift 1
 		;;
@@ -1056,7 +1057,7 @@ do
 			else
 				echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} single instance master node, kubernetes version=${KUBERNETES_VERSION}"
 
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
 					--plateform=${PLATEFORM} \
 					--cloud-provider=${CLOUD_PROVIDER} \
 					--k8s-distribution=${KUBERNETES_DISTRO} \
@@ -1088,7 +1089,7 @@ do
 			if [ ${NODEINDEX} = 0 ]; then
 				echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} instance master node number ${INDEX}, kubernetes version=${KUBERNETES_VERSION}"
 
-				ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
+				ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
 					--plateform=${PLATEFORM} \
 					--cloud-provider=${CLOUD_PROVIDER} \
 					--k8s-distribution=${KUBERNETES_DISTRO} \
@@ -1130,10 +1131,13 @@ do
 
 				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
 					--plateform=${PLATEFORM} \
 					--cloud-provider=${CLOUD_PROVIDER} \
 					--k8s-distribution=${KUBERNETES_DISTRO} \
+					--kubernetes-version="${KUBERNETES_VERSION}" \
+					--container-runtime=${CONTAINER_ENGINE} \
+					--cni-plugin=${CNI_PLUGIN} \
 					--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 					--csi-region=${REGION} \
 					--csi-zone=${ZONEID} \
@@ -1152,10 +1156,13 @@ do
 
 				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
 					--plateform=${PLATEFORM} \
 					--cloud-provider=${CLOUD_PROVIDER} \
 					--k8s-distribution=${KUBERNETES_DISTRO} \
+					--kubernetes-version="${KUBERNETES_VERSION}" \
+					--container-runtime=${CONTAINER_ENGINE} \
+					--cni-plugin=${CNI_PLUGIN} \
 					--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 					--csi-region=${REGION} \
 					--csi-zone=${ZONEID} \

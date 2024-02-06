@@ -1,17 +1,23 @@
 #!/bin/bash
+APISERVER_ADVERTISE_PORT=6443
 CERT_SANS=
 CLOUD_PROVIDER=
 CLUSTER_DIR=/etc/cluster
+CLUSTER_DNS="10.96.0.10"
 CLUSTER_NODES=()
+CNI_PLUGIN=flannel
 CONTROL_PLANE_ENDPOINT_ADDR=
 CONTROL_PLANE_ENDPOINT=
 DELETE_CREDENTIALS_CONFIG=NO
 ETCD_ENDPOINT=
 EXTERNAL_ETCD=NO
+FILL_ETC_HOSTS=YES
 HA_CLUSTER=false
 INSTANCEID=
 INSTANCENAME=${HOSTNAME}
+KUBEADM_CONFIG=/etc/kubernetes/kubeadm-config.yaml
 KUBERNETES_DISTRO=kubeadm
+KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 MASTER_IP=$(cat ./cluster/manager-ip)
 MASTER_NODE_ALLOW_DEPLOYMENT=NO
 MAX_PODS=110
@@ -19,12 +25,13 @@ NET_IF=$(ip route get 1|awk '{print $5;exit}')
 NODEGROUP_NAME=
 NODEINDEX=0
 NODENAME=${HOSTNAME}
+POD_NETWORK_CIDR="10.244.0.0/16"
 REGION=home
+SERVICE_NETWORK_CIDR="10.96.0.0/12"
 TOKEN=$(cat ./cluster/token)
 ZONEID=office
-FILL_ETC_HOSTS=YES
 
-TEMP=$(getopt -o i:g:c:n: --long fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,delete-credentials-provider:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,csi-region:,csi-zone:,vm-uuid: -n "$0" -- "$@")
+TEMP=$(getopt -o i:g:k:c:n:r:x --long kubernetes-version:,cni-plugin:,container-runtime:,trace,fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,delete-credentials-provider:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,csi-region:,csi-zone:,vm-uuid: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -39,12 +46,20 @@ while true; do
 		PLATEFORM=$2
 		shift 2
 		;;
+	-x|--trace)
+		set -x
+		shift 1
+		;;
 	-g|--node-group)
 		NODEGROUP_NAME="$2"
 		shift 2
 		;;
 	-i|--node-index)
 		NODEINDEX="$2"
+		shift 2
+		;;
+	-k|--kubernetes-version)
+		KUBERNETES_VERSION="$2"
 		shift 2
 		;;
 	--tls-san)
@@ -69,6 +84,10 @@ while true; do
 		;;
 	--join-master)
 		MASTER_IP=$2
+		shift 2
+		;;
+	--cni-plugin)
+		CNI_PLUGIN=$2
 		shift 2
 		;;
 	--allow-deployment)
@@ -99,6 +118,29 @@ while true; do
 		esac
 		shift 2
 		;;
+	-r|--container-runtime)
+		case "$2" in
+			"docker")
+				CONTAINER_ENGINE="$2"
+				CONTAINER_RUNTIME=remote
+				CONTAINER_CTL=unix:///run/containerd/containerd.sock
+				;;
+			"containerd")
+				CONTAINER_ENGINE="$2"
+				CONTAINER_RUNTIME=remote
+				CONTAINER_CTL=unix:///var/run/containerd/containerd.sock
+				;;
+			"cri-o")
+				CONTAINER_ENGINE="$2"
+				CONTAINER_RUNTIME=remote
+				CONTAINER_CTL=unix:///var/run/crio/crio.sock
+				;;
+			*)
+				echo "Unsupported container runtime: $2"
+				exit 1
+				;;
+		esac
+		shift 2;;
 # Plateform specific
 	-c|--control-plane-endpoint)
 		IFS=: read CONTROL_PLANE_ENDPOINT CONTROL_PLANE_ENDPOINT_ADDR <<< "$2"
@@ -290,6 +332,13 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 
 else
 	CACERT=$(cat ./cluster/ca.cert)
+	mkdir -p /etc/kubernetes/patches
+
+cat > /etc/kubernetes/patches/kubeletconfiguration.yaml <<EOF
+address: ${APISERVER_ADVERTISE_ADDRESS}
+providerID: ${PROVIDERID}
+maxPods: ${MAX_PODS}
+EOF
 
 	if [ "${HA_CLUSTER}" = "true" ]; then
 		cp cluster/kubernetes/pki/ca.crt /etc/kubernetes/pki
@@ -319,6 +368,7 @@ else
 		kubeadm join ${MASTER_IP} \
 			--node-name "${NODENAME}" \
 			--token "${TOKEN}" \
+			--patches /etc/kubernetes/patches \
 			--discovery-token-ca-cert-hash "sha256:${CACERT}" \
 			--apiserver-advertise-address ${APISERVER_ADVERTISE_ADDRESS} \
 			--control-plane
@@ -326,17 +376,9 @@ else
 		kubeadm join ${MASTER_IP} \
 			--node-name "${NODENAME}" \
 			--token "${TOKEN}" \
+			--patches /etc/kubernetes/patches \
 			--discovery-token-ca-cert-hash "sha256:${CACERT}" \
 			--apiserver-advertise-address ${APISERVER_ADVERTISE_ADDRESS}
-	fi
-
-	if [ -n "${PROVIDERID}" ]; then
-		cat > patch.yaml <<EOF
-spec:
-  providerID: '${PROVIDERID}'
-EOF
-
-		kubectl patch node ${NODENAME} --patch-file patch.yaml
 	fi
 fi
 

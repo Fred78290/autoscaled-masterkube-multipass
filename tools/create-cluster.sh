@@ -747,7 +747,7 @@ elif [ "${KUBERNETES_DISTRO}" == "k3s" ]; then
 	kubectl taint node ${NODENAME} node-role.kubernetes.io/master:NoSchedule node-role.kubernetes.io/control-plane:NoSchedule
 fi
 
-sed -i -e "/${CONTROL_PLANE_ENDPOINT%%.}/d" /etc/hosts
+#sed -i -e "/${CONTROL_PLANE_ENDPOINT%%.}/d" /etc/hosts
 
 echo -n "${LOAD_BALANCER_IP[0]}:${APISERVER_ADVERTISE_PORT}" > ${CLUSTER_DIR}/manager-ip
 

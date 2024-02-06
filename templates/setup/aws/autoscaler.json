@@ -12,6 +12,7 @@
 	"maxNode": ${MAXNODES},
 	"maxPods": ${MAX_PODS},
 	"maxNode-per-cycle": 2,
+	"nodegroup": "${NODEGROUP_NAME}",
 	"node-name-prefix": "autoscaled",
 	"managed-name-prefix": "managed",
 	"controlplane-name-prefix": "master",

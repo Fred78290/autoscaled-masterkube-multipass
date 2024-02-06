@@ -80,6 +80,7 @@
 						"command": [
 							"/usr/local/bin/kubernetes-cloud-autoscaler",
 							"--distribution=${KUBERNETES_DISTRO}",
+							"--nodegroup=${NODEGROUP_NAME}",
 							"--plateform=${PLATEFORM}",
 							"--plateform-config=/etc/cluster/provider.json",
 							"--config=/etc/cluster/autoscaler.json",

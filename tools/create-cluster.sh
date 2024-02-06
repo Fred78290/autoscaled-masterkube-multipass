@@ -536,6 +536,7 @@ streamingConnectionIdleTimeout: 0s
 syncFrequency: 0s
 volumeStatsAggPeriod: 0s
 maxPods: ${MAX_PODS}
+providerID: ${PROVIDERID}
 ---
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
@@ -716,15 +717,6 @@ EOF
 
 		kubectl apply -f https://raw.githubusercontent.com/romana/romana/master/containerize/specs/romana-kubeadm.yml 2>&1
 
-	fi
-
-	if [ -n "${PROVIDERID}" ]; then
-		cat > patch.yaml <<EOF
-spec:
-  providerID: '${PROVIDERID}'
-EOF
-
-		kubectl patch node ${NODENAME} --patch-file patch.yaml
 	fi
 fi
 

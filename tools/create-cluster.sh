@@ -645,31 +645,9 @@ EOF
 		KUBERNETES_MINOR_RELEASE=$(kubectl version -o json | jq -r .serverVersion.minor)
 		UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2 | cut -d '.' -f 1)
 
-		if [ ${KUBERNETES_MINOR_RELEASE} -gt 27 ]; then
-			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.16.0/config/master/aws-k8s-cni.yaml
-		elif [ ${KUBERNETES_MINOR_RELEASE} -gt 26 ]; then
-			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.15.5/config/master/aws-k8s-cni.yaml
-		elif [ ${KUBERNETES_MINOR_RELEASE} -gt 25 ]; then
-			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.14.1/config/master/aws-k8s-cni.yaml
-		elif [ ${KUBERNETES_MINOR_RELEASE} -gt 24 ]; then
-			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.12.1/config/master/aws-k8s-cni.yaml
-		elif [ ${KUBERNETES_MINOR_RELEASE} -gt 22 ]; then
-			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.11/config/master/aws-k8s-cni.yaml
-		elif [ ${KUBERNETES_MINOR_RELEASE} -gt 20 ]; then
-			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.10/config/master/aws-k8s-cni.yaml
-		else
-			AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.9.3/config/v1.9/aws-k8s-cni.yaml
-		fi
+		AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.16.0/config/master/aws-k8s-cni.yaml
 
-		if [ ${CONTAINER_ENGINE} == "cri-o" ]; then
-			curl -s ${AWS_CNI_URL} | yq e -P - \
-					| sed -e 's/mountPath: \/var\/run\/dockershim\.sock/mountPath: \/var\/run\/cri\.sock/g' -e 's/path: \/var\/run\/dockershim\.sock/path: \/var\/run\/cri\.sock/g' > cni-aws.yaml
-		elif [ ${CONTAINER_ENGINE} == "containerd" ]; then
-			curl -s ${AWS_CNI_URL} | yq e -P - \
-					| sed -e 's/mountPath: \/var\/run\/dockershim\.sock/mountPath: \/var\/run\/cri\.sock/g' -e 's/path: \/var\/run\/dockershim\.sock/path: \/var\/run\/containerd\/containerd\.sock/g' > cni-aws.yaml
-		else
-			curl -s ${AWS_CNI_URL} > cni-aws.yaml
-		fi
+		curl -s ${AWS_CNI_URL} > cni-aws.yaml
 
 		# https://github.com/aws/amazon-vpc-cni-k8s/issues/2103
 		if [ ${UBUNTU_VERSION_ID} -ge 22 ]; then

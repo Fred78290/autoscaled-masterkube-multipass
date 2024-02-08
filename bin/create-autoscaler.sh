@@ -65,10 +65,14 @@ elif [ "${LAUNCH_CA}" == "LOCAL" ]; then
 	GOARCH=$(go env GOARCH)
 	nohup ../out/${GOOS}/${GOARCH}/kubernetes-cloud-autoscaler \
 		--kubeconfig=${KUBECONFIG} \
-		--provider=${PLATEFORM} \
+		--distribution=${KUBERNETES_DISTRO} \
+		--grpc-provider=${GRPC_PROVIDER} \
+		--cloud-provider=${CLOUD_PROVIDER} \
+		--machines=${TARGET_CONFIG_LOCATION}/machines.json \
+		--plateform=${PLATEFORM} \
+		--plateform-config=${TARGET_CONFIG_LOCATION}/provider.json \
 		--config=${TARGET_CONFIG_LOCATION}/autoscaler.json \
-		--provider-config=${TARGET_CONFIG_LOCATION}/provider.json \
-		--save=${TARGET_CONFIG_LOCATION}/autoscaler-state.json \
+		--save=${TARGET_CONFIG_LOCATION}/state.json \
 		--log-level=info 1>>${TARGET_CONFIG_LOCATION}/autoscaler.log 2>&1 &
 	pid="$!"
 

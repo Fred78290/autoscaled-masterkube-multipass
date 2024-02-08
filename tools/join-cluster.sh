@@ -372,8 +372,7 @@ EOF
 			--node-name "${NODENAME}" \
 			--token "${TOKEN}" \
 			--patches /etc/kubernetes/patches \
-			--discovery-token-ca-cert-hash "sha256:${CACERT}" \
-			--apiserver-advertise-address ${APISERVER_ADVERTISE_ADDRESS}
+			--discovery-token-ca-cert-hash "sha256:${CACERT}"
 	fi
 fi
 

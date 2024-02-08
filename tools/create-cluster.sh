@@ -18,7 +18,6 @@ CONTAINER_RUNTIME=docker
 CONTROL_PLANE_ENDPOINT_ADDR=
 CONTROL_PLANE_ENDPOINT_HOST=
 CONTROL_PLANE_ENDPOINT=
-DELETE_CREDENTIALS_CONFIG=NO
 ETCD_ENDPOINT=
 EXTERNAL_ETCD=false
 HA_CLUSTER=false
@@ -45,7 +44,7 @@ FILL_ETC_HOSTS=YES
 
 export KUBECONFIG=
 
-TEMP=$(getopt -o xm:g:r:i:c:n:k: --long fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,delete-credentials-provider:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace:,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
+TEMP=$(getopt -o xm:g:r:i:c:n:k: --long fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace:,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -74,10 +73,6 @@ while true; do
 		;;
 	--allow-deployment)
 		MASTER_NODE_ALLOW_DEPLOYMENT=$2
-		shift 2
-		;;
-	--delete-credentials-provider)
-		DELETE_CREDENTIALS_CONFIG=$2
 		shift 2
 		;;
 	--fill-etc-hosts)

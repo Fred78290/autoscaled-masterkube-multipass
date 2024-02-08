@@ -87,6 +87,8 @@
 							"--machines=/etc/cluster/machines.json",
 							"--grpc-provider=${GRPC_PROVIDER}",
 							"--cloud-provider=${CLOUD_PROVIDER}",
+							"--image-credential-provider-bin-dir=${IMAGE_CREDENTIALS_BIN}",
+							"--image-credential-provider-config=${IMAGE_CREDENTIALS_CONFIG}",
 							"--min-memory=0",
 							"--max-memory=${MAX_MEMORY}",
 							"--min-cpus=0",

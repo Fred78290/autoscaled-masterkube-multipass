@@ -485,10 +485,6 @@ if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; 
 	WANTED_KUBERNETES_VERSION=${KUBERNETES_VERSION}
 	IFS=. read K8S_VERSION K8S_MAJOR K8S_MINOR <<< "${KUBERNETES_VERSION}"
 
-	if [ ${K8S_MAJOR} -eq 28 ] && [ ${K8S_MINOR} -lt 5 ]; then 
-		DELETE_CREDENTIALS_CONFIG=YES
-	fi
-
 	if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 		RANCHER_CHANNEL=$(curl -s https://update.rke2.io/v1-release/channels)
 	else
@@ -635,8 +631,6 @@ if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 
 	./bin/create-image.sh \
 		--arch="${SEED_ARCH}" \
-		--aws-access-key=${AWS_ACCESSKEY} \
-		--aws-secret-key=${AWS_SECRETKEY} \
 		--cni-version="${CNI_VERSION}" \
 		--container-runtime=${CONTAINER_ENGINE} \
 		--custom-image="${TARGET_IMAGE}" \
@@ -677,6 +671,17 @@ fi
 
 echo "${KUBERNETES_PASSWORD}" >${TARGET_CONFIG_LOCATION}/kubernetes-password.txt
 
+case "${KUBERNETES_DISTRO}" in
+	k3s|rke2)
+		IMAGE_CREDENTIALS_CONFIG=/var/lib/rancher/credentialprovider/config.yaml
+		IMAGE_CREDENTIALS_BIN=/var/lib/rancher/credentialprovider/bin
+		;;
+	kubeadm)
+		IMAGE_CREDENTIALS_CONFIG=/etc/kubernetes/credential.yaml
+		IMAGE_CREDENTIALS_BIN=/usr/local/bin
+		;;
+esac
+
 # Cloud init vendor-data
 cat >${TARGET_CONFIG_LOCATION}/vendordata.yaml <<EOF
 #cloud-config
@@ -691,6 +696,40 @@ system_info:
   default_user:
 	name: ${KUBERNETES_USER}
 EOF
+
+if [ -n "${AWS_ACCESSKEY}" ] && [ -n "${AWS_SECRETKEY}" ]; then
+	IMAGE_CREDENTIALS_CONFIG_B64=$(cat | base64 -w 0 <<EOF
+apiVersion: kubelet.config.k8s.io/v1
+kind: CredentialProviderConfig
+providers:
+  - name: ecr-credential-provider
+    matchImages:
+      - "*.dkr.ecr.*.amazonaws.com"
+      - "*.dkr.ecr.*.amazonaws.cn"
+      - "*.dkr.ecr-fips.*.amazonaws.com"
+      - "*.dkr.ecr.us-iso-east-1.c2s.ic.gov"
+      - "*.dkr.ecr.us-isob-east-1.sc2s.sgov.gov"
+    defaultCacheDuration: "12h"
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
+    args:
+      - get-credentials
+    env:
+      - name: AWS_ACCESS_KEY_ID 
+        value: ${AWS_ACCESSKEY}
+      - name: AWS_SECRET_ACCESS_KEY
+        value: ${AWS_SECRETKEY}
+EOF
+)
+
+	cat >>${TARGET_CONFIG_LOCATION}/vendordata.yaml <<EOF
+write_files:
+- encoding: b64
+  content: ${IMAGE_CREDENTIALS_CONFIG_B64}
+  owner: root:root
+  path: ${IMAGE_CREDENTIALS_CONFIG}
+  permissions: '0644'
+EOF
+fi
 
 gzip -c9 <${TARGET_CONFIG_LOCATION}/vendordata.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/vendordata.base64
 
@@ -1034,7 +1073,6 @@ do
 					--plateform=${PLATEFORM} \
 					--cloud-provider=${CLOUD_PROVIDER} \
 					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 					--vm-uuid=${VMUUID} \
 					--csi-region=${REGION} \
 					--csi-zone=${ZONEID} \
@@ -1066,7 +1104,6 @@ do
 					--plateform=${PLATEFORM} \
 					--cloud-provider=${CLOUD_PROVIDER} \
 					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 					--vm-uuid=${VMUUID} \
 					--csi-region=${REGION} \
 					--csi-zone=${ZONEID} \
@@ -1111,7 +1148,6 @@ do
 					--kubernetes-version="${KUBERNETES_VERSION}" \
 					--container-runtime=${CONTAINER_ENGINE} \
 					--cni-plugin=${CNI_PLUGIN} \
-					--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 					--csi-region=${REGION} \
 					--csi-zone=${ZONEID} \
 					--max-pods=${MAX_PODS} \
@@ -1136,7 +1172,6 @@ do
 					--kubernetes-version="${KUBERNETES_VERSION}" \
 					--container-runtime=${CONTAINER_ENGINE} \
 					--cni-plugin=${CNI_PLUGIN} \
-					--delete-credentials-provider=${DELETE_CREDENTIALS_CONFIG} \
 					--csi-region=${REGION} \
 					--csi-zone=${ZONEID} \
 					--max-pods=${MAX_PODS} \
@@ -1193,19 +1228,23 @@ else
 	SERVER_ADDRESS="${MASTER_IP}"
 fi
 
-if [ "${DELETE_CREDENTIALS_CONFIG}" == "YES" ]; then
-	DELETE_CREDENTIALS_CONFIG=true
-else
-	DELETE_CREDENTIALS_CONFIG=false
-fi
-
 cp ${PWD}/templates/setup/${PLATEFORM}/machines.json ${TARGET_CONFIG_LOCATION}/machines.json
 
-echo $(eval "cat <<EOF
-$(<${PWD}/templates/setup/${PLATEFORM}/autoscaler.json)
-EOF") | jq . > ${TARGET_CONFIG_LOCATION}/autoscaler.json
+if [ -n "${AWS_ACCESSKEY}" ] && [ -n "${AWS_SECRETKEY}" ]; then
+	echo $(eval "cat <<EOF
+$(<${PWD}/templates/setup/image-credential-provider-config.json)
+EOF") | jq . > ${TARGET_CONFIG_LOCATION}/image-credential-provider-config.json
+
+	IMAGE_CREDENTIALS=$(cat "${TARGET_CONFIG_LOCATION}/image-credential-provider-config.json")
+else
+	IMAGE_CREDENTIALS='{}'
+fi
 
 echo $(eval "cat <<EOF
 $(<${PWD}/templates/setup/${PLATEFORM}/provider.json)
 EOF") | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
+
+echo $(eval "cat <<EOF
+$(<${PWD}/templates/setup/${PLATEFORM}/autoscaler.json)
+EOF") | jq --argjson IMAGE_CREDENTIALS "${IMAGE_CREDENTIALS}" '. += $IMAGE_CREDENTIALS' > ${TARGET_CONFIG_LOCATION}/autoscaler.json
 

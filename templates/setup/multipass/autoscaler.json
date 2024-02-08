@@ -6,6 +6,8 @@
 	"plateform": "${PLATEFORM}",
 	"kubernetes-pki-srcdir": "/etc/kubernetes/pki",
 	"kubernetes-pki-dstdir": "/etc/kubernetes/pki",
+	"image-credential-provider-bin-dir": "${IMAGE_CREDENTIALS_BIN}",
+	"image-credential-provider-config": "${IMAGE_CREDENTIALS_CONFIG}",
 	"listen": "${LISTEN}",
 	"secret": "${PLATEFORM}",
 	"minNode": ${MINNODES},
@@ -34,7 +36,6 @@
 			"--ignore-preflight-errors=All"
 		],
 		"datastore-endpoint": "${ETCD_ENDPOINT}",
-		"delete-credentials-provider": ${DELETE_CREDENTIALS_CONFIG},
 		"extras-commands": []
 	},
 	"default-machine": "${AUTOSCALE_MACHINE}",

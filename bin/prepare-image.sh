@@ -47,55 +47,25 @@ echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
 
 sysctl --system
 
-mkdir -p $(dirname ${CREDENTIALS_CONFIG})
+case "${KUBERNETES_DISTRO}" in
+	k3s|rke2)
+		CREDENTIALS_CONFIG_DIR=/var/lib/rancher/credentialprovider
+		CREDENTIALS_BIN=/var/lib/rancher/credentialprovider/bin
+		;;
+	kubeadm)
+		CREDENTIALS_CONFIG_DIR=/etc/kubernetes
+		CREDENTIALS_BIN=/usr/local/bin
+		;;
+esac
+
+mkdir -p ${CREDENTIALS_CONFIG_DIR}
 mkdir -p ${CREDENTIALS_BIN}
+mkdir -p /root/.aws
 
 echo "kubernetes ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kubernetes
 
-if [ -n "${AWS_ACCESS_KEY_ID}" ] && [ -n "${AWS_SECRET_ACCESS_KEY}" ]; then
-	mkdir -p /root/.aws
-
-	cat > /root/.aws/config <<EOF
-[default]
-output = json
-region = us-east-1
-cli_binary_format=raw-in-base64-out
-EOF
-
-	cat > /root/.aws/credentials <<EOF
-[default]
-aws_access_key_id = ${AWS_ACCESS_KEY_ID}
-aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
-EOF
-
-	KUBELET_CREDS_ARGS="--image-credential-provider-config=${CREDENTIALS_CONFIG} --image-credential-provider-bin-dir=${CREDENTIALS_BIN}"
-	ECR_CREDS_VERSION=v1.29.0
-
-	curl -sL https://github.com/Fred78290/aws-ecr-credential-provider/releases/download/${ECR_CREDS_VERSION}/ecr-credential-provider-${SEED_ARCH} -o ${CREDENTIALS_BIN}/ecr-credential-provider
-	chmod +x ${CREDENTIALS_BIN}/ecr-credential-provider
-
-	cat > ${CREDENTIALS_CONFIG} <<EOF
-apiVersion: kubelet.config.k8s.io/v1
-kind: CredentialProviderConfig
-providers:
-  - name: ecr-credential-provider
-    matchImages:
-      - "*.dkr.ecr.*.amazonaws.com"
-      - "*.dkr.ecr.*.amazonaws.cn"
-      - "*.dkr.ecr-fips.*.amazonaws.com"
-      - "*.dkr.ecr.us-iso-east-1.c2s.ic.gov"
-      - "*.dkr.ecr.us-isob-east-1.sc2s.sgov.gov"
-    defaultCacheDuration: "12h"
-    apiVersion: credentialprovider.kubelet.k8s.io/v1
-    args:
-      - get-credentials
-    env:
-      - name: AWS_ACCESS_KEY_ID 
-        value: ${AWS_ACCESS_KEY_ID}
-      - name: AWS_SECRET_ACCESS_KEY
-        value: ${AWS_SECRET_ACCESS_KEY}
-EOF
-fi
+curl -sL https://github.com/Fred78290/aws-ecr-credential-provider/releases/download/v1.29.0/ecr-credential-provider-${SEED_ARCH} -o ${CREDENTIALS_BIN}/ecr-credential-provider
+chmod +x ${CREDENTIALS_BIN}/ecr-credential-provider
 
 if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 	echo "prepare rke2 image"
@@ -355,7 +325,7 @@ ExecStartPre=/sbin/iptables -P FORWARD ACCEPT -w 5
 EOF
 	fi
 
-	echo "KUBELET_EXTRA_ARGS='${KUBELET_CREDS_ARGS} --fail-swap-on=false --read-only-port=10255'" > /etc/default/kubelet
+	echo "KUBELET_EXTRA_ARGS=" > /etc/default/kubelet
 
 	echo 'export PATH=/opt/cni/bin:${PATH}' >> /etc/profile.d/apps-bin-path.sh
 

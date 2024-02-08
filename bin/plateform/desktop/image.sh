@@ -30,8 +30,6 @@ OPTIONS=(
 	"second-network:"
 	"k8s-distribution:"
 	"container-runtime:"
-	"aws-access-key:"
-	"aws-secret-key:"
 )
 
 PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
@@ -87,16 +85,6 @@ while true ; do
 					;;
 			esac
 			shift 2;;
-
-		--aws-access-key)
-			AWS_ACCESS_KEY_ID=$2
-			shift 2
-			;;
-		--aws-secret-key)
-			AWS_SECRET_ACCESS_KEY=$2
-			shift 2
-			;;
-
 		--) shift ; break ;;
 		*) echo_red_bold "$1 - Internal error!" ; exit 1 ;;
 	esac
@@ -330,17 +318,6 @@ function dump_vendordata() {
 	grep 'guestinfo.vendordata ' "${VMREST_FOLDER}/${TARGET_IMAGE}${VMWAREWM}/${TARGET_IMAGE}.vmx" | cut -d= -f2 | sed 's/[ "]//g'  | base64 -d - | gunzip -
 }
 
-case "${KUBERNETES_DISTRO}" in
-	k3s|rke2)
-		CREDENTIALS_CONFIG=/var/lib/rancher/credentialprovider/config.yaml
-		CREDENTIALS_BIN=/var/lib/rancher/credentialprovider/bin
-		;;
-	kubeadm)
-		CREDENTIALS_CONFIG=/etc/kubernetes/credential.yaml
-		CREDENTIALS_BIN=/usr/local/bin
-		;;
-esac
-
 KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | tr '.' ' ' | awk '{ print $2 }')
 CRIO_VERSION=$(echo -n ${KUBERNETES_VERSION} | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
 
@@ -393,10 +370,7 @@ CRIO_VERSION=${CRIO_VERSION}
 CONTAINER_ENGINE=${CONTAINER_ENGINE}
 CONTAINER_CTL=${CONTAINER_CTL}
 KUBERNETES_DISTRO=${KUBERNETES_DISTRO}
-CREDENTIALS_CONFIG=${CREDENTIALS_CONFIG}
-CREDENTIALS_BIN=${CREDENTIALS_BIN}
-AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+
 EOF
 
 cat ${CURDIR}/prepare-image.sh >> "${CACHE}/prepare-image.sh"

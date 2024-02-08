@@ -42,7 +42,6 @@ export CONTROLPLANE_USE_PUBLICIP=false
 export CORESTOTAL="0:16"
 export CREATE_IMAGE_ONLY=NO
 export DELETE_CLUSTER=NO
-export DELETE_CREDENTIALS_CONFIG=NO
 export DEPLOY_COMPONENTS=YES
 export DISTRO=jammy
 export DOMAIN_NAME=
@@ -64,6 +63,8 @@ export GOVC_USERNAME=${GOVC_USERNAME:=}
 export GOVC_VIM_VERSION=${GOVC_VIM_VERSION:='6.0'}
 export GRPC_PROVIDER=externalgrpc
 export HA_CLUSTER=false
+export IMAGE_CREDENTIALS_CONFIG=/etc/kubernetes/credential.yaml
+export IMAGE_CREDENTIALS_BIN=/usr/local/bin
 export KUBECONFIG=${HOME}/.kube/config
 export KUBERNETES_DISTRO=kubeadm
 export KUBERNETES_PASSWORD=

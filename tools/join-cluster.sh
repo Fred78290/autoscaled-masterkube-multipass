@@ -8,7 +8,6 @@ CLUSTER_NODES=()
 CNI_PLUGIN=flannel
 CONTROL_PLANE_ENDPOINT_ADDR=
 CONTROL_PLANE_ENDPOINT=
-DELETE_CREDENTIALS_CONFIG=NO
 ETCD_ENDPOINT=
 EXTERNAL_ETCD=NO
 FILL_ETC_HOSTS=YES
@@ -31,7 +30,7 @@ SERVICE_NETWORK_CIDR="10.96.0.0/12"
 TOKEN=$(cat ./cluster/token)
 ZONEID=office
 
-TEMP=$(getopt -o i:g:k:c:n:r:x --long kubernetes-version:,cni-plugin:,container-runtime:,trace,fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,delete-credentials-provider:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,csi-region:,csi-zone:,vm-uuid: -n "$0" -- "$@")
+TEMP=$(getopt -o i:g:k:c:n:r:x --long kubernetes-version:,cni-plugin:,container-runtime:,trace,fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,csi-region:,csi-zone:,vm-uuid: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -92,10 +91,6 @@ while true; do
 		;;
 	--allow-deployment)
 		MASTER_NODE_ALLOW_DEPLOYMENT=$2 
-		shift 2
-		;;
-	--delete-credentials-provider)
-		DELETE_CREDENTIALS_CONFIG=$2
 		shift 2
 		;;
 	--fill-etc-hosts)

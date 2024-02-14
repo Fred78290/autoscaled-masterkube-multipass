@@ -145,6 +145,10 @@ while true; do
 		CERT_SELFSIGNED=YES
 		shift 1
 		;;
+	--use-cloud-init)
+		USE_CLOUDINIT_TO_CONFIGURE=true
+		shift 1
+		;;
 	--zerossl-eab-kid)
 		CERT_ZEROSSL_EAB_KID=$2
 		shift 2

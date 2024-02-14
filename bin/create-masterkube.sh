@@ -65,6 +65,7 @@ OPTIONS=(
 	"scale-down-unneeded-time:"
 	"scale-down-unready-time:"
 	"unremovable-node-recheck-timeout:"
+	"use-cloud-init"
 )
 
 echo -n > ${OUTPUT}

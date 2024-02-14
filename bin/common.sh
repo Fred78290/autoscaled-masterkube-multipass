@@ -236,6 +236,7 @@ Options are:
 --worker-node-machine=<value>                    # Override machine type used for worker nodes, default ${WORKER_NODE_MACHINE}
 --worker-nodes=<value>                           # Specify the number of worker nodes created in HA cluster, default ${WORKERNODES}
 --create-external-etcd | -e                      # Create an external HA etcd cluster, default ${EXTERNAL_ETCD}
+--use-cloud-init                                 # Use cloud-init to configure autoscaled nodes instead off ssh, default ${USE_CLOUDINIT_TO_CONFIGURE}
 
 ### Design domain
 

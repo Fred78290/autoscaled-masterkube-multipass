@@ -44,7 +44,7 @@ FILL_ETC_HOSTS=YES
 
 export KUBECONFIG=
 
-TEMP=$(getopt -o xm:g:r:i:c:n:k: --long fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace:,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
+TEMP=$(getopt -o xm:g:r:i:c:n:k: --long fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 

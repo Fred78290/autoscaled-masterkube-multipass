@@ -8,6 +8,8 @@
 	"template-name": "file://${TARGET_IMAGE}",
 	"netplan-name": "10-custom.yaml",
 	"allow-upgrade": false,
+	"csi-region": "${REGION}",
+	"csi-zone": "${ZONEID}",
 	"network": {
 		"domain": "${NET_DOMAIN}",
 		"dns": {

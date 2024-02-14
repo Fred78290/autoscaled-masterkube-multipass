@@ -13,6 +13,8 @@
 	"linked": false,
 	"allow-upgrade": false,
 	"customization": "${GOVC_CUSTOMIZATION}",
+	"csi-region": "${REGION}",
+	"csi-zone": "${ZONEID}",
 	"network": {
 		"domain": "${NET_DOMAIN}",
 		"dns": {

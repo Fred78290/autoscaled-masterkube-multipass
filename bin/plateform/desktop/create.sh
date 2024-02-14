@@ -699,7 +699,7 @@ system_info:
 EOF
 
 if [ -n "${AWS_ACCESSKEY}" ] && [ -n "${AWS_SECRETKEY}" ]; then
-	IMAGE_CREDENTIALS_CONFIG_B64=$(cat | base64 -w 0 <<EOF
+	cat > ${TARGET_CONFIG_LOCATION}/credential.yaml <<EOF
 apiVersion: kubelet.config.k8s.io/v1
 kind: CredentialProviderConfig
 providers:
@@ -720,12 +720,11 @@ providers:
       - name: AWS_SECRET_ACCESS_KEY
         value: ${AWS_SECRETKEY}
 EOF
-)
 
 	cat >>${TARGET_CONFIG_LOCATION}/vendordata.yaml <<EOF
 write_files:
 - encoding: b64
-  content: ${IMAGE_CREDENTIALS_CONFIG_B64}
+  content: $(cat ${TARGET_CONFIG_LOCATION}/credential.yaml | base64 -w 0)
   owner: root:root
   path: ${IMAGE_CREDENTIALS_CONFIG}
   permissions: '0644'
@@ -1282,3 +1281,4 @@ EOF") | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
 echo $(eval "cat <<EOF
 $(<${PWD}/templates/setup/${PLATEFORM}/autoscaler.json)
 EOF") | jq --argjson IMAGE_CREDENTIALS "${IMAGE_CREDENTIALS}" '. += $IMAGE_CREDENTIALS' > ${TARGET_CONFIG_LOCATION}/autoscaler.json
+

@@ -627,6 +627,9 @@ TARGET_IMAGE_UUID=$(get_vmuuid ${TARGET_IMAGE})
 if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 	echo_title "Create ${PLATEFORM} preconfigured image ${TARGET_IMAGE}"
 
+# Never add second network 
+# if $(jq --arg SECOND_NETWORK_NAME "${SECOND_NETWORK_NAME}" '.network.interfaces | select(.network = $SECOND_NETWORK_NAME)|.exists' provider.json) == false
+
 	./bin/create-image.sh \
 		--arch="${SEED_ARCH}" \
 		--cni-version="${CNI_VERSION}" \
@@ -637,12 +640,12 @@ if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 		--kubernetes-version="${KUBERNETES_VERSION}" \
 		--password="${KUBERNETES_PASSWORD}" \
 		--plateform=${PLATEFORM} \
-		--primary-network="${VC_NETWORK_PRIVATE}" \
-		--second-network="${VC_NETWORK_PUBLIC}" \
 		--seed="${SEED_IMAGE}-${SEED_ARCH}" \
 		--ssh-key="${SSH_KEY}" \
 		--ssh-priv-key="${SSH_PRIVATE_KEY}" \
-		--user="${KUBERNETES_USER}"
+		--user="${KUBERNETES_USER}" \
+		--primary-network="${VC_NETWORK_PRIVATE}" \
+#		--second-network="${VC_NETWORK_PUBLIC}"
 
 	TARGET_IMAGE_UUID=$(get_vmuuid ${TARGET_IMAGE})
 fi

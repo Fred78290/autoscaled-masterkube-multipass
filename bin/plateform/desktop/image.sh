@@ -12,7 +12,7 @@
 # The second VM will contains everything to run kubernetes
 
 PRIMARY_NETWORK_NAME=vmnet0
-SECOND_NETWORK_NAME=vmnet8
+SECOND_NETWORK_NAME= #vmnet8
 TARGET_IMAGE=
 
 OPTIONS=(
@@ -398,10 +398,13 @@ if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 	exit 1
 fi
 
-#if [ -n "${SECOND_NETWORK_NAME}" ]; then
-#	echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${TARGET_IMAGE}"
-#	vmrest_network_add ${TARGET_IMAGE_UUID} ${SECOND_NETWORK_NAME} > /dev/null
-#fi
+# Never add second network 
+# if $(jq --arg SECOND_NETWORK_NAME "${SECOND_NETWORK_NAME}" '.network.interfaces | select(.network = $SECOND_NETWORK_NAME)|.exists' provider.json) == false
+
+if [ -n "${SECOND_NETWORK_NAME}" ]; then
+	echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${TARGET_IMAGE}"
+	vmrest_network_add ${TARGET_IMAGE_UUID} ${SECOND_NETWORK_NAME} > /dev/null
+fi
 
 echo_blue_bold "Power On ${TARGET_IMAGE}"
 vmrest_poweron ${TARGET_IMAGE_UUID} > /dev/null

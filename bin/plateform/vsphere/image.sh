@@ -194,6 +194,8 @@ if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 			govc vm.network.change -vm "${SEED_IMAGE}" -net "${PRIMARY_NETWORK_NAME}" -net.adapter "${PRIMARY_NETWORK_ADAPTER}" || true
 		fi
 
+		# Never add second network 
+		# if $(jq --arg SECOND_NETWORK_NAME "${SECOND_NETWORK_NAME}" '.network.interfaces | select(.network = $SECOND_NETWORK_NAME)|.exists' provider.json) == false
 		if [ -n "${SECOND_NETWORK_NAME}" ]; then
 			echo_blue_bold "Add second network card ${SECOND_NETWORK_NAME} on ${SEED_IMAGE}"
 

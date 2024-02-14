@@ -946,6 +946,12 @@ do
 	PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
 done
 
+if [ ${WORKERNODES} -gt 0 ]; then
+	FIRST_WORKER_NODE_IP=${IPADDRS[${#IPADDRS[@]} - ${WORKERNODES}]}
+else
+	FIRST_WORKER_NODE_IP=$(nextip ${IPADDRS[${#IPADDRS[@]} - 1]})
+fi
+
 wait_jobs_finish
 
 if [ "${HA_CLUSTER}" = "true" ]; then

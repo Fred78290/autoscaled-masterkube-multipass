@@ -33,7 +33,7 @@
 				"nic": "eth0",
 				"dhcp": ${SCALEDNODES_DHCP},
 				"use-dhcp-routes": ${USE_DHCP_ROUTES_PRIVATE},
-				"address": "${NODE_IP}",
+				"address": "${FIRST_WORKER_NODE_IP}",
 				"gateway": "${NET_GATEWAY}",
 				"netmask": "${NET_MASK}",
 				"routes": ${PRIVATE_ROUTES_DEFS}

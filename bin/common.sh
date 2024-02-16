@@ -519,7 +519,7 @@ function ipv4() {
 	if [ "${OSDISTRO}" == "Darwin" ]; then
 		read -a LOCAL_IPADDR <<< "$(ifconfig ${INF} | grep -m 1 "inet\s" | sed -n 1p)"
 	else
-		read -a LOCAL_IPADDR <<< "$(ip addr show ${INF} | grep -m 1 "inet\s" | tr '/' ' ' | cut -d ' ' -f 2 3)"
+		read -a LOCAL_IPADDR <<< "$(ip addr show ${INF} | grep -m 1 "inet\s" | tr '/' ' ')"
 	fi
 
 	echo -n "${LOCAL_IPADDR[1]}"

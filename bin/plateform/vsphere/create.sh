@@ -740,15 +740,15 @@ gzip -c9 <${TARGET_CONFIG_LOCATION}/vendordata.yaml | base64 -w 0 | tee > ${TARG
 IPADDRS=()
 NODE_IP=${NET_IP}
 
-if [ -z "${VC_NETWORK_PUBLIC}" ]; then
+if [ -z "${VC_NETWORK_PUBLIC}" ] || [ "${PUBLIC_IP}" == "NONE" ]; then
 	PUBLIC_IP=NONE
 	PUBLIC_NODE_IP=NONE
 	VC_NETWORK_PUBLIC_ENABLED=false
-elif [ "${PUBLIC_IP}" != "DHCP" ] && [ "${PUBLIC_IP}" != "NONE" ]; then
+elif [ "${PUBLIC_IP}" == "DHCP" ]; then
+	PUBLIC_NODE_IP=${PUBLIC_IP}
+else
 	IFS=/ read PUBLIC_NODE_IP PUBLIC_MASK_CIDR <<< "${PUBLIC_IP}"
 	PUBLIC_NETMASK=$(cidr_to_netmask ${PUBLIC_MASK_CIDR})
-else
-	PUBLIC_NODE_IP=${PUBLIC_IP}
 fi
 
 # No external elb, use keep alived

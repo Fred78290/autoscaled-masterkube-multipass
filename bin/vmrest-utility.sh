@@ -6,7 +6,7 @@ export VMREST_INSECURE=true
 if [ "$(uname -s)" == "Darwin" ]; then
 	VMREST_FOLDER="${HOME}/Virtual Machines.localized"
 else
-	VMREST_FOLDER="/vmware"
+	VMREST_FOLDER="${HOME}/vmware"
 fi
 
 export AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)

@@ -129,6 +129,7 @@ function unregister_dns() {
 }
 
 function update_build_env() {
+    set +u
     EVAL=$(cat ${PLATEFORMDEFS} | sed -e '/MASTER_INSTANCE_PROFILE_ARN/d' -e '/WORKER_INSTANCE_PROFILE_ARN/d' > ${TARGET_CONFIG_LOCATION}/buildenv)
 
 cat > ${TARGET_CONFIG_LOCATION}/buildenv <<EOF
@@ -235,6 +236,7 @@ export WORKER_PROFILE_NAME=${WORKER_PROFILE_NAME}
 export WORKERNODE_USE_PUBLICIP=${WORKERNODE_USE_PUBLICIP}
 export WORKERNODES=${WORKERNODES}
 EOF
+    set -u
 }
 
 function update_provider_config() {

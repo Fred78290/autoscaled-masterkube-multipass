@@ -768,8 +768,17 @@ else
 	TOTALNODES=${WORKERNODES}
 fi
 
+if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
 PUBLIC_ROUTES_DEFS=$(build_routes ${NETWORK_PUBLIC_ROUTES[@]})
+else
+	PUBLIC_ROUTES_DEFS='[]'
+fi
+
+if [ ${#NETWORK_PRIVATE_ROUTES[@]} -gt 0 ]; then
 PRIVATE_ROUTES_DEFS=$(build_routes ${NETWORK_PRIVATE_ROUTES[@]})
+else
+	PRIVATE_ROUTES_DEFS='[]'
+fi
 
 #===========================================================================================================================================
 #

@@ -25,6 +25,7 @@ function unregister_dns() {
 }
 
 function update_build_env() {
+    set +u
 cat ${PLATEFORMDEFS} > ${TARGET_CONFIG_LOCATION}/buildenv
 
 cat > ${TARGET_CONFIG_LOCATION}/buildenv <<EOF
@@ -126,6 +127,7 @@ export VC_NETWORK_PUBLIC=${VC_NETWORK_PUBLIC}
 export WORKERNODES=${WORKERNODES}
 export ZONEID=${ZONEID}
 EOF
+    set -u
 }
 
 function update_provider_config() {

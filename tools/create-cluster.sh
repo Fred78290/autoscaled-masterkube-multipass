@@ -588,6 +588,11 @@ EOF
 		sed -i '/container-runtime:/d' ${KUBEADM_CONFIG}
 	fi
 
+	# Kubelet argument if credential config exist
+	if [ -f /etc/kubernetes/credential.yaml ]; then
+		echo "KUBELET_EXTRA_ARGS='--image-credential-provider-config=/etc/kubernetes/credential.yaml --image-credential-provider-bin-dir=/usr/local/bin'" > /etc/default/kubelet
+	fi
+
 	echo "Init K8 cluster with options:$K8_OPTIONS"
 
 	cat ${KUBEADM_CONFIG}

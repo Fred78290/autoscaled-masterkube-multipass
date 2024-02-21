@@ -329,7 +329,12 @@ else
 	CACERT=$(cat ./cluster/ca.cert)
 	mkdir -p /etc/kubernetes/patches
 
-cat > /etc/kubernetes/patches/kubeletconfiguration.yaml <<EOF
+	# Kubelet argument if credential config exist
+	if [ -f /etc/kubernetes/credential.yaml ]; then
+		echo "KUBELET_EXTRA_ARGS='--image-credential-provider-config=/etc/kubernetes/credential.yaml --image-credential-provider-bin-dir=/usr/local/bin'" > /etc/default/kubelet
+	fi
+
+	cat > /etc/kubernetes/patches/kubeletconfiguration.yaml <<EOF
 address: ${APISERVER_ADVERTISE_ADDRESS}
 providerID: ${PROVIDERID}
 maxPods: ${MAX_PODS}

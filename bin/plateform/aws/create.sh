@@ -922,8 +922,6 @@ if [ -z "${TARGET_IMAGE_AMI}" ]; then
 	./bin/create-image.sh \
 		--ami="${SEED_IMAGE}" \
 		--arch="${SEED_ARCH}" \
-		--aws-access-key="${AWS_ACCESSKEY}" \
-		--aws-secret-key="${AWS_SECRETKEY}" \
 		--cni-plugin="${CNI_PLUGIN}" \
 		--cni-version="${CNI_VERSION}" \
 		--container-runtime=${CONTAINER_ENGINE} \
@@ -995,7 +993,7 @@ case "${KUBERNETES_DISTRO}" in
 esac
 
 if [ -n "${AWS_ACCESSKEY}" ] && [ -n "${AWS_SECRETKEY}" ]; then
-	IMAGE_CREDENTIALS_CONFIG_B64=$(cat | base64 -w 0 <<EOF
+	cat > ${TARGET_CONFIG_LOCATION}/credential.yaml <<EOF
 apiVersion: kubelet.config.k8s.io/v1
 kind: CredentialProviderConfig
 providers:
@@ -1016,9 +1014,9 @@ providers:
       - name: AWS_SECRET_ACCESS_KEY
         value: ${AWS_SECRETKEY}
 EOF
-)
+
 else
-	IMAGE_CREDENTIALS_CONFIG_B64=$(cat | base64 -w 0 <<EOF
+	cat > ${TARGET_CONFIG_LOCATION}/credential.yaml <<EOF
 apiVersion: kubelet.config.k8s.io/v1
 kind: CredentialProviderConfig
 providers:
@@ -1034,7 +1032,7 @@ providers:
     args:
       - get-credentials
 EOF
-)
+
 fi
 
 EVAL=$(sed -i '/NODE_INDEX/d' ${TARGET_CONFIG_LOCATION}/buildenv)
@@ -1190,7 +1188,7 @@ function create_vm() {
 #cloud-config
 write_files:
 - encoding: b64
-  content: ${IMAGE_CREDENTIALS_CONFIG_B64}
+  content: $(cat ${TARGET_CONFIG_LOCATION}/credential.yaml | base64 -w 0)
   owner: root:root
   path: ${IMAGE_CREDENTIALS_CONFIG}
   permissions: '0644'

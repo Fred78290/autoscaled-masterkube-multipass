@@ -7,6 +7,7 @@
 	"keyName": "${SSH_KEYNAME}",
 	"ami": "${TARGET_IMAGE_AMI}",
 	"iam-role-arn": "${WORKER_INSTANCE_PROFILE_ARN}",
+	"volume-type": "${VOLUME_TYPE}",
 	"timeout": 120,
 	"tags": [
 		{

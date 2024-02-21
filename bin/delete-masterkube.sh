@@ -150,8 +150,8 @@ elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
 	delete_all_vms
 fi
 
-unregister_dns
 wait_jobs_finish
+unregister_dns
 
 ./bin/kubeconfig-delete.sh ${NODEGROUP_NAME} &> /dev/null || true
 

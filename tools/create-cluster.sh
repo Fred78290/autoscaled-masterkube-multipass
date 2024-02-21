@@ -644,18 +644,8 @@ EOF
 		echo "Install AWS network"
 
 		KUBERNETES_MINOR_RELEASE=$(kubectl version -o json | jq -r .serverVersion.minor)
-		UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2 | cut -d '.' -f 1)
 
-		AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.16.0/config/master/aws-k8s-cni.yaml
-
-		curl -s ${AWS_CNI_URL} > cni-aws.yaml
-
-		# https://github.com/aws/amazon-vpc-cni-k8s/issues/2103
-		if [ ${UBUNTU_VERSION_ID} -ge 22 ]; then
-			sed -i '/ENABLE_IPv6/i\            - name: ENABLE_NFTABLES\n              value: "true"' cni-aws.yaml
-		fi
-
-		kubectl apply -f cni-aws.yaml
+		kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.16.2/config/master/aws-k8s-cni.yaml
 
 		kubectl set env daemonset -n kube-system aws-node AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS=${VPC_IPV4_CIDR_BLOCK}
 

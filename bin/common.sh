@@ -595,7 +595,9 @@ source ${PLATEFORMDEFS}
 #
 #===========================================================================================================================================
 
-if [ -f ${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
+if [ -f ${HOME}/etc/ssl/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
+    SSL_LOCATION=${HOME}/etc/ssl/${PUBLIC_DOMAIN_NAME}
+elif [ -f ${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
     SSL_LOCATION=${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}
 elif [ -f $HOME/.acme.sh/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
     SSL_LOCATION=$HOME/.acme.sh/${PUBLIC_DOMAIN_NAME}

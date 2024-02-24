@@ -591,7 +591,7 @@ if [ -z ${KUBERNETES_PASSWORD} ]; then
 fi
 
 # GRPC network endpoint
-if [ "${LAUNCH_CA}" != "YES" ]; then
+if [ "${LAUNCH_CA}" == "NO" ] || [ "${LAUNCH_CA}" == "DEBUG" ]; then
 	SSH_PRIVATE_KEY_LOCAL="${SSH_PRIVATE_KEY}"
 
 	if [ "${TRANSPORT}" == "unix" ]; then

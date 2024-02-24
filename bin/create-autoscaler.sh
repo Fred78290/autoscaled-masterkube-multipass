@@ -43,11 +43,17 @@ esac
 
 mkdir -p ${ETC_DIR}
 
+if [ "${LAUNCH_CA}" == "DRY" ]; then
+	DRY=--dry-run=client
+else
+	DRY=
+fi
+
 function deploy {
 	echo "Create ${ETC_DIR}/$1.json"
 echo $(eval "cat <<EOF
 $(<${KUBERNETES_TEMPLATE}/$1.json)
-EOF") | jq . | tee ${ETC_DIR}/$1.json | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+EOF") | jq . | tee ${ETC_DIR}/$1.json | kubectl apply ${DRY} --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 }
 
 deploy service-account-autoscaler

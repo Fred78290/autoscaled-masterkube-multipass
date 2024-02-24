@@ -166,6 +166,8 @@
 							"--scale-down-delay-after-failure=${SCALEDOWNDELAYAFTERFAILURE}",
 							"--scale-down-unneeded-time=${SCALEDOWNUNEEDEDTIME}",
 							"--scale-down-unready-time=${SCALEDOWNUNREADYTIME}",
+							"--max-node-provision-time=${MAXNODEPROVISIONTIME}",
+							"--ignore-daemonsets-utilization=true",
 							"--unremovable-node-recheck-timeout=${UNREMOVABLENODERECHECKTIMEOUT}"
 						],
 						"imagePullPolicy": "Always",

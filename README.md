@@ -71,6 +71,7 @@ During the process the script will create many files located in
 | `--scale-down-delay-after-failure` | How long after scale down failure that scale down evaluation resumes | 1 minutes |
 | `--scale-down-unneeded-time` | How long a node should be unneeded before it is eligible for scale down | 1 minutes |
 | `--scale-down-unready-time` | How long an unready node should be unneeded before it is eligible for scale down | 1 minutes |
+| `--max-node-provision-time` | The default maximum time CA waits for node to be provisioned - the value can be overridden per node group | 15 minutes |
 | `--unremovable-node-recheck-timeout` | The timeout before we check again a node that couldn't be removed before | 1 minutes |
 
 ## Raise autoscaling

@@ -339,6 +339,10 @@ while true; do
 		SCALEDOWNUNREADYTIME="$2"
 		shift 2
 		;;
+	--max-node-provision-time)
+		MAXNODEPROVISIONTIME="$2"
+		shift 2
+		;;
 	--unremovable-node-recheck-timeout)
 		UNREMOVABLENODERECHECKTIMEOUT="$2"
 		shift 2

@@ -69,6 +69,7 @@
 							"--scale-down-delay-after-failure=${SCALEDOWNDELAYAFTERFAILURE}",
 							"--scale-down-unneeded-time=${SCALEDOWNUNEEDEDTIME}",
 							"--scale-down-unready-time=${SCALEDOWNUNREADYTIME}",
+							"--max-node-provision-time=${MAXNODEPROVISIONTIME}",
 							"--unremovable-node-recheck-timeout=${UNREMOVABLENODERECHECKTIMEOUT}"
 						],
 						"imagePullPolicy": "Always",

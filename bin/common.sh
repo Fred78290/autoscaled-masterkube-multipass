@@ -80,6 +80,7 @@ export MAX_PODS=110
 export MAXAUTOPROVISIONNEDNODEGROUPCOUNT="1"
 export MAXNODES=9
 export MAXTOTALNODES=${MAXNODES}
+export MAXNODEPROVISIONTIME=15m
 export MEMORYTOTAL="0:48"
 export METALLB_IP_RANGE=10.0.0.100-10.0.0.127
 export MINNODES=0
@@ -276,6 +277,7 @@ Options are:
 --scale-down-delay-after-failure=<value>         # autoscaler flag, default: ${SCALEDOWNDELAYAFTERFAILURE}
 --scale-down-unneeded-time=<value>               # autoscaler flag, default: ${SCALEDOWNUNEEDEDTIME}
 --scale-down-unready-time=<value>                # autoscaler flag, default: ${SCALEDOWNUNREADYTIME}
+--max-node-provision-time=<value>                # autoscaler flag, default: ${MAXNODEPROVISIONTIME}
 --unremovable-node-recheck-timeout=<value>       # autoscaler flag, default: ${UNREMOVABLENODERECHECKTIMEOUT}
 
 EOF

@@ -64,6 +64,7 @@ OPTIONS=(
 	"scale-down-delay-after-failure:"
 	"scale-down-unneeded-time:"
 	"scale-down-unready-time:"
+	"max-node-provision-time:"
 	"unremovable-node-recheck-timeout:"
 	"use-cloud-init"
 )

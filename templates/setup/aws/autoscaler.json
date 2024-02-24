@@ -51,6 +51,9 @@
 		"scaleDownUtilizationThreshold": ${SCALEDOWNUTILIZATIONTHRESHOLD},
 		"scaleDownGpuUtilizationThreshold": ${SCALEDOWNGPUUTILIZATIONTHRESHOLD},
 		"scaleDownUnneededTime": "${SCALEDOWNUNEEDEDTIME}",
-		"scaleDownUnreadyTime": "${SCALEDOWNUNREADYTIME}"
+		"scaleDownUnreadyTime": "${SCALEDOWNUNREADYTIME}",
+		"maxNodeProvisionTime": "${MAXNODEPROVISIONTIME}",
+		"zeroOrMaxNodeScaling": false,
+		"ignoreDaemonSetsUtilization": true
 	}
 }

@@ -92,6 +92,18 @@
 				""
 			],
 			"resources": [
+				"secrets"
+			],
+			"verbs": [
+				"get",
+				"delete"
+			]
+		},
+		{
+			"apiGroups": [
+				""
+			],
+			"resources": [
 				"pods",
 				"namespaces",
 				"services",

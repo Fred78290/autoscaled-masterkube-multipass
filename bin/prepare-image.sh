@@ -1,9 +1,104 @@
+#!/bin/bash
+ECR_PASSWORD=
+CNI_PLUGIN=
+CNI_VERSION=
+CONTAINER_ENGINE=
+CONTAINER_CTL=
+KUBERNETES_VERSION=
+KUBERNETES_DISTRO=
+ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
+
+export DEBIAN_FRONTEND=noninteractive
+
+OPTIONS=(
+	"container-runtime:"
+	"cni-version:"
+	"cni-plugin:"
+	"ecr-password:"
+	"kubernetes-version:"
+	"k8s-distribution:"
+)
+
+PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+TEMP=$(getopt -o r:c:p:v:d: --long "${PARAMS}"  -n "$0" -- "$@")
+
+eval set -- "${TEMP}"
+
+while true ; do
+	#echo "$1=$2"
+	case "$1" in
+		-r|--container-runtime)
+			case "$2" in
+				"docker")
+					CONTAINER_ENGINE="$2"
+					CONTAINER_CTL=docker
+					;;
+				"cri-o"|"containerd")
+					CONTAINER_ENGINE="$2"
+					CONTAINER_CTL=crictl
+					;;
+				*)
+					echo "Unsupported container runtime: $2"
+					exit 1
+					;;
+			esac
+			shift 2
+			;;
+		-c|--cni-version)
+			CNI_VERSION=$2
+			shift 2
+			;;
+		-p|--cni-plugin)
+			CNI_PLUGIN=$2
+			shift 2
+			;;
+		--ecr-password)
+			ECR_PASSWORD=$2
+			shift 2
+			;;
+		-v|--kubernetes-version)
+			KUBERNETES_VERSION=$2
+			shift 2
+			;;
+		-d|--k8s-distribution)
+			case "$2" in
+				kubeadm|k3s|rke2|microk8s)
+				KUBERNETES_DISTRO=$2
+				;;
+			*)
+				echo "Unsupported kubernetes distribution: $2"
+				exit 1
+				;;
+			esac
+			shift 2
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			echo "$1 - Internal error!"
+			exit 1
+			;;
+	esac
+done
+
+KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | awk -F. '{ print $2 }')
+CRIO_VERSION=$(echo -n ${KUBERNETES_VERSION} | tr -d 'v' | awk -F. '{ print $1"."$2 }')
+
 echo "==============================================================================================================================="
 echo "= Upgrade ubuntu distro"
 echo "==============================================================================================================================="
 apt update
 apt upgrade -y
 echo
+
+echo "==============================================================================================================================="
+echo "= Install mandatories tools"
+echo "==============================================================================================================================="
+
+apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
+snap install yq
 
 echo "==============================================================================================================================="
 echo "= Install aws cli"
@@ -13,7 +108,7 @@ mkdir -p /tmp/aws-install
 
 pushd /tmp/aws-install
 
-if [ "${SEED_ARCH}" == "arm64" ];  then
+if [ "${ARCH}" == "arm64" ];  then
     echo "= Install aws cli arm64"
     curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
 else
@@ -52,7 +147,7 @@ case "${KUBERNETES_DISTRO}" in
 		CREDENTIALS_CONFIG_DIR=/var/lib/rancher/credentialprovider
 		CREDENTIALS_BIN=/var/lib/rancher/credentialprovider/bin
 		;;
-	kubeadm)
+	kubeadm|microk8s)
 		CREDENTIALS_CONFIG_DIR=/etc/kubernetes
 		CREDENTIALS_BIN=/usr/local/bin
 		;;
@@ -64,16 +159,24 @@ mkdir -p /root/.aws
 
 echo "kubernetes ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kubernetes
 
-curl -sL https://github.com/Fred78290/aws-ecr-credential-provider/releases/download/v1.29.0/ecr-credential-provider-${SEED_ARCH} -o ${CREDENTIALS_BIN}/ecr-credential-provider
+curl -sL https://github.com/Fred78290/aws-ecr-credential-provider/releases/download/v1.29.0/ecr-credential-provider-${ARCH} -o ${CREDENTIALS_BIN}/ecr-credential-provider
 chmod +x ${CREDENTIALS_BIN}/ecr-credential-provider
 
-if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	echo "==============================================================================================================================="
+	echo "= Install kubernetes binaries"
+	echo "==============================================================================================================================="
+
+	cd /usr/local/bin
+	curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/${ARCH}/kubectl
+	chmod +x /usr/local/bin/kube*
+elif [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 	echo "prepare rke2 image"
 
 	curl -sfL https://get.rke2.io | INSTALL_RKE2_CHANNEL="${KUBERNETES_VERSION}" sh -
 
 	pushd /usr/local/bin
-	curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION%%+*}/bin/linux/${SEED_ARCH}/{kubectl,kube-proxy}
+	curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION%%+*}/bin/linux/${ARCH}/{kubectl,kube-proxy}
 	chmod +x /usr/local/bin/kube*
 	popd
 
@@ -116,7 +219,7 @@ ExecStart=/usr/local/bin/k3s $K3S_MODE $K3S_ARGS $K3S_SERVER_ARGS $K3S_AGENT_ARG
 
 EOF
 
-else
+elif [ "${KUBERNETES_DISTRO}" == "kubeadm" ]; then
 	echo "prepare kubeadm image"
 
 	function pull_image() {
@@ -157,7 +260,7 @@ else
 	echo "= Install CNI plugins"
 	echo "==============================================================================================================================="
 
-	curl -sL "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-${SEED_ARCH}-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
+	curl -sL "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-${ARCH}-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
 
 	ls -l /opt/cni/bin
 
@@ -199,7 +302,7 @@ EOF
 		echo "Install Containerd"
 		echo "==============================================================================================================================="
 
-		curl -sL https://github.com/containerd/containerd/releases/download/v1.7.11/cri-containerd-cni-1.7.11-linux-${SEED_ARCH}.tar.gz | tar -C / -xz
+		curl -sL https://github.com/containerd/containerd/releases/download/v1.7.11/cri-containerd-cni-1.7.11-linux-${ARCH}.tar.gz | tar -C / -xz
 
 		mkdir -p /etc/containerd
 		containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/g' | tee /etc/containerd/config.toml
@@ -207,7 +310,7 @@ EOF
 		systemctl enable containerd.service
 		systemctl restart containerd
 
-		curl -sL https://github.com/containerd/nerdctl/releases/download/v1.7.2/nerdctl-1.7.2-linux-${SEED_ARCH}.tar.gz | tar -C /usr/local/bin -xz
+		curl -sL https://github.com/containerd/nerdctl/releases/download/v1.7.2/nerdctl-1.7.2-linux-${ARCH}.tar.gz | tar -C /usr/local/bin -xz
 
 	else
 
@@ -232,7 +335,7 @@ EOF
 	echo "==============================================================================================================================="
 	echo "= Install crictl"
 	echo "==============================================================================================================================="
-	curl -sL https://github.com/kubernetes-sigs/cri-tools/releases/download/v${CRIO_VERSION}.0/crictl-v${CRIO_VERSION}.0-linux-${SEED_ARCH}.tar.gz | tar -C /usr/local/bin -xz
+	curl -sL https://github.com/kubernetes-sigs/cri-tools/releases/download/v${CRIO_VERSION}.0/crictl-v${CRIO_VERSION}.0-linux-${ARCH}.tar.gz | tar -C /usr/local/bin -xz
 	chmod +x /usr/local/bin/crictl
 
 	echo "==============================================================================================================================="
@@ -247,7 +350,7 @@ EOF
 	echo "==============================================================================================================================="
 
 	cd /usr/local/bin
-	curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/${SEED_ARCH}/{kubeadm,kubelet,kubectl,kube-proxy}
+	curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/${ARCH}/{kubeadm,kubelet,kubectl,kube-proxy}
 	chmod +x /usr/local/bin/kube*
 
 	echo
@@ -350,9 +453,9 @@ EOF
 		AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.16.0/config/master/aws-k8s-cni.yaml
 		pull_image ${AWS_CNI_URL} AWS ${ECR_PASSWORD}
 	elif [ "${CNI_PLUGIN}" = "calico" ]; then
-		curl -s -O -L "https://github.com/projectcalico/calico/releases/download/v3.27.0/calicoctl-linux-${SEED_ARCH}"
-		chmod +x calicoctl-linux-${SEED_ARCH}
-		mv calicoctl-linux-${SEED_ARCH} /usr/local/bin/calicoctl
+		curl -s -O -L "https://github.com/projectcalico/calico/releases/download/v3.27.0/calicoctl-linux-${ARCH}"
+		chmod +x calicoctl-linux-${ARCH}
+		mv calicoctl-linux-${ARCH} /usr/local/bin/calicoctl
 		pull_image https://docs.projectcalico.org/manifests/calico-vxlan.yaml
 	elif [ "${CNI_PLUGIN}" = "flannel" ]; then
 		pull_image https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml

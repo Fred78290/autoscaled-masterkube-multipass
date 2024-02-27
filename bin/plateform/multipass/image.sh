@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#set -e
+set -e
 
 # This script will create a VM used as template
 # This step is done by importing https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-amd64.img
@@ -57,7 +57,7 @@ while true ; do
 		--second-network) SECOND_NETWORK_NAME=$2 ; shift 2;;
 		--k8s-distribution) 
 			case "$2" in
-				kubeadm|k3s|rke2)
+				kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
 				;;
 			*)
@@ -101,7 +101,9 @@ echo_blue_bold "Ubuntu password:${KUBERNETES_PASSWORD}"
 
 mkdir -p ${CACHE}/packer/cloud-data
 
-echo -n > ${CACHE}/packer/cloud-data/meta-data
+cat > ${CACHE}/packer/cloud-data/meta-data <<EOF
+instance-id: $(uuidgen)/packer
+EOF
 
 cat > ${CACHE}/packer/cloud-data/user-data <<EOF
 #cloud-config
@@ -109,6 +111,12 @@ timezone: ${TZ}
 package_update: false
 package_upgrade: false
 ssh_pwauth: true
+write_files:
+- encoding: b64
+  content: $(cat ${CURDIR}/prepare-image.sh | base64 -w 0)
+  owner: root:adm
+  path: /usr/local/bin/prepare-image.sh
+  permissions: '0755'
 users:
   - name: ${KUBERNETES_USER}
     groups: users, admin
@@ -133,31 +141,6 @@ KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | tr '.' ' ' | awk '{ p
 CRIO_VERSION=$(echo -n ${KUBERNETES_VERSION} | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
 
 echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: ${CRIO_VERSION} and kubernetes: ${KUBERNETES_VERSION}"
-
-cat > "${CACHE}/prepare-image.sh" << EOF
-#!/bin/bash
-SEED_ARCH=${SEED_ARCH}
-CNI_PLUGIN=${CNI_PLUGIN}
-CNI_VERSION=${CNI_VERSION}
-KUBERNETES_VERSION=${KUBERNETES_VERSION}
-KUBERNETES_MINOR_RELEASE=${KUBERNETES_MINOR_RELEASE}
-CRIO_VERSION=${CRIO_VERSION}
-CONTAINER_ENGINE=${CONTAINER_ENGINE}
-CONTAINER_CTL=${CONTAINER_CTL}
-KUBERNETES_DISTRO=${KUBERNETES_DISTRO}
-
-apt update
-apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
-snap install yq
-sed -i 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0\"/' /etc/default/grub
-update-grub
-
-EOF
-
-cat ${CURDIR}/prepare-image.sh >> "${CACHE}/prepare-image.sh"
-
-chmod +x "${CACHE}/prepare-image.sh"
-
 read ISO_CHECKSUM ISO_FILE <<< "$(curl -s http://cloud-images.ubuntu.com/releases/${DISTRO}/release/SHA256SUMS | grep server-cloudimg-${SEED_ARCH}.img | tr -d '*')" 
 
 ACCEL=kvm
@@ -189,11 +172,17 @@ fi
 
 popd
 
+INIT_SCRIPT="/usr/local/bin/prepare-image.sh --container-runtime ${CONTAINER_ENGINE} --cni-version ${CNI_VERSION} --cni-plugin ${CNI_PLUGIN} --kubernetes-version ${KUBERNETES_VERSION} --k8s-distribution ${KUBERNETES_DISTRO}"
+
 pushd ${CACHE}/packer
+
+mkisofs -output cidata.iso -volid cidata -joliet -rock cloud-data/user-data cloud-data/meta-data
+
 rm -rf output-qemu
 export PACKER_LOG=1
 packer build \
 	-var QEMU_BINARY=${QEMU_BINARY} \
+	-var CDROM=${CACHE}/packer/cidata.iso \
 	-var CPU_HOST="${CPU_HOST}" \
 	-var MACHINE_TYPE="${MACHINE_TYPE}" \
 	-var DISTRO=${DISTRO} \
@@ -201,9 +190,9 @@ packer build \
 	-var SSH_PRIVATE_KEY="${SSH_PRIVATE_KEY}" \
 	-var ISO_CHECKSUM="sha256:${ISO_CHECKSUM}" \
 	-var ISO_FILE="${ISO_FILE}" \
-	-var INIT_SCRIPT="${CACHE}/prepare-image.sh" \
-	-var KUBERNETES_PASSWORD="${KUBERNETES_PASSWORD}" \
+	-var INIT_SCRIPT="${INIT_SCRIPT}" \
 	template.json
+
 mv output-qemu/packer-qemu ${TARGET_IMAGE}
 popd
 

@@ -65,7 +65,7 @@ while true ; do
 		--second-network) SECOND_NETWORK_NAME=$2 ; shift 2;;
 		--k8s-distribution) 
 			case "$2" in
-				kubeadm|k3s|rke2)
+				kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
 				;;
 			*)
@@ -76,13 +76,12 @@ while true ; do
 			shift 2
 			;;
 		--container-runtime)
+			CONTAINER_ENGINE="$2"
 			case "$2" in
 				"docker")
-					CONTAINER_ENGINE="$2"
 					CONTAINER_CTL=docker
 					;;
 				"cri-o"|"containerd")
-					CONTAINER_ENGINE="$2"
 					CONTAINER_CTL=crictl
 					;;
 				*)
@@ -262,6 +261,12 @@ echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: ${CRIO_VERSION
 
 cat > "${CACHE}/user-data" <<EOF
 #cloud-config
+write_files:
+- encoding: b64
+  content: $(cat ${CURDIR}/prepare-image.sh | base64 -w 0)
+  owner: root:adm
+  path: /usr/local/bin/prepare-image.sh
+  permissions: '0755'
 EOF
 
 cat > "${CACHE}/network.yaml" <<EOF
@@ -296,24 +301,6 @@ cat > "${CACHE}/meta-data" <<EOF
 }
 EOF
 
-cat > "${CACHE}/prepare-image.sh" << EOF
-#!/bin/bash
-SEED_ARCH=${SEED_ARCH}
-CNI_PLUGIN=${CNI_PLUGIN}
-CNI_VERSION=${CNI_VERSION}
-KUBERNETES_VERSION=${KUBERNETES_VERSION}
-KUBERNETES_MINOR_RELEASE=${KUBERNETES_MINOR_RELEASE}
-CRIO_VERSION=${CRIO_VERSION}
-CONTAINER_ENGINE=${CONTAINER_ENGINE}
-CONTAINER_CTL=${CONTAINER_CTL}
-KUBERNETES_DISTRO=${KUBERNETES_DISTRO}
-
-EOF
-
-cat ${CURDIR}/prepare-image.sh >> "${CACHE}/prepare-image.sh"
-
-chmod +x "${CACHE}/prepare-image.sh"
-
 gzip -c9 < "${CACHE}/meta-data" | base64 -w 0 > ${CACHE}/metadata.base64
 gzip -c9 < "${CACHE}/user-data" | base64 -w 0 > ${CACHE}/userdata.base64
 gzip -c9 < "${CACHE}/vendor-data" | base64 -w 0 > ${CACHE}/vendordata.base64
@@ -343,9 +330,12 @@ govc vm.power -on "${TARGET_IMAGE}"
 echo_blue_bold "Wait for IP from ${TARGET_IMAGE}"
 IPADDR=$(govc vm.ip -wait 5m "${TARGET_IMAGE}")
 
-scp ${SCP_OPTIONS} "${CACHE}/prepare-image.sh" "${KUBERNETES_USER}@${IPADDR}:~"
-
-ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo ./prepare-image.sh
+ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo /usr/local/bin/prepare-image.sh \
+						--container-runtime ${CONTAINER_ENGINE} \
+						--cni-version ${CNI_VERSION} \
+						--cni-plugin ${CNI_PLUGIN} \
+						--kubernetes-version ${KUBERNETES_VERSION} \
+						--k8s-distribution ${KUBERNETES_DISTRO}
 
 govc vm.power -persist-session=false -s=true "${TARGET_IMAGE}"
 

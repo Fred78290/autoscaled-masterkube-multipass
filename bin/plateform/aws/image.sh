@@ -60,7 +60,7 @@ while true ; do
 		--use-public-ip) MASTER_USE_PUBLICIP="${2}" ; shift 2;;
 		--k8s-distribution) 
 			case "$2" in
-				kubeadm|k3s|rke2)
+				kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
 				;;
 			*)
@@ -71,13 +71,12 @@ while true ; do
 			shift 2
 			;;
 		--container-runtime)
+			CONTAINER_ENGINE="$2"
 			case "$2" in
 				"docker")
-					CONTAINER_ENGINE="$2"
 					CONTAINER_CTL=docker
 					;;
 				"cri-o"|"containerd")
-					CONTAINER_ENGINE="$2"
 					CONTAINER_CTL=crictl
 					;;
 				*)
@@ -178,30 +177,6 @@ cat > ${CACHE}/mapping.json <<EOF
 ]
 EOF
 
-cat > "${CACHE}/prepare-image.sh" << EOF
-#!/bin/bash
-SEED_ARCH=${SEED_ARCH}
-CNI_PLUGIN=${CNI_PLUGIN}
-CNI_VERSION=${CNI_VERSION}
-KUBERNETES_VERSION=${KUBERNETES_VERSION}
-KUBERNETES_MINOR_RELEASE=${KUBERNETES_MINOR_RELEASE}
-ECR_PASSWORD=${ECR_PASSWORD}
-CRIO_VERSION=${CRIO_VERSION}
-CONTAINER_ENGINE=${CONTAINER_ENGINE}
-CONTAINER_CTL=${CONTAINER_CTL}
-KUBERNETES_DISTRO=${KUBERNETES_DISTRO}
-
-apt update
-apt upgrade -y
-apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
-snap install yq
-
-EOF
-
-cat ${CURDIR}/prepare-image.sh >> "${CACHE}/prepare-image.sh"
-
-chmod +x "${CACHE}/prepare-image.sh"
-
 if [ "${MASTER_USE_PUBLICIP}" == "true" ]; then
 	PUBLIC_IP_OPTIONS=--associate-public-ip-address
 else
@@ -215,6 +190,12 @@ cat > "${CACHE}/user-data.yaml" <<EOF
 timezone: ${TZ}
 ssh_authorized_keys:
   - ${SSH_KEY}
+write_files:
+- encoding: gz+b64
+  content: $(gzip -c9 < ${CURDIR}/prepare-image.sh | base64 -w 0)
+  owner: root:adm
+  path: /usr/local/bin/prepare-image.sh
+  permissions: '0755'
 users:
   - name: ${KUBERNETES_USER}
     groups: users, admin
@@ -273,14 +254,19 @@ echo_blue_dot_title "Wait for ${TARGET_IMAGE} ssh ready for on ${IP_TYPE} IP=${I
 while :
 do
 	echo_blue_dot
-	scp ${SCP_OPTIONS} -o ConnectTimeout=1 "${CACHE}/prepare-image.sh" "${KUBERNETES_USER}@${IPADDR}":~ 2>/dev/null && break
+	ssh ${SSH_OPTIONS} -o ConnectTimeout=1 -t ${KUBERNETES_USER}@${IPADDR} exit 2>/dev/null && break
 	sleep 1
 done
 
 echo
 
-ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo ./prepare-image.sh
-ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" rm ./prepare-image.sh
+ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo /usr/local/bin/prepare-image.sh \
+						--container-runtime ${CONTAINER_ENGINE} \
+						--cni-version ${CNI_VERSION} \
+						--cni-plugin ${CNI_PLUGIN} \
+						--ecr-password ${ECR_PASSWORD} \
+						--kubernetes-version ${KUBERNETES_VERSION} \
+						--k8s-distribution ${KUBERNETES_DISTRO}
 
 aws ec2 stop-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${LAUNCHED_ID}" &> /dev/null
 

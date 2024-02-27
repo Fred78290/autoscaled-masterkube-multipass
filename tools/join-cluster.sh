@@ -103,7 +103,7 @@ while true; do
 		;;
 	--k8s-distribution)
 		case "$2" in
-			kubeadm|k3s|rke2)
+			kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
 				;;
 			*)
@@ -217,7 +217,80 @@ cp cluster/config /etc/kubernetes/admin.conf
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
-if [ ${KUBERNETES_DISTRO} == "rke2" ]; then
+if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
+	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
+	MICROK8S_CHANNEL="${VERSION:1}.${MAJOR}/stable"
+	MICROK8S_CONFIG=/var/snap/microk8s/common/.microk8s.yaml
+	APISERVER_ADVERTISE_PORT=16443
+	ANNOTE_MASTER=true
+
+	if [ "${HA_CLUSTER}" == "true" ]; then
+		WORKER_NODE=false
+	else
+		WORKER_NODE=true
+	fi
+
+	mkdir -p /var/snap/microk8s/common/
+
+	cat >  ${MICROK8S_CONFIG} <<EOF
+version: 0.1.0
+persistentClusterToken: ${TOKEN}
+join:
+  url: ${MASTER_IP%%:*}:25000/${TOKEN}
+  worker: ${WORKER_NODE}
+extraMicroK8sAPIServerProxyArgs:
+  --refresh-interval: "0"
+EOF
+
+	echo "extraKubeletArgs:" >> ${MICROK8S_CONFIG}
+	echo "  --max-pods: ${MAX_PODS}" >> ${MICROK8S_CONFIG}
+	echo "  --cloud-provider: ${CLOUD_PROVIDER}" >> ${MICROK8S_CONFIG}
+	echo "  --node-ip: ${APISERVER_ADVERTISE_ADDRESS}" >> ${MICROK8S_CONFIG}
+
+	if [ -f /etc/kubernetes/credential.yaml ]; then
+		echo "  --image-credential-provider-config: /etc/kubernetes/credential.yaml" >> ${MICROK8S_CONFIG}
+		echo "  --image-credential-provider-bin-dir: /usr/local/bin" >> ${MICROK8S_CONFIG}
+	fi
+
+	if [ "${HA_CLUSTER}" = "true" ]; then
+		echo "addons:" >> ${MICROK8S_CONFIG}
+		echo "  - name: dns" >> ${MICROK8S_CONFIG}
+		echo "  - name: rbac" >> ${MICROK8S_CONFIG}
+		echo "  - name: hostpath-storage" >> ${MICROK8S_CONFIG}
+
+		echo "extraKubeAPIServerArgs:" >> ${MICROK8S_CONFIG}
+		echo "  --advertise-address: ${APISERVER_ADVERTISE_ADDRESS}" >> ${MICROK8S_CONFIG}
+		echo "  --authorization-mode: RBAC,Node" >> ${MICROK8S_CONFIG}
+
+		if [ "${EXTERNAL_ETCD}" == "true" ]; then
+			echo "  --etcd-servers: ${ETCD_ENDPOINT}" >> ${MICROK8S_CONFIG}
+			echo "  --etcd-cafile: /etc/etcd/ssl/ca.pem" >> ${MICROK8S_CONFIG}
+			echo "  --etcd-certfile: /etc/etcd/ssl/etcd.pem" >> ${MICROK8S_CONFIG}
+			echo "  --etcd-keyfile: /etc/etcd/ssl/etcd-key.pem" >> ${MICROK8S_CONFIG}
+		fi
+
+		echo "extraSANs:" >> ${MICROK8S_CONFIG}
+		
+		for CERT_SAN in $(echo -n ${CERT_SANS} | tr ',' ' ')
+		do
+			echo "  - ${CERT_SAN}" >>  ${MICROK8S_CONFIG}
+		done
+	fi
+
+	cat ${MICROK8S_CONFIG}
+
+	echo "Install microk8s ${MICROK8S_CHANNEL}"
+	snap install microk8s --classic --channel=${MICROK8S_CHANNEL}
+
+	echo -n "Wait node ${NODENAME} to be ready"
+
+	while [ -z "$(kubectl get no ${NODENAME} 2>/dev/null | grep -v NAME)" ];
+	do
+		echo -n "."
+		sleep 1
+	done
+
+elif [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 	ANNOTE_MASTER=true
 	RKE2_SERVICE=rke2-agent
 
@@ -384,6 +457,7 @@ fi
 if [ "${HA_CLUSTER}" = "true" ]; then
 	kubectl label nodes ${NODENAME} \
 		"cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" \
+		"node-role.kubernetes.io/control-plane=${ANNOTE_MASTER}" \
 		"node-role.kubernetes.io/master=${ANNOTE_MASTER}" \
 		"topology.kubernetes.io/region=${REGION}" \
 		"topology.kubernetes.io/zone=${ZONEID}" \

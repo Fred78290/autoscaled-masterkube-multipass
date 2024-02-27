@@ -196,7 +196,7 @@ while true; do
 		;;
 	--k8s-distribution)
 		case "$2" in
-			kubeadm|k3s|rke2)
+			kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
 				;;
 			*)
@@ -472,9 +472,17 @@ if [ "${USE_ZEROSSL}" = "YES" ]; then
 	fi
 fi
 
+if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	APISERVER_ADVERTISE_PORT=16443
+fi
+
 if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-	LOAD_BALANCER_PORT="${LOAD_BALANCER_PORT},9345"
+	LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},9345"
 	EXTERNAL_ETCD=false
+elif [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},25000"
+else
+	LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT}"
 fi
 
 if [ "${HA_CLUSTER}" = "true" ]; then
@@ -507,6 +515,12 @@ if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; 
 	else
 		echo_blue_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} found, use ${KUBERNETES_DISTRO} ${KUBERNETES_VERSION}"
 	fi
+elif [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	WANTED_KUBERNETES_VERSION=${KUBERNETES_VERSION}
+	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
+	MICROK8S_CHANNEL="${VERSION:1}.${MAJOR}/stable"
+
+	echo_blue_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} found, use ${KUBERNETES_DISTRO} ${MICROK8S_CHANNEL}"
 fi
 
 SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
@@ -586,7 +600,7 @@ if [ -n "${VC_NETWORK_PUBLIC}" ]; then
 	fi
 fi
 
-if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ] || [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
 	TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}"
 else
 	TARGET_IMAGE="${ROOT_IMG_NAME}-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
@@ -1182,12 +1196,12 @@ do
 				while :
 				do
 					echo_blue_dot
-					curl -s -k "https://${IPADDRS[0]}:6443" &> /dev/null && break
+					curl -s -k "https://${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" &> /dev/null && break
 					sleep 1
 				done
 				echo
 
-				echo -n ${IPADDRS[0]}:6443 > ${TARGET_CLUSTER_LOCATION}/manager-ip
+				echo -n ${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT} > ${TARGET_CLUSTER_LOCATION}/manager-ip
 			elif [[ ${INDEX} > ${CONTROLNODES} ]] || [ "${HA_CLUSTER}" = "false" ]; then
 				echo_blue_bold "Join node ${MASTERKUBE_NODE} instance worker node, kubernetes version=${KUBERNETES_VERSION}"
 
@@ -1274,7 +1288,9 @@ else
 	echo "address: ${CONNECTTO}" > ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG}
 fi
 
-if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	SERVER_ADDRESS="${MASTER_IP%%:*}:25000"
+elif [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 	SERVER_ADDRESS="${MASTER_IP%%:*}:9345"
 else
 	SERVER_ADDRESS="${MASTER_IP}"

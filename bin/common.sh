@@ -72,7 +72,6 @@ export KUBERNETES_PASSWORD=
 export KUBERNETES_USER=kubernetes
 export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 export LAUNCH_CA=YES
-export LOAD_BALANCER_PORT=6443
 export MASTER_INSTANCE_PROFILE_ARN=
 export MASTER_NODE_ALLOW_DEPLOYMENT=NO
 export MASTER_PROFILE_NAME="kubernetes-master-profile"

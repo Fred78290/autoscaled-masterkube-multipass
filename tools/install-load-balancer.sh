@@ -5,7 +5,7 @@ set -e
 CONTROL_PLANE_ENDPOINT=
 CLUSTER_NODES=
 NET_IP=0.0.0.0
-LOAD_BALANCER_PORT=6443
+LOAD_BALANCER_PORT=80,443,6443
 
 TEMP=$(getopt -o l:c:p:n: --long listen-port:,listen-ip:,cluster-nodes:,control-plane-endpoint: -n "$0" -- "$@")
 
@@ -102,9 +102,7 @@ function create_tcp_stream() {
 	done
 }
 
-create_tcp_stream apiserver_lb ${LOAD_BALANCER_PORT} /etc/nginx/tcpconf.d/apiserver.conf
-create_tcp_stream https_lb 443 /etc/nginx/tcpconf.d/https.conf
-create_tcp_stream http_lb 80 /etc/nginx/tcpconf.d/http.conf
+create_tcp_stream tcp_lb ${LOAD_BALANCER_PORT} /etc/nginx/tcpconf.d/listen.conf
 
 apt install --fix-broken
 

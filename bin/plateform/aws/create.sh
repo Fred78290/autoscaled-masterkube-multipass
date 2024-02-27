@@ -205,7 +205,7 @@ while true; do
 		;;
 	--k8s-distribution)
 		case "$2" in
-			kubeadm|k3s|rke2)
+			kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
 				;;
 			*)
@@ -527,9 +527,17 @@ if [ "${USE_ZEROSSL}" = "YES" ]; then
 	fi
 fi
 
+if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	APISERVER_ADVERTISE_PORT=16443
+fi
+
 if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-	LOAD_BALANCER_PORT="${LOAD_BALANCER_PORT},9345"
+	LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},9345"
 	EXTERNAL_ETCD=false
+elif [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},25000"
+else
+	LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT}"
 fi
 
 if [ "${HA_CLUSTER}" = "true" ]; then
@@ -562,6 +570,12 @@ if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; 
 	else
 		echo_blue_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} found, use ${KUBERNETES_DISTRO} ${KUBERNETES_VERSION}"
 	fi
+elif [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	WANTED_KUBERNETES_VERSION=${KUBERNETES_VERSION}
+	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
+	MICROK8S_CHANNEL="${VERSION:1}.${MAJOR}/stable"
+
+	echo_blue_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} found, use ${KUBERNETES_DISTRO} ${MICROK8S_CHANNEL}"
 fi
 
 SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
@@ -667,7 +681,7 @@ if [ -z "${TARGET_IMAGE}" ]; then
 
 fi
 
-if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ] || [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
 	TARGET_IMAGE=$(echo -n "${ROOT_IMG_NAME}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}" | tr '+' '-')
 else
 	TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
@@ -1105,19 +1119,19 @@ function named_index_suffix() {
 #
 #===========================================================================================================================================
 function wait_nlb_ready() {
-	echo_blue_dot_title "Wait for ELB start on IP: ${CONTROL_PLANE_ENDPOINT}:6443"
+	echo_blue_dot_title "Wait for ELB start on IP: ${CONTROL_PLANE_ENDPOINT}:${APISERVER_ADVERTISE_PORT}"
 
 	while :
 	do
 		echo_blue_dot
-		curl -s -k --connect-timeout 1 "https://${CONTROL_PLANE_ENDPOINT}:6443" &> /dev/null && break
+		curl -s -k --connect-timeout 1 "https://${CONTROL_PLANE_ENDPOINT}:${APISERVER_ADVERTISE_PORT}" &> /dev/null && break
 		sleep 1
 	done
 	echo
 
 	echo_line
 
-	echo -n ${CONTROL_PLANE_ENDPOINT}:6443 > ${TARGET_CLUSTER_LOCATION}/manager-ip
+	echo -n ${CONTROL_PLANE_ENDPOINT}:${APISERVER_ADVERTISE_PORT} > ${TARGET_CLUSTER_LOCATION}/manager-ip
 }
 
 #===========================================================================================================================================
@@ -1686,7 +1700,7 @@ function start_kubernes_on_instances() {
 
 					wait_nlb_ready
 
-					MASTER_IP=${IPADDR}:6443
+					MASTER_IP=${IPADDR}:${APISERVER_ADVERTISE_PORT}
 
 					echo_blue_bold "Master ${MASTERKUBE_NODE} started in cluster mode, master-ip=${MASTER_IP}"
 				# Start control-plane join master node
@@ -1753,7 +1767,7 @@ function start_kubernes_on_instances() {
 
 					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
 
-					MASTER_IP=${IPADDR}:6443
+					MASTER_IP=${IPADDR}:${APISERVER_ADVERTISE_PORT}
 
 					echo_blue_bold "Master ${MASTERKUBE_NODE} started master-ip=${MASTER_IP}"
 				else
@@ -2067,7 +2081,7 @@ CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 if [ "${HA_CLUSTER}" = "true" ]; then
 
 	IPADDR="${PRIVATE_ADDR_IPS[${CONTROLNODE_INDEX}]}"
-	JOIN_IP="${IPADDR}:6443"
+	JOIN_IP="${IPADDR}:${APISERVER_ADVERTISE_PORT}"
 
 	for INDEX in $(seq 1 ${CONTROLNODES})
 	do
@@ -2133,7 +2147,7 @@ else
 	LOAD_BALANCER_IP=${PRIVATE_ADDR_IPS[0]}
 	IPADDR="${PRIVATE_ADDR_IPS[${CONTROLNODE_INDEX}]}"
 	PRIVATEDNS=$(echo ${LAUNCHED_INSTANCES[${CONTROLNODE_INDEX}]} | jq -r '.PrivateDnsName')
-	JOIN_IP="${IPADDR}:6443"
+	JOIN_IP="${IPADDR}:${APISERVER_ADVERTISE_PORT}"
 
 	echo_grey "IPADDR=${PRIVATEDNS}:${IPADDR} IPRESERVED2=${PRIVATEDNS2}:${IPRESERVED2} IPRESERVED3=${PRIVATEDNS3}:${IPRESERVED3}"
 
@@ -2185,7 +2199,9 @@ else
 	echo "address: ${CONNECTTO}" > ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG}
 fi
 
-if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	SERVER_ADDRESS="${MASTER_IP%%:*}:25000"
+elif [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 	SERVER_ADDRESS="${MASTER_IP%%:*}:9345"
 else
 	SERVER_ADDRESS="${MASTER_IP}"

@@ -34,12 +34,19 @@
 	"${KUBERNETES_DISTRO}": {
 		"address": "${SERVER_ADDRESS}",
 		"token": "${TOKEN}",
+		"datastore-endpoint": "${ETCD_ENDPOINT}",
 		"ca": "sha256:${CACERT}",
 		"extras-args": [
 			"--ignore-preflight-errors=All"
 		],
-		"datastore-endpoint": "${ETCD_ENDPOINT}",
-		"extras-commands": []
+		"channel": "${MICROK8S_CHANNEL}",
+		"extras-commands": [],
+		"join-command": "/usr/local/bin/join-cluster.sh",
+		"delete-command": "/usr/local/bin/leave-cluster.sh",
+		"config-path": "/etc/external-cluster/config.yaml",
+		"extra-config": {
+			"ball": "same player"
+		}
 	},
 	"default-machine": "${AUTOSCALE_MACHINE}",
 	"cloud-init": {

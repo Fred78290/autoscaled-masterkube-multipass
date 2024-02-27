@@ -26,6 +26,7 @@ if [ "${EXTERNAL_ETCD}" = "true" ]; then
 		| tee ${TARGET_DEPLOY_LOCATION}/secrets/etcd-ssl.yaml \
 		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 else
+	mkdir -p ${TARGET_CLUSTER_LOCATION}/kubernetes/pki/etcd
 	kubectl create secret generic etcd-ssl -n kube-system --dry-run=client -o yaml \
 		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 		--from-file ${TARGET_CLUSTER_LOCATION}/kubernetes/pki/etcd \

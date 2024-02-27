@@ -8,7 +8,7 @@ pushd ${CURDIR}/../ &>/dev/null
 export KUBERNETES_TEMPLATE=./templates/vsphere-storage
 export ETC_DIR=${TARGET_DEPLOY_LOCATION}/vsphere-storage
 
-if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+if [ "${KUBERNETES_DISTRO}" == "microk8s" ] || [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
   ANNOTE_MASTER=true
 fi
 

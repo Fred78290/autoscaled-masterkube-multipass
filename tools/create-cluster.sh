@@ -24,7 +24,6 @@ HA_CLUSTER=false
 INSTANCEID=
 INSTANCENAME=${HOSTNAME}
 K8_OPTIONS="--ignore-preflight-errors=All --config=/etc/kubernetes/kubeadm-config.yaml"
-KUBEADM_CONFIG=/etc/kubernetes/kubeadm-config.yaml
 KUBECONFIG=/etc/kubernetes/admin.conf
 KUBERNETES_DISTRO=kubeadm
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
@@ -81,7 +80,7 @@ while true; do
 		;;
 	--k8s-distribution)
 		case "$2" in
-			kubeadm|k3s|rke2)
+			kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
 				;;
 			*)
@@ -255,7 +254,86 @@ mkdir -p ${CLUSTER_DIR}/etcd
 
 echo "${APISERVER_ADVERTISE_ADDRESS} $(hostname) ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 
-if [ ${KUBERNETES_DISTRO} == "rke2" ]; then
+if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
+	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
+	MICROK8S_CHANNEL="${VERSION:1}.${MAJOR}/stable"
+	MICROK8S_CONFIG=/var/snap/microk8s/common/.microk8s.yaml
+	MICROK8S_CLUSTER_TOKEN=$(echo $(date +%s%N) | sha256sum | head -c 32)
+	APISERVER_ADVERTISE_PORT=16443
+	ANNOTE_MASTER=true
+
+	mkdir -p /var/snap/microk8s/common/
+
+	cat >  ${MICROK8S_CONFIG} <<EOF
+version: 0.1.0
+persistentClusterToken: ${MICROK8S_CLUSTER_TOKEN}
+addons:
+  - name: dns
+  - name: rbac
+  - name: hostpath-storage
+extraKubeAPIServerArgs:
+  --advertise-address: ${APISERVER_ADVERTISE_ADDRESS}
+  --authorization-mode: RBAC,Node
+EOF
+
+	if [ "${EXTERNAL_ETCD}" == "true" ]; then
+		echo "  --etcd-servers: ${ETCD_ENDPOINT}" >> ${MICROK8S_CONFIG}
+		echo "  --etcd-cafile: /etc/etcd/ssl/ca.pem" >> ${MICROK8S_CONFIG}
+		echo "  --etcd-certfile: /etc/etcd/ssl/etcd.pem" >> ${MICROK8S_CONFIG}
+		echo "  --etcd-keyfile: /etc/etcd/ssl/etcd-key.pem" >> ${MICROK8S_CONFIG}
+	fi
+
+	echo "extraKubeletArgs:" >> ${MICROK8S_CONFIG}
+	echo "  --max-pods: ${MAX_PODS}" >> ${MICROK8S_CONFIG}
+	echo "  --cloud-provider: ${CLOUD_PROVIDER}" >> ${MICROK8S_CONFIG}
+	echo "  --node-ip: ${APISERVER_ADVERTISE_ADDRESS}" >> ${MICROK8S_CONFIG}
+
+	if [ -f /etc/kubernetes/credential.yaml ]; then
+		echo "  --image-credential-provider-config: /etc/kubernetes/credential.yaml" >> ${MICROK8S_CONFIG}
+		echo "  --image-credential-provider-bin-dir: /usr/local/bin" >> ${MICROK8S_CONFIG}
+	fi
+
+	echo "extraSANs:" >> ${MICROK8S_CONFIG}
+
+	for CERT_SAN in $(echo -n ${CERT_SANS} | tr ',' ' ')
+	do
+		echo "  - ${CERT_SAN}" >>  ${MICROK8S_CONFIG}
+	done
+
+	cat ${MICROK8S_CONFIG}
+
+	echo "Install microk8s ${MICROK8S_CHANNEL}"
+	snap install microk8s --classic --channel=${MICROK8S_CHANNEL}
+	
+	echo "Wait microk8s get ready"
+	microk8s status --wait-ready -t 120
+
+	if [ "${HA_CLUSTER}" = "true" ]; then
+		microk8s add-node
+		microk8s add-node
+	fi
+
+	mkdir -p ${CLUSTER_DIR}/kubernetes/pki
+
+	cp /var/snap/microk8s/current/certs/* ${CLUSTER_DIR}/kubernetes/pki
+
+	mkdir -p ${HOME}/.kube
+	microk8s config > ${HOME}/.kube/config
+	chown $(id -u):$(id -g) ${HOME}/.kube/config
+
+	microk8s config | sed \
+		-e "s/microk8s-cluster/${NODEGROUP_NAME}/g" \
+		-e "s/microk8s/${NODEGROUP_NAME}/g" \
+		-e "s/admin/admin@${NODEGROUP_NAME}/g" > ${CLUSTER_DIR}/config
+
+	echo -n ${MICROK8S_CLUSTER_TOKEN} > ${CLUSTER_DIR}/token
+	openssl x509 -pubkey -in /var/snap/microk8s/current/certs/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > ${CLUSTER_DIR}/ca.cert
+
+	chmod -R uog+r ${CLUSTER_DIR}/*
+
+	KUBECONFIG=${HOME}/.kube/config
+
+elif [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 	ANNOTE_MASTER=true
 
 	if [ "${CLOUD_PROVIDER}" == "external" ]; then
@@ -414,7 +492,7 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 
 else
 	if [ -f /etc/kubernetes/kubelet.conf ]; then
-			echo "Already installed k8s master node"
+		echo "Already installed k8s master node"
 	fi
 
 	if [ -e /etc/default/kubelet ]; then
@@ -431,6 +509,7 @@ else
 
 	CNI_PLUGIN=$(echo "${CNI_PLUGIN}" | tr '[:upper:]' '[:lower:]')
 	KUBEADM_TOKEN=$(kubeadm token generate)
+	KUBEADM_CONFIG=/etc/kubernetes/kubeadm-config.yaml
 
 	case ${CNI_PLUGIN} in
 		aws)
@@ -693,6 +772,7 @@ chmod -R uog+r ${CLUSTER_DIR}/*
 
 kubectl label nodes ${NODENAME} \
 	"cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" \
+	"node-role.kubernetes.io/control-plane=${ANNOTE_MASTER}" \
 	"node-role.kubernetes.io/master=${ANNOTE_MASTER}" \
 	"topology.kubernetes.io/region=${REGION}" \
 	"topology.kubernetes.io/zone=${ZONEID}" \

@@ -12,6 +12,7 @@
 			"ssh_username": "packer",
 			"ssh_password": "packerpassword",
 			"ssh_private_key_file": "{{user `SSH_PRIV_KEY`}}",
+			"ssh_handshake_attempts": 500,
 			"http_directory": "cloud-data",
 			"machine_type": "{{ user `MACHINE_TYPE` }}",
 			"qemu_binary": "{{ user `QEMU_BINARY` }}",
@@ -21,8 +22,8 @@
 					"{{ user `CPU_HOST` }}"
 				],
 				[
-					"-smbios",
-					"type=1,serial=ds=nocloud-net;instance-id=packer;seedfrom=http://{{ .HTTPIP }}:{{ .HTTPPort }}/"
+					"-cdrom",
+					"{{ user `CDROM` }}"
 				]
 			],
 			"use_default_display": true
@@ -30,16 +31,20 @@
 	],
 	"provisioners": [
 		{
-			"type": "file",
-			"source": "{{ user `INIT_SCRIPT` }}",
-			"destination": "/tmp/init.sh"
+			"type": "shell",
+			"execute_command": "sudo sh -xc '{{ .Vars }} {{ .Path }}'",
+			"remote_folder": "/tmp",
+			"inline": [
+				"sed -i 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0\"/' /etc/default/grub",
+				"update-grub"
+			]
 		},
 		{
 			"type": "shell",
-			"execute_command": "sudo sh -c '{{ .Vars }} {{ .Path }}'",
+			"execute_command": "sudo sh -xc '{{ .Vars }} {{ .Path }}'",
 			"remote_folder": "/tmp",
 			"inline": [
-				"/bin/bash /tmp/init.sh"
+				"{{ user `INIT_SCRIPT` }}"
 			]
 		},
 		{

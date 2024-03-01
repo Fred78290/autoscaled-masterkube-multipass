@@ -223,7 +223,7 @@ if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 		sudo apt upgrade -y
 		sudo apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
 		sudo snap install yq
-		sudo sh -c 'echo datasource_list: [ NoCloud, VMware, OVF ] > /etc/cloud/cloud.cfg.d/99-VMWare-Only.cfg'
+		sudo sh -c 'echo datasource_list: [ NoCloud, VMware ] > /etc/cloud/cloud.cfg.d/99-VMWare-Only.cfg'
 		exit 
 EOF
 

@@ -1,12 +1,74 @@
 #!/bin/bash
-APISERVER_VIP=$1
-APISERVER_DEST_PORT=6443
-KEEPALIVED_PASSWORD=$2
-KEEPALIVED_PRIORITY=$3
-KEEPALIVED_MCAST=$4
-KEEPALIVED_PEER1=$5
-KEEPALIVED_PEER2=$6
-KEEPALIVED_STATUS=$7
+set -eu
+
+OPTIONS=(
+	"bind-address:"
+	"bind-port:"
+	"keep-alive-password:"
+	"keep-alive-priority:"
+	"keep-alive-multicast:"
+	"keep-alive-peer1:"
+	"keep-alive-peer2:"
+	"keep-alive-status:"
+)
+
+PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+TEMP=$(getopt -o a:b:p:i:m:1:2:s: --long "${PARAMS}"  -n "$0" -- "$@")
+
+eval set -- "${TEMP}"
+
+while true; do
+	case "$1" in
+    -a|--bind-address)
+      APISERVER_VIP=$2
+      shift 2
+      ;;
+
+    -b|--bind-port)
+      APISERVER_DEST_PORT=$2
+      shift 2
+      ;;
+
+    -p|--keep-alive-password)
+      KEEPALIVED_PASSWORD=$2
+      shift 2
+      ;;
+
+    -i|--keep-alive-priority)
+      KEEPALIVED_PRIORITY=$2
+      shift 2
+      ;;
+ 
+    -m|--keep-alive-multicast)
+      KEEPALIVED_MCAST=$2
+      shift 2
+      ;;
+ 
+    -1|--keep-alive-peer1)
+      KEEPALIVED_PEER1=$2
+      shift 2
+      ;;
+
+    -2|--keep-alive-peer2)
+      KEEPALIVED_PEER2=$2
+      shift 2
+      ;;
+
+    -s|--keep-alive-status)
+      KEEPALIVED_STATUS=$2
+      shift 2
+      ;;
+
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo_red "$1 - Internal error!"
+      exit 1
+      ;;
+  esac
+done
 
 if [ -f /etc/keepalived/check_apiserver.sh ]; then
 	exit 0

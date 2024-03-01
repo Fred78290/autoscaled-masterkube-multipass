@@ -170,6 +170,20 @@ while true; do
 	esac
 done
 
+function wait_node_ready() {
+	echo -n "Wait node ${NODENAME} to be ready"
+
+	while [ -z "$(kubectl get no ${NODENAME} 2>/dev/null | grep -v NAME)" ];
+	do
+		echo -n "."
+		sleep 1
+	done
+
+	kubectl wait --for=condition=Ready nodes --field-selector metadata.name=${NODENAME} --timeout=120s
+
+	echo
+}
+
 if [ ${PLATEFORM} == "aws" ]; then
 	LOCALHOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)
 	INSTANCEID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
@@ -217,6 +231,12 @@ cp cluster/config /etc/kubernetes/admin.conf
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
+SUDO_HOME=$(eval echo ~${SUDO_USER})
+
+mkdir -p ${SUDO_HOME}/.kube
+cp ${KUBECONFIG} ${SUDO_HOME}/.kube/config
+chown ${SUDO_UID}:${SUDO_GID} ${SUDO_HOME}/.kube/config
+
 if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
 	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
 	MICROK8S_CHANNEL="${VERSION:1}.${MAJOR}/stable"
@@ -240,12 +260,11 @@ join:
   worker: ${WORKER_NODE}
 extraMicroK8sAPIServerProxyArgs:
   --refresh-interval: "0"
+extraKubeletArgs:
+  --max-pods: ${MAX_PODS}
+  --cloud-provider: ${CLOUD_PROVIDER}
+  --node-ip: ${APISERVER_ADVERTISE_ADDRESS}
 EOF
-
-	echo "extraKubeletArgs:" >> ${MICROK8S_CONFIG}
-	echo "  --max-pods: ${MAX_PODS}" >> ${MICROK8S_CONFIG}
-	echo "  --cloud-provider: ${CLOUD_PROVIDER}" >> ${MICROK8S_CONFIG}
-	echo "  --node-ip: ${APISERVER_ADVERTISE_ADDRESS}" >> ${MICROK8S_CONFIG}
 
 	if [ -f /etc/kubernetes/credential.yaml ]; then
 		echo "  --image-credential-provider-config: /etc/kubernetes/credential.yaml" >> ${MICROK8S_CONFIG}
@@ -281,14 +300,6 @@ EOF
 
 	echo "Install microk8s ${MICROK8S_CHANNEL}"
 	snap install microk8s --classic --channel=${MICROK8S_CHANNEL}
-
-	echo -n "Wait node ${NODENAME} to be ready"
-
-	while [ -z "$(kubectl get no ${NODENAME} 2>/dev/null | grep -v NAME)" ];
-	do
-		echo -n "."
-		sleep 1
-	done
 
 elif [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 	ANNOTE_MASTER=true
@@ -343,38 +354,28 @@ EOF
 	systemctl enable ${RKE2_SERVICE}.service
 	systemctl start ${RKE2_SERVICE}.service
 
-	echo -n "Wait node ${NODENAME} to be ready"
-
-	while [ -z "$(kubectl get no ${NODENAME} 2>/dev/null | grep -v NAME)" ];
-	do
-		echo -n "."
-		sleep 1
-	done
-
-	echo
-
 elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 	ANNOTE_MASTER=true
 
 	K3S_MODE=agent
 	K3S_ARGS="--kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --server=https://${MASTER_IP} --token=${TOKEN}"
-	K3S_DISABLE_ARGS=--disable-apiserver-lb
-	K3S_SERVER_ARGS=
+	K3S_DISABLE_ARGS=""
 
 	if [ -n "${PROVIDERID}" ]; then
 		K3S_ARGS="${K3S_ARGS} --kubelet-arg=provider-id=${PROVIDERID}"
 	fi
 
 	if [ "${HA_CLUSTER}" = "true" ]; then
-		K3S_MODE=server
+        K3S_MODE=server
 		K3S_DISABLE_ARGS="--disable=servicelb --disable=traefik --disable=metrics-server"
+		K3S_SERVER_ARGS="--tls-san=${CERT_SANS}"
 
 		if [ "${CLOUD_PROVIDER}" == "external" ]; then
 			K3S_DISABLE_ARGS="${K3S_DISABLE_ARGS} --disable-cloud-controller"
 		fi
 
 		if [ "${EXTERNAL_ETCD}" == "true" ] && [ -n "${ETCD_ENDPOINT}" ]; then
-			K3S_SERVER_ARGS="--datastore-endpoint=${ETCD_ENDPOINT} --datastore-cafile /etc/etcd/ssl/ca.pem --datastore-certfile /etc/etcd/ssl/etcd.pem --datastore-keyfile /etc/etcd/ssl/etcd-key.pem"
+			K3S_SERVER_ARGS="${K3S_SERVER_ARGS} --datastore-endpoint=${ETCD_ENDPOINT} --datastore-cafile=/etc/etcd/ssl/ca.pem --datastore-certfile=/etc/etcd/ssl/etcd.pem --datastore-keyfile=/etc/etcd/ssl/etcd-key.pem"
 		fi
 	fi
 
@@ -387,16 +388,6 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 
 	systemctl enable k3s.service
 	systemctl start k3s.service
-
-	echo -n "Wait node ${NODENAME} to be ready"
-
-	while [ -z "$(kubectl get no ${NODENAME} 2>/dev/null | grep -v NAME)" ];
-	do
-		echo -n "."
-		sleep 1
-	done
-
-	echo
 
 else
 	CACERT=$(cat ./cluster/ca.cert)
@@ -453,6 +444,8 @@ EOF
 			--discovery-token-ca-cert-hash "sha256:${CACERT}"
 	fi
 fi
+
+wait_node_ready
 
 if [ "${HA_CLUSTER}" = "true" ]; then
 	kubectl label nodes ${NODENAME} \

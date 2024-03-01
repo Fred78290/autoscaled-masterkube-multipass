@@ -69,4 +69,9 @@ rm -rf etcd-${ETCD_VER}-linux-${ARCH}.tar.gz etcd-${ETCD_VER}-linux-${ARCH}
 
 systemctl daemon-reload
 systemctl enable etcd
-systemctl start etcd --no-block
+
+if [ ${NODE_INDEX} -eq 3 ]; then
+	systemctl start etcd
+else
+	systemctl start etcd --no-block
+fi

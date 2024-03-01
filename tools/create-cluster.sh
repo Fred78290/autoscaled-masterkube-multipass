@@ -43,7 +43,7 @@ FILL_ETC_HOSTS=YES
 
 export KUBECONFIG=
 
-TEMP=$(getopt -o xm:g:r:i:c:n:k: --long fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
+TEMP=$(getopt -o xm:g:r:i:c:n:k:p: --long advertise-port:,fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,csi-region:,csi-zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -61,6 +61,10 @@ while true; do
 	-x|--trace)
 		set -x
 		shift 1
+		;;
+	-p|--advertise-port)
+		APISERVER_ADVERTISE_PORT=$2
+		shift 2
 		;;
 	-m|--max-pods)
 		MAX_PODS=$2
@@ -195,6 +199,20 @@ while true; do
 	esac
 done
 
+function wait_node_ready() {
+	echo -n "Wait node ${NODENAME} to be ready"
+
+	while [ -z "$(kubectl get no ${NODENAME} 2>/dev/null | grep -v NAME)" ];
+	do
+		echo -n "."
+		sleep 1
+	done
+
+	kubectl wait --for=condition=Ready nodes --field-selector metadata.name=${NODENAME} --timeout=120s
+
+	echo
+}
+
 if [ -z "${NODEGROUP_NAME}" ]; then
 	echo "NODEGROUP_NAME not defined"
 	exit 1
@@ -317,11 +335,12 @@ EOF
 
 	cp /var/snap/microk8s/current/certs/* ${CLUSTER_DIR}/kubernetes/pki
 
-	mkdir -p ${HOME}/.kube
-	microk8s config > ${HOME}/.kube/config
-	chown $(id -u):$(id -g) ${HOME}/.kube/config
+	mkdir -p /etc/kubernetes/
+	microk8s config > /etc/kubernetes/admin.conf
 
-	microk8s config | sed \
+	KUBECONFIG=/etc/kubernetes/admin.conf
+
+	cat ${KUBECONFIG} | sed \
 		-e "s/microk8s-cluster/${NODEGROUP_NAME}/g" \
 		-e "s/microk8s/${NODEGROUP_NAME}/g" \
 		-e "s/admin/admin@${NODEGROUP_NAME}/g" > ${CLUSTER_DIR}/config
@@ -330,8 +349,6 @@ EOF
 	openssl x509 -pubkey -in /var/snap/microk8s/current/certs/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > ${CLUSTER_DIR}/ca.cert
 
 	chmod -R uog+r ${CLUSTER_DIR}/*
-
-	KUBECONFIG=${HOME}/.kube/config
 
 elif [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 	ANNOTE_MASTER=true
@@ -392,31 +409,18 @@ EOF
 
 	mkdir -p ${CLUSTER_DIR}/kubernetes/pki
 
-	mkdir -p ${HOME}/.kube
-	cp -i /etc/rancher/rke2/rke2.yaml ${HOME}/.kube/config
-	chown $(id -u):$(id -g) ${HOME}/.kube/config
+	KUBECONFIG=/etc/rancher/rke2/rke2.yaml
 
-	cp /etc/rancher/rke2/rke2.yaml ${CLUSTER_DIR}/config
 	cp /var/lib/rancher/rke2/server/token ${CLUSTER_DIR}/token
 	cp -r /var/lib/rancher/rke2/server/tls/* ${CLUSTER_DIR}/kubernetes/pki/
 
 	openssl x509 -pubkey -in /var/lib/rancher/rke2/server/tls/server-ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > ${CLUSTER_DIR}/ca.cert
 
-	sed -i -e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" -e "s/default/kubernetes-admin@${NODEGROUP_NAME}/g" ${CLUSTER_DIR}/config
+	cat ${KUBECONFIG} | sed \
+		-e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" \
+		-e "s/default/kubernetes-admin@${NODEGROUP_NAME}/g" > ${CLUSTER_DIR}/config
 
 	rm -rf ${CLUSTER_DIR}/kubernetes/pki/temporary-certs
-
-	KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-
-	echo -n "Wait node ${HOSTNAME} to be ready"
-
-	while [ -z "$(kubectl get no ${HOSTNAME} 2>/dev/null | grep -v NAME)" ];
-	do
-		echo -n "."
-		sleep 1
-	done
-
-	echo
 
 elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 	ANNOTE_MASTER=true
@@ -438,9 +442,9 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 		K3S_MODE=server
 
 		if [ "${EXTERNAL_ETCD}" == "true" ] && [ -n "${ETCD_ENDPOINT}" ]; then
-			K3S_SERVER_ARGS='--datastore-endpoint=${ETCD_ENDPOINT} --datastore-cafile /etc/etcd/ssl/ca.pem --datastore-certfile /etc/etcd/ssl/etcd.pem --datastore-keyfile /etc/etcd/ssl/etcd-key.pem'
+			K3S_SERVER_ARGS="--datastore-endpoint=${ETCD_ENDPOINT} --datastore-cafile /etc/etcd/ssl/ca.pem --datastore-certfile /etc/etcd/ssl/etcd.pem --datastore-keyfile /etc/etcd/ssl/etcd-key.pem"
 		else
-			K3S_SERVER_ARGS=--cluster-init
+			K3S_SERVER_ARGS="--cluster-init"
 		fi
 	fi
 
@@ -462,34 +466,20 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 
 	echo
 
+	KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
 	mkdir -p ${CLUSTER_DIR}/kubernetes/pki
 
-	mkdir -p ${HOME}/.kube
-	cp -i /etc/rancher/k3s/k3s.yaml ${HOME}/.kube/config
-	chown $(id -u):$(id -g) ${HOME}/.kube/config
-
-	cp /etc/rancher/k3s/k3s.yaml ${CLUSTER_DIR}/config
 	cp /var/lib/rancher/k3s/server/token ${CLUSTER_DIR}/token
 	cp -r /var/lib/rancher/k3s/server/tls/* ${CLUSTER_DIR}/kubernetes/pki/
 
 	openssl x509 -pubkey -in /var/lib/rancher/k3s/server/tls/server-ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > ${CLUSTER_DIR}/ca.cert
 
-	sed -i -e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" -e "s/default/kubernetes-admin@${NODEGROUP_NAME}/g" ${CLUSTER_DIR}/config
+	cat ${KUBECONFIG} | sed \
+		-e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" \
+		-e "s/default/kubernetes-admin@${NODEGROUP_NAME}/g" > ${CLUSTER_DIR}/config
 
 	rm -rf ${CLUSTER_DIR}/kubernetes/pki/temporary-certs
-
-	KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-
-	echo -n "Wait node ${NODENAME} to be ready"
-
-	while [ -z "$(kubectl get no ${NODENAME} 2>/dev/null | grep -v NAME)" ];
-	do
-		echo -n "."
-		sleep 1
-	done
-
-	echo
-
 else
 	if [ -f /etc/kubernetes/kubelet.conf ]; then
 		echo "Already installed k8s master node"
@@ -687,15 +677,11 @@ EOF
 	echo "Get cacert:$(cat ${CLUSTER_DIR}/ca.cert)"
 	echo "Set local K8 environement"
 
-	mkdir -p ${HOME}/.kube
-	cp -i /etc/kubernetes/admin.conf ${HOME}/.kube/config
-	chown $(id -u):$(id -g) ${HOME}/.kube/config
+	KUBECONFIG=/etc/kubernetes/admin.conf
 
-	cat /etc/kubernetes/admin.conf | sed \
+	cat ${KUBECONFIG} | sed \
 		-e "s/kubernetes-admin@${NODEGROUP_NAME}/${NODEGROUP_NAME}/g" \
 		-e "s/kubernetes-admin/kubernetes-admin@${NODEGROUP_NAME}/g" > ${CLUSTER_DIR}/config
-
-	KUBECONFIG=/etc/kubernetes/admin.conf
 
 	mkdir -p ${CLUSTER_DIR}/kubernetes/pki
 
@@ -767,6 +753,14 @@ EOF
 
 	fi
 fi
+
+wait_node_ready
+
+SUDO_HOME=$(eval echo ~${SUDO_USER})
+
+mkdir -p ${SUDO_HOME}/.kube
+cp ${KUBECONFIG} ${SUDO_HOME}/.kube/config
+chown ${SUDO_UID}:${SUDO_GID} ${SUDO_HOME}/.kube/config
 
 chmod -R uog+r ${CLUSTER_DIR}/*
 

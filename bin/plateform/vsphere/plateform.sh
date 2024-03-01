@@ -125,10 +125,20 @@ EOF
 			-e guestinfo.vendordata="$(cat ${TARGET_CONFIG_LOCATION}/vendordata.base64)" \
 			-e guestinfo.vendordata.encoding="gzip+base64" ${SILENT}
 
-		if [ -n "${VC_NETWORK_PUBLIC}" ]; then
-			echo_blue_bold "Add second network card ${VC_NETWORK_PUBLIC} on ${MASTERKUBE_NODE}"
+		govc vm.network.change -vm "${MASTERKUBE_NODE}" -net="${VC_NETWORK_PRIVATE}" -net.adapter="vmxnet3" ethernet-0
 
-			govc vm.network.add -vm "${MASTERKUBE_NODE}" -net="${VC_NETWORK_PUBLIC}" -net.adapter="vmxnet3"
+		NUM_ETHERNET=$(govc device.info -vm ${MASTERKUBE_NODE} -json | jq '[.devices[]|select(.backing.network.type == "Network")]|length')
+
+		if [ -n "${VC_NETWORK_PUBLIC}" ]; then
+			if [ ${NUM_ETHERNET} -lt 2 ]; then
+				echo_blue_bold "Add second network ${VC_NETWORK_PUBLIC} on ${MASTERKUBE_NODE}"
+				govc vm.network.add -vm "${MASTERKUBE_NODE}" -net="${VC_NETWORK_PUBLIC}" -net.adapter="vmxnet3"
+			else
+				echo_blue_bold "Change second network interface to ${VC_NETWORK_PUBLIC} on ${MASTERKUBE_NODE}"
+				govc vm.network.change -vm "${MASTERKUBE_NODE}" -net="${VC_NETWORK_PUBLIC}" -net.adapter="vmxnet3" ethernet-1
+			fi
+		elif [ ${NUM_ETHERNET} -gt 1 ]; then
+			govc device.remove "${MASTERKUBE_NODE}" ethernet-1
 		fi
 
 		echo_title "Power On ${MASTERKUBE_NODE}"

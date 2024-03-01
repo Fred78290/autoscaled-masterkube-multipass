@@ -423,7 +423,7 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 
 	K3S_MODE=server
 	K3S_ARGS="--kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --advertise-address=${APISERVER_ADVERTISE_ADDRESS} --advertise-port=${APISERVER_ADVERTISE_PORT} --tls-san=${CERT_SANS}"
-	K3S_DISABLE_ARGS='--disable=servicelb --disable=traefik --disable=metrics-server'
+	K3S_DISABLE_ARGS="--disable=servicelb --disable=traefik --disable=metrics-server"
 	K3S_SERVER_ARGS=
 
 	if [ -n "${PROVIDERID}" ]; then
@@ -446,7 +446,7 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 
 	echo "K3S_MODE=${K3S_MODE}" > /etc/default/k3s
 	echo "K3S_ARGS='${K3S_ARGS}'" > /etc/systemd/system/k3s.service.env
-	echo "K3S_DISABLE_ARGS='${K3S_DISABLE_ARGS}" > /etc/systemd/system/k3s.disabled.env
+	echo "K3S_DISABLE_ARGS='${K3S_DISABLE_ARGS}'" > /etc/systemd/system/k3s.disabled.env
 	echo "K3S_SERVER_ARGS='${K3S_SERVER_ARGS}'" > /etc/systemd/system/k3s.server.env
 
 	echo -n "Start k3s service"

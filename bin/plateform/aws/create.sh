@@ -1676,6 +1676,7 @@ function start_kubernes_on_instances() {
 						--cloud-provider=external \
 						--plateform=${PLATEFORM} \
 						--cloud-provider=external \
+						--advertise-port=${APISERVER_ADVERTISE_PORT} \
 						--k8s-distribution=${KUBERNETES_DISTRO} \
 						--max-pods=${MAX_PODS} \
 						--ecr-password=${ECR_PASSWORD} \
@@ -1748,6 +1749,7 @@ function start_kubernes_on_instances() {
 					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
 						--plateform=${PLATEFORM} \
 						--cloud-provider=external \
+						--advertise-port=${APISERVER_ADVERTISE_PORT} \
 						--k8s-distribution=${KUBERNETES_DISTRO} \
 						--max-pods=${MAX_PODS} \
 						--ecr-password=${ECR_PASSWORD} \

@@ -1095,6 +1095,7 @@ do
 					--use-external-etcd=${EXTERNAL_ETCD} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
+					--join-master="${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" \
 					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
 					--tls-san="${CERT_SANS}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
@@ -1125,7 +1126,7 @@ do
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--cluster-nodes="${CLUSTER_NODES}" \
 					--net-if=${NET_IF} \
-					--join-master="${IPADDRS[${CONTROLNODE_INDEX}]}:${APISERVER_ADVERTISE_PORT}" \
+					--join-master="${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" \
 					--control-plane=true ${SILENT}
 			fi
 		fi

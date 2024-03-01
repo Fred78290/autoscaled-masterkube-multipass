@@ -1,9 +1,9 @@
 #!/bin/bash
+set -eu
+
 CURDIR=$(dirname $0)
 
-source "${CURDIR}/common.sh"
-
-TEMP=$(getopt -o c:g: --long node-group:,cluster-nodes: -n "$0" -- "$@")
+TEMP=$(getopt -o c:g:l: --long target-location:,node-group:,cluster-nodes: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -16,6 +16,10 @@ while true; do
 			;;
 		-g|--node-group)
 			NODEGROUP_NAME=$2
+			shift 2
+			;;
+		-l|--target-location)
+			TARGET_CLUSTER_LOCATION=$2
 			shift 2
 			;;
 		--)

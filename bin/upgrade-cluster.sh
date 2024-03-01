@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eu
 
 CURDIR=$(dirname $0)
 

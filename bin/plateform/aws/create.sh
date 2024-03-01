@@ -1584,7 +1584,7 @@ function create_load_balancer() {
 	if [ "${EXTERNAL_ETCD}" = "true" ]; then
 		echo_title "Created etcd cluster: ${MASTER_NODES}"
 
-		eval prepare-etcd.sh --node-group=${NODEGROUP_NAME} --cluster-nodes="${MASTER_NODES}" ${SILENT}
+		eval prepare-etcd.sh --node-group=${NODEGROUP_NAME} --cluster-nodes="${MASTER_NODES}" --target-location="${TARGET_CLUSTER_LOCATION}" ${SILENT}
 
 		for INDEX in $(seq 1 ${CONTROLNODES})
 		do
@@ -1595,7 +1595,7 @@ function create_load_balancer() {
 				IPADDR=$(get_ssh_ip ${INSTANCE_INDEX})
 
 				echo_title "Start etcd node: ${IPADDR}"
-				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
+                eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/etcd ${KUBERNETES_USER}@${IPADDR}:~/etcd ${SILENT}
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh \
 					--user=${KUBERNETES_USER} \
 					--cluster-nodes="${MASTER_NODES}" \

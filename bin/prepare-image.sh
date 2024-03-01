@@ -1,4 +1,6 @@
 #!/bin/bash
+set -eu
+
 ECR_PASSWORD=
 CNI_PLUGIN=
 CNI_VERSION=

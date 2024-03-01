@@ -56,8 +56,8 @@ done
 mkdir -p /etc/etcd
 mkdir -p /var/lib/etcd
 
-cp -R /home/${USER}/cluster/etcd/ssl /etc/etcd/ssl
-cp /home/${USER}/cluster/etcd/etcd-0${NODE_INDEX}.service /etc/systemd/system/etcd.service
+cp -R /home/${USER}/etcd/ssl /etc/etcd/ssl
+cp /home/${USER}/etcd/etcd-0${NODE_INDEX}.service /etc/systemd/system/etcd.service
 
 curl -sL ${DOWNLOAD_URL}/${ETCD_VER}/etcd-${ETCD_VER}-linux-${ARCH}.tar.gz | tar zx
 

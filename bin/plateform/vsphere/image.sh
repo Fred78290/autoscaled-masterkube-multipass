@@ -190,7 +190,7 @@ if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 		if [ -n "${PRIMARY_NETWORK_ADAPTER}" ];then
 			echo_blue_bold "Change primary network card ${PRIMARY_NETWORK_NAME} to ${PRIMARY_NETWORK_ADAPTER} on ${SEED_IMAGE}"
 
-			govc vm.network.change -vm "${SEED_IMAGE}" -net.adapter "${PRIMARY_NETWORK_ADAPTER}" ethernet-0 || true
+			govc vm.network.change -vm "${SEED_IMAGE}" -net="${PRIMARY_NETWORK_NAME}" -net.adapter=${PRIMARY_NETWORK_ADAPTER} ethernet-0
 		fi
 
 		# Never add second network 

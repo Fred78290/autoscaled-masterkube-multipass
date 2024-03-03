@@ -147,6 +147,7 @@ function delete_vm_by_name() {
 
     if [ "$(multipass info ${VMNAME} 2>/dev/null)" ]; then
         echo_blue_bold "Delete VM: ${VMNAME}"
+		multipass exec ${VMNAME} -- sudo shutdown now
         multipass delete ${VMNAME} -p
 	fi
 

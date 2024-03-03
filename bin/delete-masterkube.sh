@@ -132,10 +132,11 @@ if [ ! -f ${TARGET_CLUSTER_LOCATION}/config ]; then
 fi
 
 function delete_nodes() {
-	NODES=$(kubectl get node -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config | jq -r --arg LABEL $1 '.items |reverse | .[] | select(.metadata.labels[$LABEL]) | .metadata.name')
+	NODES=$(kubectl get node -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config | jq -r --arg LABEL $1 '.items | .[] | select(.metadata.labels[$LABEL]) | .metadata.name' | sort -r)
 
 	for NODE in ${NODES}
 	do
+		kubectl delete no ${NODE}
 		delete_vm_by_name ${NODE} || true
 	done
 }

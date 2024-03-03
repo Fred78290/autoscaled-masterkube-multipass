@@ -282,6 +282,12 @@ if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
 
 	mkdir -p /var/snap/microk8s/common/
 
+	if [ "${HA_CLUSTER}" == "true" ]; then
+		DISABLE_HA_CLUSTER=false
+	else
+		DISABLE_HA_CLUSTER=true
+	fi
+
 	cat >  ${MICROK8S_CONFIG} <<EOF
 version: 0.1.0
 persistentClusterToken: ${MICROK8S_CLUSTER_TOKEN}
@@ -289,6 +295,9 @@ addons:
   - name: dns
   - name: rbac
   - name: hostpath-storage
+    disable: ${HA_CLUSTER}
+  - name: ha-cluster
+    disable: ${DISABLE_HA_CLUSTER}
 extraKubeAPIServerArgs:
   --advertise-address: ${APISERVER_ADVERTISE_ADDRESS}
   --authorization-mode: RBAC,Node
@@ -326,24 +335,24 @@ EOF
 	echo "Wait microk8s get ready"
 	microk8s status --wait-ready -t 120
 
-	if [ "${HA_CLUSTER}" = "true" ]; then
-		microk8s add-node
-		microk8s add-node
-	fi
-
 	mkdir -p ${CLUSTER_DIR}/kubernetes/pki
 
 	cp /var/snap/microk8s/current/certs/* ${CLUSTER_DIR}/kubernetes/pki
 
+	if [ "${EXTERNAL_ETCD}" == "true" ]; then
+		microk8s kubectl apply -f /var/snap/microk8s/current/args/cni-network/cni.yaml
+	fi
+
 	mkdir -p /etc/kubernetes/
-	microk8s config > /etc/kubernetes/admin.conf
+	microk8s config -l > /etc/kubernetes/admin.conf
 
 	KUBECONFIG=/etc/kubernetes/admin.conf
 
-	cat ${KUBECONFIG} | sed \
-		-e "s/microk8s-cluster/${NODEGROUP_NAME}/g" \
-		-e "s/microk8s/${NODEGROUP_NAME}/g" \
-		-e "s/admin/admin@${NODEGROUP_NAME}/g" > ${CLUSTER_DIR}/config
+	cat /etc/kubernetes/admin.conf | sed \
+		-e "s/admin/admin@${NODEGROUP_NAME}/g" \
+		-e "s/127.0.0.1/${CONTROL_PLANE_ENDPOINT}/g" \
+		-e "s/microk8s-cluster/${NODEGROUP_NAME}/g" | yq \
+		".contexts[0].name = \"${NODEGROUP_NAME}\"| .current-context = \"${NODEGROUP_NAME}\"" > ${CLUSTER_DIR}/config
 
 	echo -n ${MICROK8S_CLUSTER_TOKEN} > ${CLUSTER_DIR}/token
 	openssl x509 -pubkey -in /var/snap/microk8s/current/certs/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > ${CLUSTER_DIR}/ca.cert

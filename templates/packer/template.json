@@ -3,7 +3,7 @@
 		{
 			"type": "qemu",
 			"accelerator": "{{ user `ACCEL` }}",
-			"iso_url": "http://cloud-images.ubuntu.com/releases/{{ user `DISTRO` }}/release/{{ user `ISO_FILE` }}",
+			"iso_url": "http://cloud-images.ubuntu.com/{{ user `DISTRO` }}/current/{{ user `ISO_FILE` }}",
 			"iso_checksum": "{{ user `ISO_CHECKSUM` }}",
 			"disk_image": true,
 			"disk_size": 5120,

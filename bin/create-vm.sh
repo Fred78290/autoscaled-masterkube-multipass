@@ -65,7 +65,7 @@ OPTIONS+=(
 	"no-dhcp-autoscaled-node"
 	"public-address:"
 	"metallb-ip-range:"
-	"use-keepalived:"
+	"use-keepalived"
 )
 
 PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')

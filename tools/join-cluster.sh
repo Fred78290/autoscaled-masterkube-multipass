@@ -275,7 +275,6 @@ EOF
 		echo "addons:" >> ${MICROK8S_CONFIG}
 		echo "  - name: dns" >> ${MICROK8S_CONFIG}
 		echo "  - name: rbac" >> ${MICROK8S_CONFIG}
-		echo "  - name: hostpath-storage" >> ${MICROK8S_CONFIG}
 		echo "  - name: ha-cluster" >> ${MICROK8S_CONFIG}
 
 		echo "extraKubeAPIServerArgs:" >> ${MICROK8S_CONFIG}

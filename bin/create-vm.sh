@@ -474,6 +474,10 @@ fi
 
 if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
 	APISERVER_ADVERTISE_PORT=16443
+	# microk8s can't join thru tcp load balancer
+	if [ "${HA_CLUSTER}" = "true" ]; then
+		USE_KEEPALIVED=YES
+	fi
 fi
 
 if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then

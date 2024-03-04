@@ -276,7 +276,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 
 		echo_blue_bold "Update seed image ${SEED_IMAGE}"
 
-		ssh -t "${SEED_USER}@${IPADDR}" "sudo apt update ; sudo apt upgrade -y"
+		ssh -t "${SEED_USER}@${IPADDR}" "sudo apt update ; sudo bash -c 'export DEBIAN_FRONTEND=noninteractive ; apt upgrade -y'"
 		
 		# Prepare seed VM
 		echo_blue_bold "Install cloud-init VMWareGuestInfo datasource"

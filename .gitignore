@@ -23,3 +23,5 @@ bin/**/*.def
 *.log
 
 images/
+
+test/

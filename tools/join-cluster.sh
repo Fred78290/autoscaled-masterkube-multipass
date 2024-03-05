@@ -262,9 +262,12 @@ extraMicroK8sAPIServerProxyArgs:
   --refresh-interval: "0"
 extraKubeletArgs:
   --max-pods: ${MAX_PODS}
-  --cloud-provider: ${CLOUD_PROVIDER}
   --node-ip: ${APISERVER_ADVERTISE_ADDRESS}
 EOF
+
+	if [ -n "${CLOUD_PROVIDER}" ]; then
+		echo "  --cloud-provider: ${CLOUD_PROVIDER}" >> ${MICROK8S_CONFIG}
+	fi
 
 	if [ -f /etc/kubernetes/credential.yaml ]; then
 		echo "  --image-credential-provider-config: /etc/kubernetes/credential.yaml" >> ${MICROK8S_CONFIG}

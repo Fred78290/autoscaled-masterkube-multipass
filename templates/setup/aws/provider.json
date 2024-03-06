@@ -16,13 +16,15 @@
 		}
 	],
 	"network": {
-		"route53": "${AWS_ROUTE53_PRIVATE_ZONE_ID}",
-		"privateZoneName": "${PRIVATE_DOMAIN_NAME}",
-		"accessKey": "${AWS_ROUTE53_ACCESSKEY}",
-		"secretKey": "${AWS_ROUTE53_SECRETKEY}",
-		"token": "${AWS_ROUTE53_TOKEN}",
-		"profile": "${AWS_PROFILE_ROUTE53}",
-		"region": "${AWS_REGION}",
+		"route53": {
+			"zoneID": "${AWS_ROUTE53_PRIVATE_ZONE_ID}",
+			"privateZoneName": "${PRIVATE_DOMAIN_NAME}",
+			"accessKey": "${AWS_ROUTE53_ACCESSKEY}",
+			"secretKey": "${AWS_ROUTE53_SECRETKEY}",
+			"token": "${AWS_ROUTE53_TOKEN}",
+			"profile": "${AWS_PROFILE_ROUTE53}",
+			"region": "${AWS_REGION}"
+		},
 		"eni": [
 			{
 				"subnets": [],

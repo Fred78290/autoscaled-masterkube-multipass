@@ -10,6 +10,8 @@ set -eu
 
 CLUSTER_NODES=
 ETCD_ENDPOINT=
+VC_NETWORK_PUBLIC_NIC=eth0 #Multipass setup
+IPADDRS=()
 
 function usage() {
 	common_usage
@@ -427,302 +429,341 @@ while true; do
 	esac
 done
 
-SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
-SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function prepare_environment() {
+	NODE_IP=${NET_IP}
+	
+	SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
+	SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 
-if [ "${VERBOSE}" == "YES" ]; then
-	SILENT=
-else
-	SSH_OPTIONS="${SSH_OPTIONS} -q"
-	SCP_OPTIONS="${SCP_OPTIONS} -q"
-fi
-
-# Check if ssh private key exists
-if [ ! -f ${SSH_PRIVATE_KEY} ]; then
-	echo_red "The private ssh key: ${SSH_PRIVATE_KEY} is not found"
-	exit -1
-fi
-
-# Check if ssh public key exists
-if [ ! -f ${SSH_PUBLIC_KEY} ]; then
-	echo_red "The private ssh key: ${SSH_PUBLIC_KEY} is not found"
-	exit -1
-fi
-
-if [ "${UPGRADE_CLUSTER}" == "YES" ] && [ "${DELETE_CLUSTER}" = "YES" ]; then
-	echo_red_bold "Can't upgrade deleted cluster, exit"
-	exit
-fi
-
-if [ "${GRPC_PROVIDER}" != "grpc" ] && [ "${GRPC_PROVIDER}" != "externalgrpc" ]; then
-	echo_red_bold "Unsupported cloud provider: ${GRPC_PROVIDER}, only grpc|externalgrpc, exit"
-	exit
-fi
-
-if [ ${GRPC_PROVIDER} = "grpc" ]; then
-	CLOUD_PROVIDER_CONFIG=grpc-config.json
-else
-	CLOUD_PROVIDER_CONFIG=grpc-config.yaml
-fi
-
-if [ "${USE_ZEROSSL}" = "YES" ]; then
-	if [ -z "${CERT_ZEROSSL_EAB_KID}" ] || [ -z "${CERT_ZEROSSL_EAB_HMAC_SECRET}" ]; then
-		echo_red_bold "CERT_ZEROSSL_EAB_KID or CERT_ZEROSSL_EAB_HMAC_SECRET is empty, exit"
-		exit 1
-	fi
-fi
-
-if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
-	APISERVER_ADVERTISE_PORT=16443
-	# microk8s can't join thru tcp load balancer
-	if [ "${HA_CLUSTER}" = "true" ]; then
-		USE_KEEPALIVED=YES
-	fi
-fi
-
-if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-	LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},9345"
-	EXTERNAL_ETCD=false
-elif [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
-	LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},25000"
-else
-	LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT}"
-fi
-
-if [ "${HA_CLUSTER}" = "true" ]; then
-	CONTROLNODES=3
-else
-	CONTROLNODES=1
-	EXTERNAL_ETCD=false
-
-	if [ "${USE_NLB}" = "YES" ]; then
-		echo_red_bold "NLB usage is not available for single plane cluster"
-		exit 1
-	fi
-fi
-
-if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-	WANTED_KUBERNETES_VERSION=${KUBERNETES_VERSION}
-	IFS=. read K8S_VERSION K8S_MAJOR K8S_MINOR <<< "${KUBERNETES_VERSION}"
-
-	if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-		RANCHER_CHANNEL=$(curl -s https://update.rke2.io/v1-release/channels)
+	if [ "${VERBOSE}" == "YES" ]; then
+		SILENT=
 	else
-		RANCHER_CHANNEL=$(curl -s https://update.k3s.io/v1-release/channels)
+		SSH_OPTIONS="${SSH_OPTIONS} -q"
+		SCP_OPTIONS="${SCP_OPTIONS} -q"
 	fi
 
-	KUBERNETES_VERSION=$(echo -n "${RANCHER_CHANNEL}" | jq -r --arg KUBERNETES_VERSION "${K8S_VERSION}.${K8S_MAJOR}" '.data[]|select(.id == $KUBERNETES_VERSION)|.latest//""')
-
-	if [ -z "${KUBERNETES_VERSION}" ]; then
-		KUBERNETES_VERSION=$(echo -n "${RANCHER_CHANNEL}" | jq -r '.data[]|select(.id == "latest")|.latest//""')
-		echo_red_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} not available, use latest ${KUBERNETES_VERSION}"
-	else
-		echo_blue_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} found, use ${KUBERNETES_DISTRO} ${KUBERNETES_VERSION}"
-	fi
-elif [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
-	WANTED_KUBERNETES_VERSION=${KUBERNETES_VERSION}
-	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
-	MICROK8S_CHANNEL="${VERSION:1}.${MAJOR}/stable"
-
-	echo_blue_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} found, use ${KUBERNETES_DISTRO} ${MICROK8S_CHANNEL}"
-fi
-
-SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
-SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
-SSH_KEY=$(cat "${SSH_PUBLIC_KEY}")
-
-TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
-TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
-TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
-
-if [ "${EXTERNAL_ETCD}" = "true" ]; then
-	EXTERNAL_ETCD_ARGS="--use-external-etcd"
-	ETCD_DST_DIR="/etc/etcd/ssl"
-else
-	EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
-	ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
-fi
-
-# Check variables coherence
-if [ "${HA_CLUSTER}" = "true" ]; then
-	CONTROLNODES=3
-	if [ ${USE_KEEPALIVED} = "YES" ]; then
-		FIRSTNODE=1
-	fi
-else
-	CONTROLNODES=1
-	USE_KEEPALIVED=NO
-	EXTERNAL_ETCD=false
-fi
-
-# Check if passord is defined
-if [ -z ${KUBERNETES_PASSWORD} ]; then
-	if [ -f ~/.kubernetes_pwd ]; then
-		KUBERNETES_PASSWORD=$(cat ~/.kubernetes_pwd)
-	else
-		KUBERNETES_PASSWORD=$(uuidgen)
-		echo -n "${KUBERNETES_PASSWORD}" > ~/.kubernetes_pwd
-	fi
-fi
-
-# GRPC network endpoint
-if [ "${LAUNCH_CA}" == "NO" ] || [ "${LAUNCH_CA}" == "DEBUG" ]; then
-	SSH_PRIVATE_KEY_LOCAL="${SSH_PRIVATE_KEY}"
-
-	if [ "${TRANSPORT}" == "unix" ]; then
-		LISTEN="unix:/var/run/cluster-autoscaler/autoscaler.sock"
-		CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
-	elif [ "${TRANSPORT}" == "tcp" ]; then
-		LISTEN="tcp://${LOCAL_IPADDR}:5200"
-		CONNECTTO="${LOCAL_IPADDR}:5200"
-	else
-		echo_red "Unknown transport: ${TRANSPORT}, should be unix or tcp"
+	# Check if ssh private key exists
+	if [ ! -f ${SSH_PRIVATE_KEY} ]; then
+		echo_red "The private ssh key: ${SSH_PRIVATE_KEY} is not found"
 		exit -1
 	fi
-else
-	SSH_PRIVATE_KEY_LOCAL="/etc/ssh/id_rsa"
-	TRANSPORT=unix
-	LISTEN="unix:/var/run/cluster-autoscaler/autoscaler.sock"
-	CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
-fi
 
-echo_blue_bold "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
-
-VC_NETWORK_PRIVATE_TYPE=$(get_net_type ${VC_NETWORK_PRIVATE})
-
-if [ -z "${VC_NETWORK_PRIVATE_TYPE}" ]; then
-	echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PRIVATE}"
-	exit 1
-fi
-
-if [ -n "${VC_NETWORK_PUBLIC}" ]; then
-	VC_NETWORK_PUBLIC_TYPE=$(get_net_type ${VC_NETWORK_PUBLIC})
-	
-	if [ -z "${VC_NETWORK_PUBLIC_TYPE}" ]; then
-		echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PUBLIC}"
-		exit 1
+	# Check if ssh public key exists
+	if [ ! -f ${SSH_PUBLIC_KEY} ]; then
+		echo_red "The private ssh key: ${SSH_PUBLIC_KEY} is not found"
+		exit -1
 	fi
-fi
 
-if [ "${KUBERNETES_DISTRO}" == "kubeadm" ]; then
-	TARGET_IMAGE="${ROOT_IMG_NAME}-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
-else
-	TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}"
-fi
-
-if [ ${PLATEFORM} == "multipass" ]; then
-	TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}.img"
-fi
-
-# Delete previous existing version
-if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
-	delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
-	if [ "${DELETE_CLUSTER}" = "YES" ]; then
+	if [ "${UPGRADE_CLUSTER}" == "YES" ] && [ "${DELETE_CLUSTER}" = "YES" ]; then
+		echo_red_bold "Can't upgrade deleted cluster, exit"
 		exit
 	fi
-# Check if we can resume the creation process
-elif [ ! -f ${TARGET_CONFIG_LOCATION}/buildenv ] && [ "${RESUME}" = "YES" ]; then
-	echo_red "Unable to resume, building env is not found"
-	exit -1
-fi
 
-mkdir -p ${TARGET_CONFIG_LOCATION}
-mkdir -p ${TARGET_DEPLOY_LOCATION}
-mkdir -p ${TARGET_CLUSTER_LOCATION}
+	if [ "${GRPC_PROVIDER}" != "grpc" ] && [ "${GRPC_PROVIDER}" != "externalgrpc" ]; then
+		echo_red_bold "Unsupported cloud provider: ${GRPC_PROVIDER}, only grpc|externalgrpc, exit"
+		exit
+	fi
 
-# If CERT doesn't exist, create one autosigned
-if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
-	if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
-		echo_red_bold "Public domaine is not defined, unable to create auto signed cert, exit"
+	if [ ${GRPC_PROVIDER} = "grpc" ]; then
+		CLOUD_PROVIDER_CONFIG=grpc-config.json
+	else
+		CLOUD_PROVIDER_CONFIG=grpc-config.yaml
+	fi
+
+	if [ "${USE_ZEROSSL}" = "YES" ]; then
+		if [ -z "${CERT_ZEROSSL_EAB_KID}" ] || [ -z "${CERT_ZEROSSL_EAB_HMAC_SECRET}" ]; then
+			echo_red_bold "CERT_ZEROSSL_EAB_KID or CERT_ZEROSSL_EAB_HMAC_SECRET is empty, exit"
+			exit 1
+		fi
+	fi
+
+	if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+		APISERVER_ADVERTISE_PORT=16443
+		# microk8s can't join thru tcp load balancer
+		if [ "${HA_CLUSTER}" = "true" ]; then
+			USE_KEEPALIVED=YES
+		fi
+	fi
+
+	if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},9345"
+		EXTERNAL_ETCD=false
+	elif [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},25000"
+	else
+		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT}"
+	fi
+
+	if [ "${HA_CLUSTER}" = "true" ]; then
+		CONTROLNODES=3
+		if [ ${USE_KEEPALIVED} = "YES" ]; then
+			FIRSTNODE=1
+		fi
+	else
+		CONTROLNODES=1
+		CONTROLNODE_INDEX=0
+		EXTERNAL_ETCD=false
+
+		if [ "${USE_NLB}" = "YES" ]; then
+			echo_red_bold "NLB usage is not available for single plane cluster"
+			USE_NLB=NO
+		fi
+	fi
+
+	SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
+	SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+	SSH_KEY=$(cat "${SSH_PUBLIC_KEY}")
+
+	TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
+	TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
+	TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+
+	if [ "${EXTERNAL_ETCD}" = "true" ]; then
+		EXTERNAL_ETCD_ARGS="--use-external-etcd"
+		ETCD_DST_DIR="/etc/etcd/ssl"
+	else
+		EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
+		ETCD_DST_DIR="/etc/kubernetes/pki/etcd"
+	fi
+
+	# Check if passord is defined
+	if [ -z ${KUBERNETES_PASSWORD} ]; then
+		if [ -f ~/.kubernetes_pwd ]; then
+			KUBERNETES_PASSWORD=$(cat ~/.kubernetes_pwd)
+		else
+			KUBERNETES_PASSWORD=$(uuidgen)
+			echo -n "${KUBERNETES_PASSWORD}" > ~/.kubernetes_pwd
+		fi
+	fi
+
+	VC_NETWORK_PRIVATE_TYPE=$(get_net_type ${VC_NETWORK_PRIVATE})
+
+	if [ -z "${VC_NETWORK_PRIVATE_TYPE}" ]; then
+		echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PRIVATE}"
 		exit 1
 	fi
 
-	echo_blue_bold "Create autosigned certificat for domain: ${PUBLIC_DOMAIN_NAME}"
-	${CURDIR}/create-cert.sh --domain ${PUBLIC_DOMAIN_NAME} --ssl-location ${SSL_LOCATION} --cert-email ${CERT_EMAIL}
-fi
-
-if [ ! -f ${SSL_LOCATION}/cert.pem ]; then
-	echo_red "${SSL_LOCATION}/cert.pem not found, exit"
-	exit 1
-fi
-
-if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
-	echo_red "${SSL_LOCATION}/fullchain.pem not found, exit"
-	exit 1
-fi
-
-# If the VM template doesn't exists, build it from scrash
-TARGET_IMAGE_UUID=$(get_vmuuid ${TARGET_IMAGE})
-
-if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
-	echo_title "Create ${PLATEFORM} preconfigured image ${TARGET_IMAGE}"
-
-# Never add second network 
-# if $(jq --arg SECOND_NETWORK_NAME "${SECOND_NETWORK_NAME}" '.network.interfaces | select(.network = $SECOND_NETWORK_NAME)|.exists' provider.json) == false
-
-	if [ ${PLATEFORM} == "multipass" ]; then
-		PRIMARY_NETWORK="${VC_NETWORK_PUBLIC}"
-		SECONDARY_NETWORK="${VC_NETWORK_PRIVATE}"
-	else
-		PRIMARY_NETWORK="${VC_NETWORK_PRIVATE}"
-		SECONDARY_NETWORK="${VC_NETWORK_PUBLIC}"
+	if [ -n "${VC_NETWORK_PUBLIC}" ]; then
+		VC_NETWORK_PUBLIC_TYPE=$(get_net_type ${VC_NETWORK_PUBLIC})
+		
+		if [ -z "${VC_NETWORK_PUBLIC_TYPE}" ]; then
+			echo_red_bold "Unable to find vnet type for vnet: ${VC_NETWORK_PUBLIC}"
+			exit 1
+		fi
 	fi
 
-	./bin/create-image.sh \
-		--arch="${SEED_ARCH}" \
-		--cni-version="${CNI_VERSION}" \
-		--container-runtime=${CONTAINER_ENGINE} \
-		--custom-image="${TARGET_IMAGE}" \
-		--distribution="${DISTRO}" \
-		--k8s-distribution=${KUBERNETES_DISTRO} \
-		--kubernetes-version="${KUBERNETES_VERSION}" \
-		--password="${KUBERNETES_PASSWORD}" \
-		--plateform=${PLATEFORM} \
-		--seed="${SEED_IMAGE}-${SEED_ARCH}" \
-		--ssh-key="${SSH_KEY}" \
-		--ssh-priv-key="${SSH_PRIVATE_KEY}" \
-		--user="${KUBERNETES_USER}" \
-		--primary-network="${PRIMARY_NETWORK}" \
-#		--second-network="${SECONDARY_NETWORK}"
+	if [ "${KUBERNETES_DISTRO}" == "kubeadm" ]; then
+		TARGET_IMAGE="${ROOT_IMG_NAME}-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
+	else
+		TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}"
+	fi
 
+	if [ ${PLATEFORM} == "multipass" ]; then
+		TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}.img"
+	fi
+
+	if [ ${WORKERNODES} -eq 0 ]; then
+		MASTER_NODE_ALLOW_DEPLOYMENT=YES
+	else
+		MASTER_NODE_ALLOW_DEPLOYMENT=NO
+	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function prepare_transport() {
+	# GRPC network endpoint
+	if [ "${LAUNCH_CA}" == "NO" ] || [ "${LAUNCH_CA}" == "DEBUG" ]; then
+		SSH_PRIVATE_KEY_LOCAL="${SSH_PRIVATE_KEY}"
+
+		if [ "${TRANSPORT}" == "unix" ]; then
+			LISTEN="unix:/var/run/cluster-autoscaler/autoscaler.sock"
+			CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
+		elif [ "${TRANSPORT}" == "tcp" ]; then
+			LISTEN="tcp://${LOCAL_IPADDR}:5200"
+			CONNECTTO="${LOCAL_IPADDR}:5200"
+		else
+			echo_red "Unknown transport: ${TRANSPORT}, should be unix or tcp"
+			exit -1
+		fi
+	else
+		SSH_PRIVATE_KEY_LOCAL="/etc/ssh/id_rsa"
+		TRANSPORT=unix
+		LISTEN="unix:/var/run/cluster-autoscaler/autoscaler.sock"
+		CONNECTTO="unix:/var/run/cluster-autoscaler/autoscaler.sock"
+	fi
+
+	echo_blue_bold "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function prepare_kubernetes_distribution() {
+	if [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+		WANTED_KUBERNETES_VERSION=${KUBERNETES_VERSION}
+		IFS=. read K8S_VERSION K8S_MAJOR K8S_MINOR <<< "${KUBERNETES_VERSION}"
+
+		if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+			RANCHER_CHANNEL=$(curl -s https://update.rke2.io/v1-release/channels)
+		else
+			RANCHER_CHANNEL=$(curl -s https://update.k3s.io/v1-release/channels)
+		fi
+
+		KUBERNETES_VERSION=$(echo -n "${RANCHER_CHANNEL}" | jq -r --arg KUBERNETES_VERSION "${K8S_VERSION}.${K8S_MAJOR}" '.data[]|select(.id == $KUBERNETES_VERSION)|.latest//""')
+
+		if [ -z "${KUBERNETES_VERSION}" ]; then
+			KUBERNETES_VERSION=$(echo -n "${RANCHER_CHANNEL}" | jq -r '.data[]|select(.id == "latest")|.latest//""')
+			echo_red_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} not available, use latest ${KUBERNETES_VERSION}"
+		else
+			echo_blue_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} found, use ${KUBERNETES_DISTRO} ${KUBERNETES_VERSION}"
+		fi
+	elif [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+		WANTED_KUBERNETES_VERSION=${KUBERNETES_VERSION}
+		IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
+		MICROK8S_CHANNEL="${VERSION:1}.${MAJOR}/stable"
+
+		echo_blue_bold "${KUBERNETES_DISTRO} ${WANTED_KUBERNETES_VERSION} found, use ${KUBERNETES_DISTRO} ${MICROK8S_CHANNEL}"
+	fi
+
+	case "${KUBERNETES_DISTRO}" in
+		k3s|rke2)
+			IMAGE_CREDENTIALS_CONFIG=/var/lib/rancher/credentialprovider/config.yaml
+			IMAGE_CREDENTIALS_BIN=/var/lib/rancher/credentialprovider/bin
+			;;
+		kubeadm)
+			IMAGE_CREDENTIALS_CONFIG=/etc/kubernetes/credential.yaml
+			IMAGE_CREDENTIALS_BIN=/usr/local/bin
+			;;
+	esac
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function delete_previous_masterkube() {
+	# Delete previous existing version
+	if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
+		delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
+		if [ "${DELETE_CLUSTER}" = "YES" ]; then
+			exit
+		fi
+	# Check if we can resume the creation process
+	elif [ ! -f ${TARGET_CONFIG_LOCATION}/buildenv ] && [ "${RESUME}" = "YES" ]; then
+		echo_red "Unable to resume, building env is not found"
+		exit -1
+	fi
+
+	mkdir -p ${TARGET_CONFIG_LOCATION}
+	mkdir -p ${TARGET_DEPLOY_LOCATION}
+	mkdir -p ${TARGET_CLUSTER_LOCATION}
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function prepare_cert() {
+	# If CERT doesn't exist, create one autosigned
+	if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
+		if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
+			echo_red_bold "Public domaine is not defined, unable to create auto signed cert, exit"
+			exit 1
+		fi
+
+		echo_blue_bold "Create autosigned certificat for domain: ${PUBLIC_DOMAIN_NAME}"
+		${CURDIR}/create-cert.sh --domain ${PUBLIC_DOMAIN_NAME} --ssl-location ${SSL_LOCATION} --cert-email ${CERT_EMAIL}
+	fi
+
+	if [ ! -f ${SSL_LOCATION}/cert.pem ]; then
+		echo_red "${SSL_LOCATION}/cert.pem not found, exit"
+		exit 1
+	fi
+
+	if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
+		echo_red "${SSL_LOCATION}/fullchain.pem not found, exit"
+		exit 1
+	fi
+
+	# Extract the domain name from CERT
+	DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function prepare_image() {
+	# If the VM template doesn't exists, build it from scrash
 	TARGET_IMAGE_UUID=$(get_vmuuid ${TARGET_IMAGE})
-fi
 
-if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
-	echo_blue_bold "Create image only, done..."
-	exit 0
-fi
+	if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
+		echo_title "Create ${PLATEFORM} preconfigured image ${TARGET_IMAGE}"
 
-# Extract the domain name from CERT
-DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
+	# Never add second network 
+	# if $(jq --arg SECOND_NETWORK_NAME "${SECOND_NETWORK_NAME}" '.network.interfaces | select(.network = $SECOND_NETWORK_NAME)|.exists' provider.json) == false
 
-if [ "${UPGRADE_CLUSTER}" == "YES" ]; then
-	echo_title "Upgrade ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-	./bin/upgrade-cluster.sh
-	exit
-elif [ "${RESUME}" = "NO" ]; then
-	echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-	update_build_env
-else
-	echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-	source ${TARGET_CONFIG_LOCATION}/buildenv
-fi
+		if [ ${PLATEFORM} == "multipass" ]; then
+			PRIMARY_NETWORK="${VC_NETWORK_PUBLIC}"
+			SECONDARY_NETWORK="${VC_NETWORK_PRIVATE}"
+		else
+			PRIMARY_NETWORK="${VC_NETWORK_PRIVATE}"
+			SECONDARY_NETWORK="${VC_NETWORK_PUBLIC}"
+		fi
 
-echo "${KUBERNETES_PASSWORD}" >${TARGET_CONFIG_LOCATION}/kubernetes-password.txt
+		./bin/create-image.sh \
+			--arch="${SEED_ARCH}" \
+			--cni-version="${CNI_VERSION}" \
+			--container-runtime=${CONTAINER_ENGINE} \
+			--custom-image="${TARGET_IMAGE}" \
+			--distribution="${DISTRO}" \
+			--k8s-distribution=${KUBERNETES_DISTRO} \
+			--kubernetes-version="${KUBERNETES_VERSION}" \
+			--password="${KUBERNETES_PASSWORD}" \
+			--plateform=${PLATEFORM} \
+			--seed="${SEED_IMAGE}-${SEED_ARCH}" \
+			--ssh-key="${SSH_KEY}" \
+			--ssh-priv-key="${SSH_PRIVATE_KEY}" \
+			--user="${KUBERNETES_USER}" \
+			--primary-network="${PRIMARY_NETWORK}" \
+	#		--second-network="${SECONDARY_NETWORK}"
 
-case "${KUBERNETES_DISTRO}" in
-	k3s|rke2)
-		IMAGE_CREDENTIALS_CONFIG=/var/lib/rancher/credentialprovider/config.yaml
-		IMAGE_CREDENTIALS_BIN=/var/lib/rancher/credentialprovider/bin
-		;;
-	kubeadm)
-		IMAGE_CREDENTIALS_CONFIG=/etc/kubernetes/credential.yaml
-		IMAGE_CREDENTIALS_BIN=/usr/local/bin
-		;;
-esac
+		TARGET_IMAGE_UUID=$(get_vmuuid ${TARGET_IMAGE})
+	fi
 
-# Cloud init vendor-data
-cat >${TARGET_CONFIG_LOCATION}/vendordata.yaml <<EOF
+	if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then
+		echo_blue_bold "Create image only, done..."
+		exit 0
+	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function prepare_deployment() {
+	if [ "${UPGRADE_CLUSTER}" == "YES" ]; then
+		echo_title "Upgrade ${MASTERKUBE} instance with ${TARGET_IMAGE}"
+		./bin/upgrade-cluster.sh
+		exit
+	elif [ "${RESUME}" = "NO" ]; then
+		echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
+		update_build_env
+	else
+		echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
+		source ${TARGET_CONFIG_LOCATION}/buildenv
+	fi
+
+	echo "${KUBERNETES_PASSWORD}" >${TARGET_CONFIG_LOCATION}/kubernetes-password.txt
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function prepare_vendordata() {
+	# Cloud init vendor-data
+	cat >${TARGET_CONFIG_LOCATION}/vendordata.yaml <<EOF
 #cloud-config
 package_update: ${UPDATE_PACKAGE}
 package_upgrade: ${UPDATE_PACKAGE}
@@ -736,8 +777,8 @@ system_info:
     name: ${KUBERNETES_USER}
 EOF
 
-if [ -n "${AWS_ACCESSKEY}" ] && [ -n "${AWS_SECRETKEY}" ]; then
-	cat > ${TARGET_CONFIG_LOCATION}/credential.yaml <<EOF
+	if [ -n "${AWS_ACCESSKEY}" ] && [ -n "${AWS_SECRETKEY}" ]; then
+		cat > ${TARGET_CONFIG_LOCATION}/credential.yaml <<EOF
 apiVersion: kubelet.config.k8s.io/v1
 kind: CredentialProviderConfig
 providers:
@@ -759,62 +800,64 @@ providers:
         value: ${AWS_SECRETKEY}
 EOF
 
-	cat >>${TARGET_CONFIG_LOCATION}/vendordata.yaml <<EOF
+		cat >>${TARGET_CONFIG_LOCATION}/vendordata.yaml <<EOF
 write_files:
-- encoding: b64
-  content: $(cat ${TARGET_CONFIG_LOCATION}/credential.yaml | base64 -w 0)
+- encoding: gzip+base64
+  content: $(cat ${TARGET_CONFIG_LOCATION}/credential.yaml | gzip -c9 | base64 -w 0)
   owner: root:root
   path: ${IMAGE_CREDENTIALS_CONFIG}
   permissions: '0644'
 EOF
-fi
+	fi
 
-gzip -c9 <${TARGET_CONFIG_LOCATION}/vendordata.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/vendordata.base64
+	gzip -c9 <${TARGET_CONFIG_LOCATION}/vendordata.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/vendordata.base64
+}
 
-IPADDRS=()
-NODE_IP=${NET_IP}
-VC_NETWORK_PUBLIC_NIC=eth0 #Multipass setup
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function prepare_networking() {
+	if [ -z "${VC_NETWORK_PUBLIC}" ] || [ "${PUBLIC_IP}" == "NONE" ]; then
+		PUBLIC_IP=NONE
+		PUBLIC_NODE_IP=NONE
+		VC_NETWORK_PUBLIC_ENABLED=false
+	elif [ "${PUBLIC_IP}" == "DHCP" ]; then
+		PUBLIC_NODE_IP=${PUBLIC_IP}
+	else
+		IFS=/ read PUBLIC_NODE_IP PUBLIC_MASK_CIDR <<< "${PUBLIC_IP}"
+		PUBLIC_NETMASK=$(cidr_to_netmask ${PUBLIC_MASK_CIDR})
+		VC_NETWORK_PUBLIC_NIC="eth0:1"
+	fi
 
-if [ -z "${VC_NETWORK_PUBLIC}" ] || [ "${PUBLIC_IP}" == "NONE" ]; then
-	PUBLIC_IP=NONE
-	PUBLIC_NODE_IP=NONE
-	VC_NETWORK_PUBLIC_ENABLED=false
-elif [ "${PUBLIC_IP}" == "DHCP" ]; then
-	PUBLIC_NODE_IP=${PUBLIC_IP}
-else
-	IFS=/ read PUBLIC_NODE_IP PUBLIC_MASK_CIDR <<< "${PUBLIC_IP}"
-	PUBLIC_NETMASK=$(cidr_to_netmask ${PUBLIC_MASK_CIDR})
-	VC_NETWORK_PUBLIC_NIC="eth0:1"
-fi
+	# No external elb, use keep alived
+	if [[ ${FIRSTNODE} > 0 ]]; then
+		delete_host "${MASTERKUBE}"
+		add_host ${NODE_IP} ${MASTERKUBE} ${MASTERKUBE}.${DOMAIN_NAME}
 
-# No external elb, use keep alived
-if [[ ${FIRSTNODE} > 0 ]]; then
-	delete_host "${MASTERKUBE}"
-	add_host ${NODE_IP} ${MASTERKUBE} ${MASTERKUBE}.${DOMAIN_NAME}
+		IPADDRS+=(${NODE_IP})
+		NODE_IP=$(nextip ${NODE_IP})
+		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
+	fi
 
-	IPADDRS+=(${NODE_IP})
-	NODE_IP=$(nextip ${NODE_IP})
-	PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
-fi
+	if [ ${HA_CLUSTER} = "true" ]; then
+		TOTALNODES=$((WORKERNODES + ${CONTROLNODES}))
+	else
+		CONTROLNODES=0
+		TOTALNODES=${WORKERNODES}
+	fi
 
-if [ ${HA_CLUSTER} = "true" ]; then
-	TOTALNODES=$((WORKERNODES + ${CONTROLNODES}))
-else
-	CONTROLNODES=0
-	TOTALNODES=${WORKERNODES}
-fi
+	if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
+		PUBLIC_ROUTES_DEFS=$(build_routes ${NETWORK_PUBLIC_ROUTES[@]})
+	else
+		PUBLIC_ROUTES_DEFS='[]'
+	fi
 
-if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
-	PUBLIC_ROUTES_DEFS=$(build_routes ${NETWORK_PUBLIC_ROUTES[@]})
-else
-	PUBLIC_ROUTES_DEFS='[]'
-fi
-
-if [ ${#NETWORK_PRIVATE_ROUTES[@]} -gt 0 ]; then
-	PRIVATE_ROUTES_DEFS=$(build_routes ${NETWORK_PRIVATE_ROUTES[@]})
-else
-	PRIVATE_ROUTES_DEFS='[]'
-fi
+	if [ ${#NETWORK_PRIVATE_ROUTES[@]} -gt 0 ]; then
+		PRIVATE_ROUTES_DEFS=$(build_routes ${NETWORK_PRIVATE_ROUTES[@]})
+	else
+		PRIVATE_ROUTES_DEFS='[]'
+	fi
+}
 
 #===========================================================================================================================================
 #
@@ -856,343 +899,379 @@ function get_machine_type() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-for INDEX in $(seq ${FIRSTNODE} ${TOTALNODES})
-do
-	if [ "${PLATEFORM}" == "vsphere" ]; then
-		create_vm ${INDEX} ${PUBLIC_NODE_IP} ${NODE_IP} &
-	else
-		create_vm ${INDEX} ${PUBLIC_NODE_IP} ${NODE_IP}
-	fi
-
-	IPADDRS+=(${NODE_IP})
-
-	# Reserve 2 ip for potentiel HA cluster
-	if [[ "${HA_CLUSTER}" == "false" ]] && [[ ${INDEX} = 0 ]]; then
-		NODE_IP=$(nextip ${NODE_IP})
-		NODE_IP=$(nextip ${NODE_IP})
-		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
-		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
-	fi
-
-	NODE_IP=$(nextip ${NODE_IP})
-	PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
-done
-
-if [ ${WORKERNODES} -gt 0 ]; then
-	FIRST_WORKER_NODE_IP=${IPADDRS[${#IPADDRS[@]} - ${WORKERNODES}]}
-else
-	FIRST_WORKER_NODE_IP=$(nextip ${IPADDRS[${#IPADDRS[@]} - 1]})
-fi
-
-wait_jobs_finish
-
-if [ "${HA_CLUSTER}" = "true" ]; then
-	CONTROLNODE_INDEX=1
-	for INDEX in $(seq 1 ${CONTROLNODES})
+function create_all_vms() {
+	for INDEX in $(seq ${FIRSTNODE} ${TOTALNODES})
 	do
-		MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${INDEX}"
-		IPADDR="${IPADDRS[${INDEX}]}"
-		NODE_DNS="${MASTERKUBE_NODE}.${DOMAIN_NAME}:${IPADDR}"
-
-		if [ -z "${CLUSTER_NODES}" ]; then
-			CLUSTER_NODES="${NODE_DNS}"
+		if [ "${PLATEFORM}" == "vsphere" ]; then
+			create_vm ${INDEX} ${PUBLIC_NODE_IP} ${NODE_IP} &
 		else
-			CLUSTER_NODES="${CLUSTER_NODES},${NODE_DNS}"
+			create_vm ${INDEX} ${PUBLIC_NODE_IP} ${NODE_IP}
 		fi
 
-		if [ "${EXTERNAL_ETCD}" = "true" ]; then
-			if [ -z "${ETCD_ENDPOINT}" ]; then
-				ETCD_ENDPOINT="https://${IPADDR}:2379"
-			else
-				ETCD_ENDPOINT="${ETCD_ENDPOINT},https://${IPADDR}:2379"
-			fi
+		IPADDRS+=(${NODE_IP})
+
+		# Reserve 2 ip for potentiel HA cluster
+		if [[ "${HA_CLUSTER}" == "false" ]] && [[ ${INDEX} = 0 ]]; then
+			NODE_IP=$(nextip ${NODE_IP})
+			NODE_IP=$(nextip ${NODE_IP})
+			PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
+			PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
 		fi
+
+		NODE_IP=$(nextip ${NODE_IP})
+		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
 	done
 
-	echo "export CLUSTER_NODES=${CLUSTER_NODES}" >> ${TARGET_CONFIG_LOCATION}/buildenv
-
-	if [ "${EXTERNAL_ETCD}" = "true" ]; then
-		echo_title "Created etcd cluster: ${CLUSTER_NODES}"
-
-		prepare-etcd.sh --node-group=${NODEGROUP_NAME} --cluster-nodes="${CLUSTER_NODES}" --target-location="${TARGET_CLUSTER_LOCATION}" ${SILENT}
-
-		for INDEX in $(seq 1 ${CONTROLNODES})
-		do
-			if [ ! -f ${TARGET_CONFIG_LOCATION}/etdc-0${INDEX}-prepared ]; then
-				IPADDR="${IPADDRS[${INDEX}]}"
-
-				echo_title "Start etcd node: ${IPADDR}"
-                eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/etcd ${KUBERNETES_USER}@${IPADDR}:~/etcd ${SILENT}
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh \
-					--user=${KUBERNETES_USER} \
-					--cluster-nodes="${CLUSTER_NODES}" \
-					--node-index="${INDEX}" ${SILENT}
-
-				touch ${TARGET_CONFIG_LOCATION}/etdc-0${INDEX}-prepared
-			fi
-		done
-	fi
-
-	if [ "${USE_KEEPALIVED}" = "YES" ]; then
-		echo_title "Created keepalived cluster: ${CLUSTER_NODES}"
-
-		for INDEX in $(seq 1 ${CONTROLNODES})
-		do
-			if [ ! -f ${TARGET_CONFIG_LOCATION}/keepalived-0${INDEX}-prepared ]; then
-				IPADDR="${IPADDRS[${INDEX}]}"
-
-				echo_title "Start keepalived node: ${IPADDR}"
-
-				case "${INDEX}" in
-					1)
-						KEEPALIVED_PEER1=${IPADDRS[2]}
-						KEEPALIVED_PEER2=${IPADDRS[3]}
-						KEEPALIVED_STATUS=MASTER
-						;;
-					2)
-						KEEPALIVED_PEER1=${IPADDRS[1]}
-						KEEPALIVED_PEER2=${IPADDRS[3]}
-						KEEPALIVED_STATUS=BACKUP
-						;;
-					3)
-						KEEPALIVED_PEER1=${IPADDRS[1]}
-						KEEPALIVED_PEER2=${IPADDRS[2]}
-						KEEPALIVED_STATUS=BACKUP
-						;;
-				esac
-
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-keepalived.sh \
-					--bind-address="${IPADDRS[0]}" \
-					--bind-port="${APISERVER_ADVERTISE_PORT}" \
-					--keep-alive-password="${KUBERNETES_PASSWORD}" \
-					--keep-alive-priority="$((80-INDEX))" \
-					--keep-alive-multicast=${IPADDRS[${INDEX}]} \
-					--keep-alive-peer1=${KEEPALIVED_PEER1} \
-					--keep-alive-peer2=${KEEPALIVED_PEER2} \
-					--keep-alive-status=${KEEPALIVED_STATUS} ${SILENT}
-
-				touch ${TARGET_CONFIG_LOCATION}/keepalived-0${INDEX}-prepared
-			fi
-		done
-	fi
-else
-	CONTROLNODE_INDEX=0
-	IPADDR="${IPADDRS[0]}"
-	IPRESERVED1=$(nextip ${IPADDR})
-	IPRESERVED2=$(nextip ${IPRESERVED1})
-	CLUSTER_NODES="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDR},${NODEGROUP_NAME}-master-02.${DOMAIN_NAME}:${IPRESERVED1},${NODEGROUP_NAME}-master-03.${DOMAIN_NAME}:${IPRESERVED2}"
-
-	echo "export CLUSTER_NODES=${CLUSTER_NODES}" >> ${TARGET_CONFIG_LOCATION}/buildenv
-fi
-
-CERT_SANS=$(collect_cert_sans "${IPADDRS[0]}" "${CLUSTER_NODES}" "${MASTERKUBE}.${DOMAIN_NAME}")
-
-for INDEX in $(seq ${FIRSTNODE} ${TOTALNODES})
-do
-	MASTERKUBE_NODE=$(get_vm_name ${INDEX})
-
-	if [ -f ${TARGET_CONFIG_LOCATION}/kubeadm-0${INDEX}-prepared ]; then
-		echo_title "Already prepared VM ${MASTERKUBE_NODE}"
+	if [ ${WORKERNODES} -gt 0 ]; then
+		FIRST_WORKER_NODE_IP=${IPADDRS[${#IPADDRS[@]} - ${WORKERNODES}]}
 	else
-		IPADDR="${IPADDRS[${INDEX}]}"
-		VMUUID=$(get_vmuuid ${MASTERKUBE_NODE})
+		FIRST_WORKER_NODE_IP=$(nextip ${IPADDRS[${#IPADDRS[@]} - 1]})
+	fi
 
-		echo_title "Prepare VM ${MASTERKUBE_NODE}, UUID=${VMUUID} with IP:${IPADDR}"
+	wait_jobs_finish
+}
 
-		if [ ${INDEX} = 0 ]; then
-			if [ "${HA_CLUSTER}" = "true" ]; then
-				echo_blue_bold "Start load balancer ${MASTERKUBE_NODE} instance"
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function create_etcd() {
+	if [ "${HA_CLUSTER}" = "true" ]; then
+		CONTROLNODE_INDEX=1
+		for INDEX in $(seq 1 ${CONTROLNODES})
+		do
+			MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${INDEX}"
+			IPADDR="${IPADDRS[${INDEX}]}"
+			NODE_DNS="${MASTERKUBE_NODE}.${DOMAIN_NAME}:${IPADDR}"
 
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-load-balancer.sh \
-					--listen-port=${LOAD_BALANCER_PORT} \
-					--cluster-nodes="${CLUSTER_NODES}" \
-					--control-plane-endpoint=${MASTERKUBE}.${DOMAIN_NAME} \
-					--listen-ip=${NET_IP} ${SILENT}
+			if [ -z "${CLUSTER_NODES}" ]; then
+				CLUSTER_NODES="${NODE_DNS}"
 			else
-				echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} single instance master node, kubernetes version=${KUBERNETES_VERSION}"
-
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
-					--plateform=${PLATEFORM} \
-					--cloud-provider=${CLOUD_PROVIDER} \
-					--advertise-port=${APISERVER_ADVERTISE_PORT} \
-					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--vm-uuid=${VMUUID} \
-					--csi-region=${REGION} \
-					--csi-zone=${ZONEID} \
-					--max-pods=${MAX_PODS} \
-					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
-					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
-					--container-runtime=${CONTAINER_ENGINE} \
-					--tls-san="${CERT_SANS}" \
-					--cluster-nodes="${CLUSTER_NODES}" \
-					--node-group=${NODEGROUP_NAME} \
-					--node-index=${INDEX} \
-					--cni-plugin=${CNI_PLUGIN} \
-					--net-if=${NET_IF} \
-					--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
-
-				eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
-			fi
-		else
-			if [ "${HA_CLUSTER}" = "true" ]; then
-				NODEINDEX=$((INDEX-1))
-			else
-				NODEINDEX=${INDEX}
+				CLUSTER_NODES="${CLUSTER_NODES},${NODE_DNS}"
 			fi
 
-			if [ ${NODEINDEX} = 0 ]; then
-				echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} instance master node number ${INDEX}, kubernetes version=${KUBERNETES_VERSION}"
-
-				ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
-					--plateform=${PLATEFORM} \
-					--cloud-provider=${CLOUD_PROVIDER} \
-					--advertise-port=${APISERVER_ADVERTISE_PORT} \
-					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--vm-uuid=${VMUUID} \
-					--csi-region=${REGION} \
-					--csi-zone=${ZONEID} \
-					--max-pods=${MAX_PODS} \
-					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
-					--container-runtime=${CONTAINER_ENGINE} \
-					--use-external-etcd=${EXTERNAL_ETCD} \
-					--node-group=${NODEGROUP_NAME} \
-					--node-index=${INDEX} \
-					--load-balancer-ip=${IPADDRS[0]} \
-					--cluster-nodes="${CLUSTER_NODES}" \
-					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[1]}" \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
-					--tls-san="${CERT_SANS}" \
-					--ha-cluster=true \
-					--cni-plugin=${CNI_PLUGIN} \
-					--net-if=${NET_IF} \
-					--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
-
-				eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
-
-				echo_blue_dot_title "Wait for ELB start on IP: ${IPADDRS[0]}"
-
-				while :
-				do
-					echo_blue_dot
-					curl -s -k "https://${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" &> /dev/null && break
-					sleep 1
-				done
-				echo
-
-				echo -n ${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT} > ${TARGET_CLUSTER_LOCATION}/manager-ip
-			elif [[ ${INDEX} > ${CONTROLNODES} ]] || [ "${HA_CLUSTER}" = "false" ]; then
-				echo_blue_bold "Join node ${MASTERKUBE_NODE} instance worker node, kubernetes version=${KUBERNETES_VERSION}"
-
-				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
-
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
-					--plateform=${PLATEFORM} \
-					--cloud-provider=${CLOUD_PROVIDER} \
-					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--kubernetes-version="${KUBERNETES_VERSION}" \
-					--container-runtime=${CONTAINER_ENGINE} \
-					--cni-plugin=${CNI_PLUGIN} \
-					--csi-region=${REGION} \
-					--csi-zone=${ZONEID} \
-					--max-pods=${MAX_PODS} \
-					--vm-uuid=${VMUUID} \
-					--use-external-etcd=${EXTERNAL_ETCD} \
-					--node-group=${NODEGROUP_NAME} \
-					--node-index=${NODEINDEX} \
-					--join-master="${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" \
-					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
-					--tls-san="${CERT_SANS}" \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
-					--net-if=${NET_IF} \
-					--cluster-nodes="${CLUSTER_NODES}" ${SILENT}
-			else
-				echo_blue_bold "Join node ${MASTERKUBE_NODE} instance master node, kubernetes version=${KUBERNETES_VERSION}"
-
-				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
-
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
-					--plateform=${PLATEFORM} \
-					--cloud-provider=${CLOUD_PROVIDER} \
-					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--kubernetes-version="${KUBERNETES_VERSION}" \
-					--container-runtime=${CONTAINER_ENGINE} \
-					--cni-plugin=${CNI_PLUGIN} \
-					--csi-region=${REGION} \
-					--csi-zone=${ZONEID} \
-					--max-pods=${MAX_PODS} \
-					--vm-uuid=${VMUUID} \
-					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
-					--use-external-etcd=${EXTERNAL_ETCD} \
-					--node-group=${NODEGROUP_NAME} \
-					--node-index=${NODEINDEX} \
-					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
-					--tls-san="${CERT_SANS}" \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
-					--cluster-nodes="${CLUSTER_NODES}" \
-					--net-if=${NET_IF} \
-					--join-master="${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" \
-					--control-plane=true ${SILENT}
+			if [ "${EXTERNAL_ETCD}" = "true" ]; then
+				if [ -z "${ETCD_ENDPOINT}" ]; then
+					ETCD_ENDPOINT="https://${IPADDR}:2379"
+				else
+					ETCD_ENDPOINT="${ETCD_ENDPOINT},https://${IPADDR}:2379"
+				fi
 			fi
+		done
+
+		echo "export CLUSTER_NODES=${CLUSTER_NODES}" >> ${TARGET_CONFIG_LOCATION}/buildenv
+
+		if [ "${EXTERNAL_ETCD}" = "true" ]; then
+			echo_title "Created etcd cluster: ${CLUSTER_NODES}"
+
+			prepare-etcd.sh --node-group=${NODEGROUP_NAME} --cluster-nodes="${CLUSTER_NODES}" --target-location="${TARGET_CLUSTER_LOCATION}" ${SILENT}
+
+			for INDEX in $(seq 1 ${CONTROLNODES})
+			do
+				if [ ! -f ${TARGET_CONFIG_LOCATION}/etdc-0${INDEX}-prepared ]; then
+					IPADDR="${IPADDRS[${INDEX}]}"
+
+					echo_title "Start etcd node: ${IPADDR}"
+					eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/etcd ${KUBERNETES_USER}@${IPADDR}:~/etcd ${SILENT}
+					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh \
+						--user=${KUBERNETES_USER} \
+						--cluster-nodes="${CLUSTER_NODES}" \
+						--node-index="${INDEX}" ${SILENT}
+
+					touch ${TARGET_CONFIG_LOCATION}/etdc-0${INDEX}-prepared
+				fi
+			done
 		fi
 
-		echo ${MASTERKUBE_NODE} > ${TARGET_CONFIG_LOCATION}/kubeadm-0${INDEX}-prepared
+		if [ "${USE_KEEPALIVED}" = "YES" ]; then
+			echo_title "Created keepalived cluster: ${CLUSTER_NODES}"
+
+			for INDEX in $(seq 1 ${CONTROLNODES})
+			do
+				if [ ! -f ${TARGET_CONFIG_LOCATION}/keepalived-0${INDEX}-prepared ]; then
+					IPADDR="${IPADDRS[${INDEX}]}"
+
+					echo_title "Start keepalived node: ${IPADDR}"
+
+					case "${INDEX}" in
+						1)
+							KEEPALIVED_PEER1=${IPADDRS[2]}
+							KEEPALIVED_PEER2=${IPADDRS[3]}
+							KEEPALIVED_STATUS=MASTER
+							;;
+						2)
+							KEEPALIVED_PEER1=${IPADDRS[1]}
+							KEEPALIVED_PEER2=${IPADDRS[3]}
+							KEEPALIVED_STATUS=BACKUP
+							;;
+						3)
+							KEEPALIVED_PEER1=${IPADDRS[1]}
+							KEEPALIVED_PEER2=${IPADDRS[2]}
+							KEEPALIVED_STATUS=BACKUP
+							;;
+					esac
+
+					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-keepalived.sh \
+						--bind-address="${IPADDRS[0]}" \
+						--bind-port="${APISERVER_ADVERTISE_PORT}" \
+						--keep-alive-password="${KUBERNETES_PASSWORD}" \
+						--keep-alive-priority="$((80-INDEX))" \
+						--keep-alive-multicast=${IPADDRS[${INDEX}]} \
+						--keep-alive-peer1=${KEEPALIVED_PEER1} \
+						--keep-alive-peer2=${KEEPALIVED_PEER2} \
+						--keep-alive-status=${KEEPALIVED_STATUS} ${SILENT}
+
+					touch ${TARGET_CONFIG_LOCATION}/keepalived-0${INDEX}-prepared
+				fi
+			done
+		fi
+	else
+		CONTROLNODE_INDEX=0
+		IPADDR="${IPADDRS[0]}"
+		IPRESERVED1=$(nextip ${IPADDR})
+		IPRESERVED2=$(nextip ${IPRESERVED1})
+		CLUSTER_NODES="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDR},${NODEGROUP_NAME}-master-02.${DOMAIN_NAME}:${IPRESERVED1},${NODEGROUP_NAME}-master-03.${DOMAIN_NAME}:${IPRESERVED2}"
+
+		echo "export CLUSTER_NODES=${CLUSTER_NODES}" >> ${TARGET_CONFIG_LOCATION}/buildenv
+	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function create_cluster() {
+	CERT_SANS=$(collect_cert_sans "${IPADDRS[0]}" "${CLUSTER_NODES}" "${MASTERKUBE}.${DOMAIN_NAME}")
+
+	for INDEX in $(seq ${FIRSTNODE} ${TOTALNODES})
+	do
+		MASTERKUBE_NODE=$(get_vm_name ${INDEX})
+
+		if [ -f ${TARGET_CONFIG_LOCATION}/kubeadm-0${INDEX}-prepared ]; then
+			echo_title "Already prepared VM ${MASTERKUBE_NODE}"
+		else
+			IPADDR="${IPADDRS[${INDEX}]}"
+			VMUUID=$(get_vmuuid ${MASTERKUBE_NODE})
+
+			echo_title "Prepare VM ${MASTERKUBE_NODE}, UUID=${VMUUID} with IP:${IPADDR}"
+
+			if [ ${INDEX} = 0 ]; then
+				if [ "${HA_CLUSTER}" = "true" ]; then
+					echo_blue_bold "Start load balancer ${MASTERKUBE_NODE} instance"
+
+					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-load-balancer.sh \
+						--listen-port=${LOAD_BALANCER_PORT} \
+						--cluster-nodes="${CLUSTER_NODES}" \
+						--control-plane-endpoint=${MASTERKUBE}.${DOMAIN_NAME} \
+						--listen-ip=${NET_IP} ${SILENT}
+				else
+					echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} single instance master node, kubernetes version=${KUBERNETES_VERSION}"
+
+					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
+						--plateform=${PLATEFORM} \
+						--cloud-provider=${CLOUD_PROVIDER} \
+						--advertise-port=${APISERVER_ADVERTISE_PORT} \
+						--k8s-distribution=${KUBERNETES_DISTRO} \
+						--vm-uuid=${VMUUID} \
+						--csi-region=${REGION} \
+						--csi-zone=${ZONEID} \
+						--max-pods=${MAX_PODS} \
+						--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
+						--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
+						--container-runtime=${CONTAINER_ENGINE} \
+						--tls-san="${CERT_SANS}" \
+						--cluster-nodes="${CLUSTER_NODES}" \
+						--node-group=${NODEGROUP_NAME} \
+						--node-index=${INDEX} \
+						--cni-plugin=${CNI_PLUGIN} \
+						--net-if=${NET_IF} \
+						--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
+
+					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
+				fi
+			else
+				if [ "${HA_CLUSTER}" = "true" ]; then
+					NODEINDEX=$((INDEX-1))
+				else
+					NODEINDEX=${INDEX}
+				fi
+
+				if [ ${NODEINDEX} = 0 ]; then
+					echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} instance master node number ${INDEX}, kubernetes version=${KUBERNETES_VERSION}"
+
+					ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
+						--plateform=${PLATEFORM} \
+						--cloud-provider=${CLOUD_PROVIDER} \
+						--advertise-port=${APISERVER_ADVERTISE_PORT} \
+						--k8s-distribution=${KUBERNETES_DISTRO} \
+						--vm-uuid=${VMUUID} \
+						--csi-region=${REGION} \
+						--csi-zone=${ZONEID} \
+						--max-pods=${MAX_PODS} \
+						--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
+						--container-runtime=${CONTAINER_ENGINE} \
+						--use-external-etcd=${EXTERNAL_ETCD} \
+						--node-group=${NODEGROUP_NAME} \
+						--node-index=${INDEX} \
+						--load-balancer-ip=${IPADDRS[0]} \
+						--cluster-nodes="${CLUSTER_NODES}" \
+						--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[1]}" \
+						--etcd-endpoint="${ETCD_ENDPOINT}" \
+						--tls-san="${CERT_SANS}" \
+						--ha-cluster=true \
+						--cni-plugin=${CNI_PLUGIN} \
+						--net-if=${NET_IF} \
+						--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
+
+					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
+
+					echo_blue_dot_title "Wait for ELB start on IP: ${IPADDRS[0]}"
+
+					while :
+					do
+						echo_blue_dot
+						curl -s -k "https://${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" &> /dev/null && break
+						sleep 1
+					done
+					echo
+
+					echo -n ${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT} > ${TARGET_CLUSTER_LOCATION}/manager-ip
+				elif [[ ${INDEX} > ${CONTROLNODES} ]] || [ "${HA_CLUSTER}" = "false" ]; then
+					echo_blue_bold "Join node ${MASTERKUBE_NODE} instance worker node, kubernetes version=${KUBERNETES_VERSION}"
+
+					eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
+
+					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
+						--plateform=${PLATEFORM} \
+						--cloud-provider=${CLOUD_PROVIDER} \
+						--k8s-distribution=${KUBERNETES_DISTRO} \
+						--kubernetes-version="${KUBERNETES_VERSION}" \
+						--container-runtime=${CONTAINER_ENGINE} \
+						--cni-plugin=${CNI_PLUGIN} \
+						--csi-region=${REGION} \
+						--csi-zone=${ZONEID} \
+						--max-pods=${MAX_PODS} \
+						--vm-uuid=${VMUUID} \
+						--use-external-etcd=${EXTERNAL_ETCD} \
+						--node-group=${NODEGROUP_NAME} \
+						--node-index=${NODEINDEX} \
+						--join-master="${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" \
+						--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
+						--tls-san="${CERT_SANS}" \
+						--etcd-endpoint="${ETCD_ENDPOINT}" \
+						--net-if=${NET_IF} \
+						--cluster-nodes="${CLUSTER_NODES}" ${SILENT}
+				else
+					echo_blue_bold "Join node ${MASTERKUBE_NODE} instance master node, kubernetes version=${KUBERNETES_VERSION}"
+
+					eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
+
+					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
+						--plateform=${PLATEFORM} \
+						--cloud-provider=${CLOUD_PROVIDER} \
+						--k8s-distribution=${KUBERNETES_DISTRO} \
+						--kubernetes-version="${KUBERNETES_VERSION}" \
+						--container-runtime=${CONTAINER_ENGINE} \
+						--cni-plugin=${CNI_PLUGIN} \
+						--csi-region=${REGION} \
+						--csi-zone=${ZONEID} \
+						--max-pods=${MAX_PODS} \
+						--vm-uuid=${VMUUID} \
+						--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
+						--use-external-etcd=${EXTERNAL_ETCD} \
+						--node-group=${NODEGROUP_NAME} \
+						--node-index=${NODEINDEX} \
+						--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
+						--tls-san="${CERT_SANS}" \
+						--etcd-endpoint="${ETCD_ENDPOINT}" \
+						--cluster-nodes="${CLUSTER_NODES}" \
+						--net-if=${NET_IF} \
+						--join-master="${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" \
+						--control-plane=true ${SILENT}
+				fi
+			fi
+
+			echo ${MASTERKUBE_NODE} > ${TARGET_CONFIG_LOCATION}/kubeadm-0${INDEX}-prepared
+		fi
+
+		echo_separator
+	done
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function create_config() {
+	kubeconfig-merge.sh ${MASTERKUBE} ${TARGET_CLUSTER_LOCATION}/config
+
+	echo_blue_bold "create cluster done"
+
+	MASTER_IP=$(cat ${TARGET_CLUSTER_LOCATION}/manager-ip)
+	TOKEN=$(cat ${TARGET_CLUSTER_LOCATION}/token)
+	CACERT=$(cat ${TARGET_CLUSTER_LOCATION}/ca.cert)
+
+	kubectl create secret generic autoscaler-ssh-keys -n kube-system --dry-run=client -o yaml \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		--from-file=id_rsa="${SSH_PRIVATE_KEY}" \
+		--from-file=id_rsa.pub="${SSH_PUBLIC_KEY}" | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+
+	echo_title "Write ${PLATEFORM} autoscaler provider config"
+
+	if [ ${GRPC_PROVIDER} = "grpc" ]; then
+		cat > ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} <<EOF
+		{
+			"address": "${CONNECTTO}",
+			"secret": "${PLATEFORM}",
+			"timeout": 300
+		}
+EOF
+	else
+		echo "address: ${CONNECTTO}" > ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG}
 	fi
 
-	echo_separator
-done
+	if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+		SERVER_ADDRESS="${MASTER_IP%%:*}:25000"
+	elif [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+		SERVER_ADDRESS="${MASTER_IP%%:*}:9345"
+	else
+		SERVER_ADDRESS="${MASTER_IP}"
+	fi
 
-kubeconfig-merge.sh ${MASTERKUBE} ${TARGET_CLUSTER_LOCATION}/config
+	cp ${PWD}/templates/setup/${PLATEFORM}/machines.json ${TARGET_CONFIG_LOCATION}/machines.json
 
-echo_blue_bold "create cluster done"
-
-MASTER_IP=$(cat ${TARGET_CLUSTER_LOCATION}/manager-ip)
-TOKEN=$(cat ${TARGET_CLUSTER_LOCATION}/token)
-CACERT=$(cat ${TARGET_CLUSTER_LOCATION}/ca.cert)
-
-kubectl create secret generic autoscaler-ssh-keys -n kube-system --dry-run=client -o yaml \
-	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--from-file=id_rsa="${SSH_PRIVATE_KEY}" \
-	--from-file=id_rsa.pub="${SSH_PUBLIC_KEY}" | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
-
-echo_title "Write ${PLATEFORM} autoscaler provider config"
-
-if [ ${GRPC_PROVIDER} = "grpc" ]; then
-	cat > ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} <<EOF
-	{
-		"address": "${CONNECTTO}",
-		"secret": "${PLATEFORM}",
-		"timeout": 300
-	}
-EOF
-else
-	echo "address: ${CONNECTTO}" > ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG}
-fi
-
-if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
-	SERVER_ADDRESS="${MASTER_IP%%:*}:25000"
-elif [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-	SERVER_ADDRESS="${MASTER_IP%%:*}:9345"
-else
-	SERVER_ADDRESS="${MASTER_IP}"
-fi
-
-cp ${PWD}/templates/setup/${PLATEFORM}/machines.json ${TARGET_CONFIG_LOCATION}/machines.json
-
-if [ -n "${AWS_ACCESSKEY}" ] && [ -n "${AWS_SECRETKEY}" ]; then
-	echo $(eval "cat <<EOF
-$(<${PWD}/templates/setup/image-credential-provider-config.json)
+	if [ -n "${AWS_ACCESSKEY}" ] && [ -n "${AWS_SECRETKEY}" ]; then
+		echo $(eval "cat <<EOF
+	$(<${PWD}/templates/setup/image-credential-provider-config.json)
 EOF") | jq . > ${TARGET_CONFIG_LOCATION}/image-credential-provider-config.json
 
-	IMAGE_CREDENTIALS=$(cat "${TARGET_CONFIG_LOCATION}/image-credential-provider-config.json")
-else
-	IMAGE_CREDENTIALS='{}'
-fi
+		IMAGE_CREDENTIALS=$(cat "${TARGET_CONFIG_LOCATION}/image-credential-provider-config.json")
+	else
+		IMAGE_CREDENTIALS='{}'
+	fi
 
-echo $(eval "cat <<EOF
-$(<${PWD}/templates/setup/${PLATEFORM}/provider.json)
+	echo $(eval "cat <<EOF
+	$(<${PWD}/templates/setup/${PLATEFORM}/provider.json)
 EOF") | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
 
-echo $(eval "cat <<EOF
-$(<${PWD}/templates/setup/${PLATEFORM}/autoscaler.json)
+	echo $(eval "cat <<EOF
+	$(<${PWD}/templates/setup/${PLATEFORM}/autoscaler.json)
 EOF") | jq --argjson IMAGE_CREDENTIALS "${IMAGE_CREDENTIALS}" '. += $IMAGE_CREDENTIALS' > ${TARGET_CONFIG_LOCATION}/autoscaler.json
+}
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+prepare_environment
+prepare_transport
+prepare_kubernetes_distribution
+
+delete_previous_masterkube
+
+prepare_image
+prepare_cert
+prepare_deployment
+prepare_vendordata
+prepare_networking
+
+create_all_vms
+create_etcd
+create_cluster
+create_config

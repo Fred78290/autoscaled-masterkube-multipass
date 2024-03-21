@@ -27,7 +27,6 @@ OPTIONS=(
 	"container-runtime:"
 	"primary-adapter:"
 	"second-adapter:"
-	"ovftool:"
 )
 
 PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')

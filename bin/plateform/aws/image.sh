@@ -191,7 +191,7 @@ timezone: ${TZ}
 ssh_authorized_keys:
   - ${SSH_KEY}
 write_files:
-- encoding: gz+b64
+- encoding: gzip+base64
   content: $(gzip -c9 < ${CURDIR}/prepare-image.sh | base64 -w 0)
   owner: root:adm
   path: /usr/local/bin/prepare-image.sh

@@ -74,7 +74,7 @@ EOF
 		echo ${NETWORK_DEFS} | jq . > ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.json
 
 		# Cloud init meta-data
-		NETWORKCONFIG=$(echo ${NETWORK_DEFS} | yq -p json -P | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml | base64 -w 0 | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64)
+		NETWORKCONFIG=$(echo ${NETWORK_DEFS} | yq -p json -P | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.yaml | gzip -c9 | base64 -w 0 | tee ${TARGET_CONFIG_LOCATION}/metadata-${INDEX}.base64)
 
 		# Cloud init user-data
 		cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
@@ -87,7 +87,7 @@ growpart:
   devices: ["/"]
   ignore_growroot_disabled: false
 write_files:
-- encoding: b64
+- encoding: gzip+base64
   content: ${NETWORKCONFIG}
   owner: root:root
   path: /etc/netplan/10-custom.yaml

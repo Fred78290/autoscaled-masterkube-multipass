@@ -1205,8 +1205,8 @@ function create_vm() {
 		cat > ${TARGET_CONFIG_LOCATION}/userdata-${SUFFIX}.yaml <<EOF
 #cloud-config
 write_files:
-- encoding: b64
-  content: $(cat ${TARGET_CONFIG_LOCATION}/credential.yaml | base64 -w 0)
+- encoding: gzip+base64
+  content: $(cat ${TARGET_CONFIG_LOCATION}/credential.yaml | gzip -c9 | base64 -w 0)
   owner: root:root
   path: ${IMAGE_CREDENTIALS_CONFIG}
   permissions: '0644'

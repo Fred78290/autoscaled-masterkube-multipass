@@ -111,8 +111,8 @@ package_update: false
 package_upgrade: false
 ssh_pwauth: true
 write_files:
-- encoding: b64
-  content: $(cat ${CURDIR}/prepare-image.sh | base64 -w 0)
+- encoding: gzip+base64
+  content: $(cat ${CURDIR}/prepare-image.sh | gzip -c9 | base64 -w 0)
   owner: root:adm
   path: /usr/local/bin/prepare-image.sh
   permissions: '0755'

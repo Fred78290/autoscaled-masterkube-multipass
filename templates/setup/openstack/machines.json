@@ -1,0 +1,37 @@
+{
+    "k8s.tiny": {
+        "memsize": 2048,
+        "vcpus": 2,
+        "disksize": 10240
+    },
+    "k8s.small": {
+        "memsize": 4096,
+        "vcpus": 2,
+        "disksize": 20480
+    },
+    "k8s.medium": {
+        "memsize": 4096,
+        "vcpus": 4,
+        "disksize": 20480
+    },
+    "k8s.large": {
+        "memsize": 8192,
+        "vcpus": 4,
+        "disksize": 51200
+    },
+    "k8s.xlarge": {
+        "memsize": 16384,
+        "vcpus": 4,
+        "disksize": 102400
+    },
+    "k8s.2xlarge": {
+        "memsize": 16384,
+        "vcpus": 8,
+        "disksize": 102400
+    },
+    "k8s.4xlarge": {
+        "memsize": 32768,
+        "vcpus": 8,
+        "disksize": 102400
+    }
+}

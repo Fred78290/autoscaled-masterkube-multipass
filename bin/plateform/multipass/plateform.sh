@@ -1,5 +1,5 @@
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl kubernetes-desktop-autoscaler-utility packer qemu-img"
-NET_IF=eth1 # eth0 is multipass interface
+PRIVATE_NET_INF=eth1 # eth0 is multipass interface
 CLOUD_PROVIDER=
 
 AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)
@@ -41,13 +41,13 @@ function create_vm() {
 				"version": 2,
 				"ethernets": {
 					"eth1": {
-						"gateway4": "${NET_GATEWAY}",
+						"gateway4": "${PRIVATE_GATEWAY}",
 						"addresses": [
-							"${NODE_IP}/${NET_MASK_CIDR}"
+							"${NODE_IP}/${PRIVATE_MASK_CIDR}"
 						],
 						"nameservers": {
 							"addresses": [
-								"${NET_DNS}"
+								"${PRIVATE_DNS}"
 							]
 						}
 					}
@@ -212,13 +212,13 @@ export MAXTOTALNODES=${MAXTOTALNODES}
 export MEMORYTOTAL="${MEMORYTOTAL}"
 export METALLB_IP_RANGE=${METALLB_IP_RANGE}
 export MINNODES=${MINNODES}
-export NET_DNS=${NET_DNS}
-export NET_DOMAIN=${NET_DOMAIN}
-export NET_GATEWAY=${NET_GATEWAY}
-export NET_IF=${NET_IF}
-export NET_IP=${NET_IP}
-export NET_MASK_CIDR=${NET_MASK_CIDR}
-export NET_MASK=${NET_MASK}
+export PRIVATE_DNS=${PRIVATE_DNS}
+export PRIVATE_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
+export PRIVATE_GATEWAY=${PRIVATE_GATEWAY}
+export PRIVATE_NET_INF=${PRIVATE_NET_INF}
+export PRIVATE_IP=${PRIVATE_IP}
+export PRIVATE_MASK_CIDR=${PRIVATE_MASK_CIDR}
+export PRIVATE_NETMASK=${PRIVATE_NETMASK}
 export NETWORK_PRIVATE_ROUTES=(${NETWORK_PRIVATE_ROUTES[@]})
 export NETWORK_PUBLIC_ROUTES=(${NETWORK_PUBLIC_ROUTES[@]})
 export NFS_SERVER_ADDRESS=${NFS_SERVER_ADDRESS}

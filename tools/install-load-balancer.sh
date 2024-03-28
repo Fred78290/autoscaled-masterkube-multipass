@@ -4,7 +4,7 @@ set -e
 
 CONTROL_PLANE_ENDPOINT=
 CLUSTER_NODES=
-NET_IP=0.0.0.0
+PRIVATE_IP=0.0.0.0
 LOAD_BALANCER_PORT=80,443,6443
 
 TEMP=$(getopt -o l:c:p:n: --long listen-port:,listen-ip:,cluster-nodes:,control-plane-endpoint: -n "$0" -- "$@")
@@ -27,7 +27,7 @@ while true; do
 		shift 2
 		;;
 	-l | --listen-ip)
-		NET_IP="$2"
+		PRIVATE_IP="$2"
 		shift 2
 		;;
 	--)
@@ -96,7 +96,7 @@ function create_tcp_stream() {
 		echo "  }" >> ${NGINX_CONF}
 
 		echo "  server {" >> ${NGINX_CONF}
-		echo "    listen ${NET_IP}:${PORT};" >> ${NGINX_CONF}
+		echo "    listen ${PRIVATE_IP}:${PORT};" >> ${NGINX_CONF}
 		echo "    proxy_pass ${STREAM_NAME}_${PORT};" >> ${NGINX_CONF}
 		echo "  }" >> ${NGINX_CONF}
 	done

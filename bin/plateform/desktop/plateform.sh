@@ -53,18 +53,18 @@ function create_vm() {
 		{
 			"instance-id": "$(uuidgen)",
 			"local-hostname": "${MASTERKUBE_NODE}",
-			"hostname": "${MASTERKUBE_NODE}.${NET_DOMAIN}",
+			"hostname": "${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}",
 			"network": {
 				"version": 2,
 				"ethernets": {
 					"eth0": {
-						"gateway4": "${NET_GATEWAY}",
+						"gateway4": "${PRIVATE_GATEWAY}",
 						"addresses": [
-							"${NODE_IP}/${NET_MASK_CIDR}"
+							"${NODE_IP}/${PRIVATE_MASK_CIDR}"
 						],
 						"nameservers": {
 							"addresses": [
-								"${NET_DNS}"
+								"${PRIVATE_DNS}"
 							]
 						}
 					}
@@ -85,10 +85,10 @@ EOF
 					'.|.network.ethernets += { "eth1": { "dhcp4": true, "dhcp4-overrides": { "use-routes": $USE_DHCP_ROUTES_PUBLIC } } }')
 			else
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
-					--arg NET_GATEWAY ${NET_GATEWAY} \
+					--arg PRIVATE_GATEWAY ${PRIVATE_GATEWAY} \
 					--arg NODE_IP "${PUBLIC_NODE_IP}/${PUBLIC_MASK_CIDR}" \
-					--arg NET_DNS ${NET_DNS} \
-					'.|.network.ethernets += { "eth1": { "gateway4": $NET_GATEWAY, "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $NET_DNS ] } }}')
+					--arg PRIVATE_DNS ${PRIVATE_DNS} \
+					'.|.network.ethernets += { "eth1": { "gateway4": $PRIVATE_GATEWAY, "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $PRIVATE_DNS ] } }}')
 			fi
 
 			if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
@@ -255,13 +255,13 @@ export MAXTOTALNODES=${MAXTOTALNODES}
 export MEMORYTOTAL="${MEMORYTOTAL}"
 export METALLB_IP_RANGE=${METALLB_IP_RANGE}
 export MINNODES=${MINNODES}
-export NET_DNS=${NET_DNS}
-export NET_DOMAIN=${NET_DOMAIN}
-export NET_GATEWAY=${NET_GATEWAY}
-export NET_IF=${NET_IF}
-export NET_IP=${NET_IP}
-export NET_MASK_CIDR=${NET_MASK_CIDR}
-export NET_MASK=${NET_MASK}
+export PRIVATE_DNS=${PRIVATE_DNS}
+export PRIVATE_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
+export PRIVATE_GATEWAY=${PRIVATE_GATEWAY}
+export PRIVATE_NET_INF=${PRIVATE_NET_INF}
+export PRIVATE_IP=${PRIVATE_IP}
+export PRIVATE_MASK_CIDR=${PRIVATE_MASK_CIDR}
+export PRIVATE_NETMASK=${PRIVATE_NETMASK}
 export NETWORK_PRIVATE_ROUTES=(${NETWORK_PRIVATE_ROUTES[@]})
 export NETWORK_PUBLIC_ROUTES=(${NETWORK_PUBLIC_ROUTES[@]})
 export NFS_SERVER_ADDRESS=${NFS_SERVER_ADDRESS}

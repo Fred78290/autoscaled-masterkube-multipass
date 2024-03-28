@@ -31,10 +31,10 @@ function usage() {
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
 --vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
 --vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default ${VC_NETWORK_PUBLIC}
---net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${NET_IP}
---net-gateway=<value>                          # Override the IP gateway, default ${NET_GATEWAY}
---net-dns=<value>                              # Override the IP DNS, default ${NET_DNS}
---net-domain=<value>                           # Override the domain name, default ${NET_DOMAIN}
+--net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${PRIVATE_IP}
+--net-gateway=<value>                          # Override the IP gateway, default ${PRIVATE_GATEWAY}
+--net-dns=<value>                              # Override the IP DNS, default ${PRIVATE_DNS}
+--net-domain=<value>                           # Override the domain name, default ${PRIVATE_DOMAIN_NAME}
 --metallb-ip-range                             # Override the metalb ip range, default ${METALLB_IP_RANGE}
 --dont-use-dhcp-routes-private                 # Tell if we don't use DHCP routes in private network, default ${USE_DHCP_ROUTES_PRIVATE}
 --dont-use-dhcp-routes-public                  # Tell if we don't use DHCP routes in public network, default ${USE_DHCP_ROUTES_PUBLIC}
@@ -176,6 +176,10 @@ while true; do
 		;;
 	--public-domain)
 		PUBLIC_DOMAIN_NAME=$2
+		shift 2
+		;;
+	--external-dns-provider)
+		EXTERNAL_DNS_PROVIDER=$2
 		shift 2
 		;;
 	--defs)
@@ -387,19 +391,19 @@ while true; do
 		shift 2
 		;;
 	--net-address)
-		NET_IP="$2"
+		PRIVATE_IP="$2"
 		shift 2
 		;;
 	--net-gateway)
-		NET_GATEWAY="$2"
+		PRIVATE_GATEWAY="$2"
 		shift 2
 		;;
 	--net-dns)
-		NET_DNS="$2"
+		PRIVATE_DNS="$2"
 		shift 2
 		;;
 	--net-domain)
-		NET_DOMAIN="$2"
+		PRIVATE_DOMAIN_NAME="$2"
 		shift 2
 		;;
 	--no-dhcp-autoscaled-node)
@@ -433,7 +437,7 @@ done
 #
 #===========================================================================================================================================
 function prepare_environment() {
-	NODE_IP=${NET_IP}
+	NODE_IP=${PRIVATE_IP}
 	
 	SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 	SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
@@ -668,28 +672,53 @@ function delete_previous_masterkube() {
 #===========================================================================================================================================
 function prepare_cert() {
 	# If CERT doesn't exist, create one autosigned
+	if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
+		DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
+	else
+		DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
+	fi
+
+	if [ -z "${DOMAIN_NAME}" ]; then
+		echo_red_bold "Public domaine is not defined, unable to create auto signed cert, exit"
+		exit 1
+	fi
+
+	if [ -z ${SSL_LOCATION} ]; then
+		if [ -f ${HOME}/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
+			SSL_LOCATION=${HOME}/etc/ssl/${DOMAIN_NAME}
+		elif [ -f ${HOME}/Library/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
+			SSL_LOCATION=${HOME}/Library/etc/ssl/${DOMAIN_NAME}
+		elif [ -f $HOME/.acme.sh/${DOMAIN_NAME}/cert.pem ]; then
+			SSL_LOCATION=$HOME/.acme.sh/${DOMAIN_NAME}
+		elif [ -f ${HOME}/Library/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
+			SSL_LOCATION=${HOME}/Library/etc/ssl/${DOMAIN_NAME}
+		elif [ -f $HOME/.acme.sh/${DOMAIN_NAME}/cert.pem ]; then
+			SSL_LOCATION=$HOME/.acme.sh/${DOMAIN_NAME}
+		fi
+	fi
+
 	if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
-		if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
-			echo_red_bold "Public domaine is not defined, unable to create auto signed cert, exit"
+		echo_blue_bold "Create autosigned certificat for domain: ${PUBLIC_DOMAIN_NAME}"
+		${CURDIR}/create-cert.sh --domain ${PUBLIC_DOMAIN_NAME} --ssl-location ${SSL_LOCATION} --cert-email ${CERT_EMAIL}
+	else
+		if [ ! -f ${SSL_LOCATION}/cert.pem ]; then
+			echo_red "${SSL_LOCATION}/cert.pem not found, exit"
 			exit 1
 		fi
 
-		echo_blue_bold "Create autosigned certificat for domain: ${PUBLIC_DOMAIN_NAME}"
-		${CURDIR}/create-cert.sh --domain ${PUBLIC_DOMAIN_NAME} --ssl-location ${SSL_LOCATION} --cert-email ${CERT_EMAIL}
-	fi
+		if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
+			echo_red "${SSL_LOCATION}/fullchain.pem not found, exit"
+			exit 1
+		fi
 
-	if [ ! -f ${SSL_LOCATION}/cert.pem ]; then
-		echo_red "${SSL_LOCATION}/cert.pem not found, exit"
-		exit 1
-	fi
+		# Extract the domain name from CERT
+		DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
 
-	if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
-		echo_red "${SSL_LOCATION}/fullchain.pem not found, exit"
-		exit 1
+		if [ "${DOMAIN_NAME}" != "${PRIVATE_DOMAIN_NAME}" ] && [ "${DOMAIN_NAME}" != "${PUBLIC_DOMAIN_NAME}" ]; then
+			echo_red_bold "Warning: The provided domain ${DOMAIN_NAME} from certificat does not target domain ${PRIVATE_DOMAIN_NAME} or ${PUBLIC_DOMAIN_NAME}"
+			exit 1
+		fi
 	fi
-
-	# Extract the domain name from CERT
-	DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
 }
 
 #===========================================================================================================================================
@@ -1061,7 +1090,7 @@ function create_cluster() {
 						--listen-port=${LOAD_BALANCER_PORT} \
 						--cluster-nodes="${CLUSTER_NODES}" \
 						--control-plane-endpoint=${MASTERKUBE}.${DOMAIN_NAME} \
-						--listen-ip=${NET_IP} ${SILENT}
+						--listen-ip=${PRIVATE_IP} ${SILENT}
 				else
 					echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} single instance master node, kubernetes version=${KUBERNETES_VERSION}"
 
@@ -1082,7 +1111,7 @@ function create_cluster() {
 						--node-group=${NODEGROUP_NAME} \
 						--node-index=${INDEX} \
 						--cni-plugin=${CNI_PLUGIN} \
-						--net-if=${NET_IF} \
+						--net-if=${PRIVATE_NET_INF} \
 						--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 
 					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
@@ -1118,7 +1147,7 @@ function create_cluster() {
 						--tls-san="${CERT_SANS}" \
 						--ha-cluster=true \
 						--cni-plugin=${CNI_PLUGIN} \
-						--net-if=${NET_IF} \
+						--net-if=${PRIVATE_NET_INF} \
 						--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 
 					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
@@ -1157,7 +1186,7 @@ function create_cluster() {
 						--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
 						--tls-san="${CERT_SANS}" \
 						--etcd-endpoint="${ETCD_ENDPOINT}" \
-						--net-if=${NET_IF} \
+						--net-if=${PRIVATE_NET_INF} \
 						--cluster-nodes="${CLUSTER_NODES}" ${SILENT}
 				else
 					echo_blue_bold "Join node ${MASTERKUBE_NODE} instance master node, kubernetes version=${KUBERNETES_VERSION}"
@@ -1183,7 +1212,7 @@ function create_cluster() {
 						--tls-san="${CERT_SANS}" \
 						--etcd-endpoint="${ETCD_ENDPOINT}" \
 						--cluster-nodes="${CLUSTER_NODES}" \
-						--net-if=${NET_IF} \
+						--net-if=${PRIVATE_NET_INF} \
 						--join-master="${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" \
 						--control-plane=true ${SILENT}
 				fi

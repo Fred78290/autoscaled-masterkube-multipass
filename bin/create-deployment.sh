@@ -49,6 +49,18 @@ else
 		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 fi
 
+if [ "${PLATEFORM}" != "openstack" ]; then
+	# Empty configmap for autoscaler deployment
+	kubectl create configmap openstack-env -n kube-system \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		--from-literal=OS_CLOUD=
+
+	kubectl create configmap openstack-cloud-config -n kube-system \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		--from-literal=clouds.yaml= \
+		--from-literal=cloud.conf=
+fi
+
 echo_title "Save templates into cluster"
 
 # Save template
@@ -57,6 +69,9 @@ kubectl create ns ${NODEGROUP_NAME} --kubeconfig=${TARGET_CLUSTER_LOCATION}/conf
 if [ ${PLATEFORM} == "vsphere" ]; then
 	echo_title "Create VSphere CSI provisionner"
 	create-vsphere-provisionner.sh
+elif [ ${PLATEFORM} == "openstack" ]; then
+	echo_title "Create OpenStack controller"
+	create-openstack-controller.sh
 elif [ ${PLATEFORM} == "aws" ]; then
 	echo_title "Create AWS controller"
 	create-aws-controller.sh

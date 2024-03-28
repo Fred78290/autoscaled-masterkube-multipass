@@ -20,7 +20,7 @@ KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 MASTER_IP=$(cat ./cluster/manager-ip)
 MASTER_NODE_ALLOW_DEPLOYMENT=NO
 MAX_PODS=110
-NET_IF=$(ip route get 1|awk '{print $5;exit}')
+PRIVATE_NET_INF=$(ip route get 1|awk '{print $5;exit}')
 NODEGROUP_NAME=
 NODEINDEX=0
 NODENAME=${HOSTNAME}
@@ -142,7 +142,7 @@ while true; do
 		shift 2
 		;;
 	--net-if)
-		NET_IF=$2
+		PRIVATE_NET_INF=$2
 		shift 2
 		;;
 	--csi-region)
@@ -193,12 +193,16 @@ if [ ${PLATEFORM} == "aws" ]; then
 	APISERVER_ADVERTISE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 	PROVIDERID=aws://${ZONEID}/${INSTANCEID}
 else
-	ifconfig ${NET_IF} &> /dev/null || NET_IF=$(ip route get 1|awk '{print $5;exit}')
-	APISERVER_ADVERTISE_ADDRESS=$(ip addr show ${NET_IF} | grep "inet\s" | tr '/' ' ' | awk '{print $2}')
+	ifconfig ${PRIVATE_NET_INF} &> /dev/null || PRIVATE_NET_INF=$(ip route get 1|awk '{print $5;exit}')
+	APISERVER_ADVERTISE_ADDRESS=$(ip addr show ${PRIVATE_NET_INF} | grep "inet\s" | tr '/' ' ' | awk '{print $2}')
 	APISERVER_ADVERTISE_ADDRESS=$(echo ${APISERVER_ADVERTISE_ADDRESS} | awk '{print $1}')
 
 	if [ "${CLOUD_PROVIDER}" == "external" ]; then
-		PROVIDERID=${PLATEFORM}://${INSTANCEID}
+		if [ ${PLATEFORM} == "openstack" ]; then
+			PROVIDERID=${PLATEFORM}://${REGION}/${INSTANCEID}
+		else
+			PROVIDERID=${PLATEFORM}://${INSTANCEID}
+		fi
 	fi
 fi
 

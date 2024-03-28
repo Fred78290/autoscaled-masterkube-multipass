@@ -185,6 +185,10 @@ while true; do
 		PUBLIC_DOMAIN_NAME=$2
 		shift 2
 		;;
+	--external-dns-provider)
+		EXTERNAL_DNS_PROVIDER=$2
+		shift 2
+		;;
 	--defs)
 		PLATEFORMDEFS=$2
 		if [ -f ${PLATEFORMDEFS} ]; then
@@ -437,6 +441,7 @@ while true; do
 	esac
 done
 
+export REGION=${AWS_REGION}
 export AWS_DEFAULT_REGION=${AWS_REGION}
 
 function zoneid_by_name() {
@@ -641,12 +646,9 @@ if [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ]; then
 		echo_red_bold "Control plane can not have public IP because nginx gatewaway or NLB is required or cluster must not be exposed to internet"
 		exit 1
 	fi
-
-	if [ "${WORKERNODE_USE_PUBLICIP}" = "true" ]; then
-		echo_red_bold "Worker node can not have a public IP when control plane does not have public IP"
-		exit 1
-	fi
-
+elif [ "${WORKERNODE_USE_PUBLICIP}" = "true" ]; then
+	echo_red_bold "Worker node can not have a public IP when control plane does not have public IP"
+	exit 1
 fi
 
 [ -z "${AWS_PROFILE_ROUTE53}" ] && AWS_PROFILE_ROUTE53=${AWS_PROFILE}
@@ -857,26 +859,40 @@ else
 	echo_grey "SSH Public key already exists"
 fi
 
+if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
+	DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
+else
+	DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
+fi
+
+if [ -z ${SSL_LOCATION} ]; then
+	if [ -f ${HOME}/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
+		SSL_LOCATION=${HOME}/etc/ssl/${DOMAIN_NAME}
+	elif [ -f ${HOME}/Library/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
+		SSL_LOCATION=${HOME}/Library/etc/ssl/${DOMAIN_NAME}
+	elif [ -f $HOME/.acme.sh/${DOMAIN_NAME}/cert.pem ]; then
+		SSL_LOCATION=$HOME/.acme.sh/${DOMAIN_NAME}
+	elif [ -f ${HOME}/Library/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
+		SSL_LOCATION=${HOME}/Library/etc/ssl/${DOMAIN_NAME}
+	elif [ -f $HOME/.acme.sh/${DOMAIN_NAME}/cert.pem ]; then
+		SSL_LOCATION=$HOME/.acme.sh/${DOMAIN_NAME}
+	fi
+fi
+
 # If CERT doesn't exist, create one autosigned
 if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
-	if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
-		ACM_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
-	else
-		ACM_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
+	echo_blue_bold "Create autosigned certificat for domain: ${DOMAIN_NAME}"
+	${CURDIR}/create-cert.sh --domain ${DOMAIN_NAME} --ssl-location ${SSL_LOCATION} --cert-email ${CERT_EMAIL}
+else
+	if [ ! -f ${SSL_LOCATION}/cert.pem ]; then
+		echo_red "${SSL_LOCATION}/cert.pem not found, exit"
+		exit 1
 	fi
 
-	echo_blue_bold "Create autosigned certificat for domain: ${ACM_DOMAIN_NAME}"
-	${CURDIR}/create-cert.sh --domain ${ACM_DOMAIN_NAME} --ssl-location ${SSL_LOCATION} --cert-email ${CERT_EMAIL}
-fi
-
-if [ ! -f ${SSL_LOCATION}/cert.pem ]; then
-	echo_red "${SSL_LOCATION}/cert.pem not found, exit"
-	exit 1
-fi
-
-if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
-	echo_red "${SSL_LOCATION}/fullchain.pem not found, exit"
-	exit 1
+	if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
+		echo_red "${SSL_LOCATION}/fullchain.pem not found, exit"
+		exit 1
+	fi
 fi
 
 TARGET_IMAGE_AMI=$(aws ec2 describe-images --profile ${AWS_PROFILE} --filters "Name=name,Values=${TARGET_IMAGE}" | jq -r '.Images[0].ImageId // ""')
@@ -886,16 +902,10 @@ ACM_DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nam
 
 # Drop wildcard
 DOMAIN_NAME=$(echo -n ${ACM_DOMAIN_NAME} | sed 's/\*\.//g')
-CERT_DOMAIN=${DOMAIN_NAME}
 
 if [ "${DOMAIN_NAME}" != "${PRIVATE_DOMAIN_NAME}" ] && [ "${DOMAIN_NAME}" != "${PUBLIC_DOMAIN_NAME}" ]; then
-	echo_red "Warning: The provided domain ${CERT_DOMAIN} from certificat does not target domain ${PRIVATE_DOMAIN_NAME} or ${PUBLIC_DOMAIN_NAME}"
-
-	if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
-		DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
-	else
-		DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
-	fi
+	echo_red_bold "Warning: The provided domain ${DOMAIN_NAME} from certificat does not target domain ${PRIVATE_DOMAIN_NAME} or ${PUBLIC_DOMAIN_NAME}"
+	exit 1
 fi
 
 # ACM Keep the wildcard
@@ -1350,7 +1360,7 @@ EOF
 		if [ -z "${PUBADDR}" ] || [ "${PREFER_SSH_PUBLICIP}" = "NO" ]; then
 			SSHADDR=${IPADDR}
 		else
-			SSHADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PublicIpAddress // ""')
+			SSHADDR=${PUBADDR}
 		fi
 
 		if [ "${PUBLICIP}" = "true" ] || [ -z ${NETWORK_INTERFACE_ID} ]; then

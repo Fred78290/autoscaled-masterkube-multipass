@@ -10,7 +10,8 @@ set -eu
 
 CLUSTER_NODES=
 ETCD_ENDPOINT=
-VC_NETWORK_PUBLIC_NIC=eth0 #Multipass setup
+OS_DNS_ZONEID=
+PRIVATE_DOMAIN_NAME=
 
 IPADDRS=()
 
@@ -24,23 +25,26 @@ function usage() {
 --kubernetes-user=<value>                      # Override the seed user in template, default ${KUBERNETES_USER}
 --kubernetes-password | -p=<value>             # Override the password to ssh the cluster VM, default random word
 
-  # Flags in ha mode only
---use-keepalived | -u                          # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
-
   # Flags to configure network in ${PLATEFORM}
---public-address=<value>                       # The public address to expose kubernetes endpoint[ipv4/cidr, DHCP, NONE], default ${PUBLIC_IP}
---no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
 --vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
 --vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default ${VC_NETWORK_PUBLIC}
---net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${NET_IP}
---net-gateway=<value>                          # Override the IP gateway, default ${NET_GATEWAY}
---net-dns=<value>                              # Override the IP DNS, default ${NET_DNS}
---net-domain=<value>                           # Override the domain name, default ${NET_DOMAIN}
---metallb-ip-range                             # Override the metalb ip range, default ${METALLB_IP_RANGE}
---dont-use-dhcp-routes-private                 # Tell if we don't use DHCP routes in private network, default ${USE_DHCP_ROUTES_PRIVATE}
---dont-use-dhcp-routes-public                  # Tell if we don't use DHCP routes in public network, default ${USE_DHCP_ROUTES_PUBLIC}
---add-route-private                            # Add route to private network syntax is --add-route-private=to=X.X.X.X/YY,via=X.X.X.X,metric=100 --add-route-private=to=Y.Y.Y.Y/ZZ,via=X.X.X.X,metric=100, default ${NETWORK_PRIVATE_ROUTES[@]}
---add-route-public                             # Add route to public network syntax is --add-route-public=to=X.X.X.X/YY,via=X.X.X.X,metric=100 --add-route-public=to=Y.Y.Y.Y/ZZ,via=X.X.X.X,metric=100, default ${NETWORK_PUBLIC_ROUTES[@]}
+--private-domain=<value>                       # Override the domain name, default ${PRIVATE_DOMAIN_NAME}
+--external-security-group=<name>               # Specify the public security group ID for VM, default ${EXTERNAL_SECURITY_GROUP}
+--internal-security-group=<name>               # Specify the private security group ID for VM, default ${INTERNAL_SECURITY_GROUP}
+--internet-facing                              # Expose the cluster on internet, default ${EXPOSE_PUBLIC_CLUSTER}--public-subnet-id=<subnetid,...>                # Specify the public subnet ID for created VM, default ${VPC_PUBLIC_SUBNET_ID}
+
+  # Flags to expose nodes in public AZ with public IP
+--control-plane-public                         # Control plane are hosted in public subnet with public IP, default ${CONTROLPLANE_USE_PUBLICIP}
+--worker-node-public                           # Worker nodes are hosted in public subnet with public IP, default ${WORKERNODE_USE_PUBLICIP}
+
+--no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
+--net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${PRIVATE_IP}
+--net-gateway=<value>                          # Override the IP gateway, default ${PRIVATE_GATEWAY}
+--net-dns=<value>                              # Override the IP DNS, default ${PRIVATE_DNS}
+
+  # Flags in ha mode only
+--use-nlb                                        # Use AWS NLB as load balancer in public AZ
+--create-nginx-apigateway                        # Create NGINX instance to install an apigateway, default ${USE_NGINX_GATEWAY}
 
   # Flags to configure nfs client provisionner
 --nfs-server-adress                            # The NFS server address, default ${NFS_SERVER_ADDRESS}
@@ -173,6 +177,10 @@ while true; do
 		;;
 	--public-domain)
 		PUBLIC_DOMAIN_NAME=$2
+		shift 2
+		;;
+	--external-dns-provider)
+		EXTERNAL_DNS_PROVIDER=$2
 		shift 2
 		;;
 	--defs)
@@ -367,8 +375,8 @@ while true; do
 		VC_NETWORK_PUBLIC="$2"
 		shift 2
 		;;
-	--net-domain)
-		NET_DOMAIN="$2"
+	--private-domain)
+		PRIVATE_DOMAIN_NAME="$2"
 		shift 2
 		;;
 	--use-nlb)
@@ -414,7 +422,7 @@ done
 #
 #===========================================================================================================================================
 function prepare_environment() {
-	NODE_IP=${NET_IP}
+	NODE_IP=${PRIVATE_IP}
 	
 	SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 	SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
@@ -457,6 +465,26 @@ function prepare_environment() {
 	if [ "${USE_ZEROSSL}" = "YES" ]; then
 		if [ -z "${CERT_ZEROSSL_EAB_KID}" ] || [ -z "${CERT_ZEROSSL_EAB_HMAC_SECRET}" ]; then
 			echo_red_bold "CERT_ZEROSSL_EAB_KID or CERT_ZEROSSL_EAB_HMAC_SECRET is empty, exit"
+			exit 1
+		fi
+	fi
+
+	if [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ]; then
+		PREFER_SSH_PUBLICIP=NO
+
+		if [ "${USE_NGINX_GATEWAY}" = "YES" ] || [ "${USE_NLB}" = "YES" ] || [ "${EXPOSE_PUBLIC_CLUSTER}" = "false" ]; then
+			echo_red_bold "Control plane can not have public IP because nginx gatewaway or NLB is required or cluster must not be exposed to internet"
+			exit 1
+		fi
+
+	elif [ "${WORKERNODE_USE_PUBLICIP}" = "true" ]; then
+		echo_red_bold "Worker node can not have a public IP when control plane does not have public IP"
+		exit 1
+	fi
+
+	if [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ] || [ ${WORKERNODE_USE_PUBLICIP} == "true" ]; then
+		if [ "${VC_NETWORK_PUBLIC}" == "NONE" ] || [ -z "${VC_NETWORK_PUBLIC}" ]; then
+			echo_red_bold "nodes with floating-ip require public network"
 			exit 1
 		fi
 	fi
@@ -665,28 +693,55 @@ function delete_previous_masterkube() {
 #===========================================================================================================================================
 function prepare_cert() {
 	# If CERT doesn't exist, create one autosigned
+	if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
+		DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
+	else
+		DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
+	fi
+
+	if [ -z "${DOMAIN_NAME}" ]; then
+		echo_red_bold "Public domaine is not defined, unable to create auto signed cert, exit"
+		exit 1
+	fi
+
+	if [ -z ${SSL_LOCATION} ]; then
+		if [ -f ${HOME}/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
+			SSL_LOCATION=${HOME}/etc/ssl/${DOMAIN_NAME}
+		elif [ -f ${HOME}/Library/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
+			SSL_LOCATION=${HOME}/Library/etc/ssl/${DOMAIN_NAME}
+		elif [ -f $HOME/.acme.sh/${DOMAIN_NAME}/cert.pem ]; then
+			SSL_LOCATION=$HOME/.acme.sh/${DOMAIN_NAME}
+		elif [ -f ${HOME}/Library/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
+			SSL_LOCATION=${HOME}/Library/etc/ssl/${DOMAIN_NAME}
+		elif [ -f $HOME/.acme.sh/${DOMAIN_NAME}/cert.pem ]; then
+			SSL_LOCATION=$HOME/.acme.sh/${DOMAIN_NAME}
+		fi
+	fi
+
 	if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
-		if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
-			echo_red_bold "Public domaine is not defined, unable to create auto signed cert, exit"
+		mkdir -p ${SSL_LOCATION}
+
+		echo_blue_bold "Create autosigned certificat for domain: ${DOMAIN_NAME}"
+		${CURDIR}/create-cert.sh --domain ${DOMAIN_NAME} --ssl-location ${SSL_LOCATION} --cert-email ${CERT_EMAIL}
+	else
+		if [ ! -f ${SSL_LOCATION}/cert.pem ]; then
+			echo_red "${SSL_LOCATION}/cert.pem not found, exit"
 			exit 1
 		fi
 
-		echo_blue_bold "Create autosigned certificat for domain: ${PUBLIC_DOMAIN_NAME}"
-		${CURDIR}/create-cert.sh --domain ${PUBLIC_DOMAIN_NAME} --ssl-location ${SSL_LOCATION} --cert-email ${CERT_EMAIL}
-	fi
+		if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
+			echo_red "${SSL_LOCATION}/fullchain.pem not found, exit"
+			exit 1
+		fi
 
-	if [ ! -f ${SSL_LOCATION}/cert.pem ]; then
-		echo_red "${SSL_LOCATION}/cert.pem not found, exit"
-		exit 1
-	fi
+		# Extract the domain name from CERT
+		DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
 
-	if [ ! -f ${SSL_LOCATION}/fullchain.pem ]; then
-		echo_red "${SSL_LOCATION}/fullchain.pem not found, exit"
-		exit 1
+		if [ "${DOMAIN_NAME}" != "${PRIVATE_DOMAIN_NAME}" ] && [ "${DOMAIN_NAME}" != "${PUBLIC_DOMAIN_NAME}" ]; then
+			echo_red_bold "Warning: The provided domain ${DOMAIN_NAME} from certificat does not target domain ${PRIVATE_DOMAIN_NAME} or ${PUBLIC_DOMAIN_NAME}"
+			exit 1
+		fi
 	fi
-
-	# Extract the domain name from CERT
-	DOMAIN_NAME=$(openssl x509 -noout -subject -in ${SSL_LOCATION}/cert.pem -nameopt sep_multiline | grep 'CN=' | awk -F= '{print $2}' | sed -e 's/^[\s\t]*//')
 }
 
 #===========================================================================================================================================
@@ -768,6 +823,21 @@ function prepare_deployment() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function prepare_dns() {
+	if [ -n "$(openstack service show -f json dns 2>/dev/null | jq -r '.id // ""')" ]; then
+		OS_DNS_ZONEID=$(openstack zone show -f json "${PRIVATE_DOMAIN_NAME}." 2>/dev/null | jq -r '.id // ""')
+
+		if [ -z "${OS_DNS_ZONEID}" ]; then
+			echo_blue_bold "Register zone: ${PRIVATE_DOMAIN_NAME}. with email: ${CERT_EMAIL}"
+			OS_DNS_ZONEID=$(openstack zone create -f json --email ${CERT_EMAIL} --ttl 60 "${PRIVATE_DOMAIN_NAME}." 2>/dev/null | jq -r '.id // ""')
+		else
+			echo_blue_bold "Zone: ${PRIVATE_DOMAIN_NAME}. already registered with ID: ${OS_DNS_ZONEID}"
+		fi
+	fi
+}
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function get_vm_name() {
 	local NODEINDEX=$1
 
@@ -791,7 +861,7 @@ function get_ssh_ip() {
 
 	ADDRESSES=($(openstack server show -f json ${VMNAME} | jq -r --arg NAME "${VC_NETWORK_PRIVATE}" '.addresses.[$NAME].[]'))
 
-	if [ ${PREFER_SSH_PUBLICIP} = "NO" ]; then
+	if [ ${PREFER_SSH_PUBLICIP} = "YES" ]; then
 		echo -n ${ADDRESSES[{ADDRESSES[${#ADDRESSES[@]}-1]}
 	else
 		echo -n ${ADDRESSES[0]}
@@ -1130,7 +1200,7 @@ function create_cluster() {
 						--node-group=${NODEGROUP_NAME} \
 						--node-index=${INDEX} \
 						--cni-plugin=${CNI_PLUGIN} \
-						--net-if=${NET_IF} \
+						--net-if=${PRIVATE_NET_INF} \
 						--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 
 					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
@@ -1166,7 +1236,7 @@ function create_cluster() {
 						--tls-san="${CERT_SANS}" \
 						--ha-cluster=true \
 						--cni-plugin=${CNI_PLUGIN} \
-						--net-if=${NET_IF} \
+						--net-if=${PRIVATE_NET_INF} \
 						--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 
 					eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
@@ -1205,7 +1275,7 @@ function create_cluster() {
 						--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
 						--tls-san="${CERT_SANS}" \
 						--etcd-endpoint="${ETCD_ENDPOINT}" \
-						--net-if=${NET_IF} \
+						--net-if=${PRIVATE_NET_INF} \
 						--cluster-nodes="${CLUSTER_NODES}" ${SILENT}
 				else
 					echo_blue_bold "Join node ${MASTERKUBE_NODE} instance master node, kubernetes version=${KUBERNETES_VERSION}"
@@ -1231,7 +1301,7 @@ function create_cluster() {
 						--tls-san="${CERT_SANS}" \
 						--etcd-endpoint="${ETCD_ENDPOINT}" \
 						--cluster-nodes="${CLUSTER_NODES}" \
-						--net-if=${NET_IF} \
+						--net-if=${PRIVATE_NET_INF} \
 						--join-master="${IPADDRS[0]}:${APISERVER_ADVERTISE_PORT}" \
 						--control-plane=true ${SILENT}
 				fi
@@ -1323,6 +1393,7 @@ prepare_flavors
 prepare_image
 prepare_cert
 prepare_deployment
+prepare_dns
 
 create_all_vms
 create_load_balancer

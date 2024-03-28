@@ -1,5 +1,5 @@
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl kubernetes-desktop-autoscaler-utility packer"
-NET_IF=eth1 # eth0 is multipass interface
+PRIVATE_NET_INF=eth1 # eth0 is multipass interface
 VC_NETWORK_PRIVATE="private"
 VC_NETWORK_PUBLIC="public"
 NGINX_MACHINE="k8s.tiny"
@@ -26,8 +26,6 @@ function use_floating_ip() {
 	else
 		echo -n ${WORKERNODE_USE_PUBLICIP}
 	fi
-
-	echo -n "NO"
 }
 
 #===========================================================================================================================================
@@ -45,6 +43,7 @@ function create_vm() {
 	local DISK_SIZE=
 	local NUM_VCPUS=
 	local MEMSIZE=
+	local NIC_OPTIONS=
 
 	MACHINE_TYPE=$(get_machine_type ${INDEX})
 	MASTERKUBE_NODE=$(get_vm_name ${INDEX})
@@ -86,16 +85,24 @@ fi
 			IPADDR=$(openstack floating ip list --tags ${MASTERKUBE_NODE} -f json 2>/dev/null | jq -r '.[0]."Floating IP Address"//""')
 
 			if [ -z "${IPADDR}" ]; then
-				echo_blue_bold "Create floating ip for ${MASTERKUBE_NODE} on network ${VC_NETWORK_PUBLIC}"
-
 				IPADDR=$(openstack floating ip create --tag ${MASTERKUBE_NODE} -f json ${VC_NETWORK_PUBLIC} | jq -r '.floating_ip_address // ""')
+
+				echo_blue_bold "Create floating ip: ${IPADDR} for ${MASTERKUBE_NODE} on network ${VC_NETWORK_PUBLIC}"
+			else
+				echo_blue_bold "Use floating ip: ${IPADDR} for ${MASTERKUBE_NODE} on network ${VC_NETWORK_PUBLIC}"
 			fi
+		fi
+
+		if [ ${NODE_IP} == "AUTO" ]; then
+			NIC_OPTIONS="net-id=${NETWORK_ID}"
+		else
+			NIC_OPTIONS="net-id=${NETWORK_ID},v4-fixed-ip=${NODE_IP}"
 		fi
 
 		LOCALIP=$(openstack server create \
 			--flavor "${MACHINE_TYPE}" \
 			--image "${TARGET_IMAGE}" \
-			--nic net-id=${NETWORK_ID},v4-fixed-ip=${NODE_IP} \
+			--nic "${NIC_OPTIONS}" \
 			--security-group "${SECURITY_GROUP}" \
 			--key-name "${SSH_KEYNAME}" \
 			--user-data ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml \
@@ -104,22 +111,33 @@ fi
 
 		if [ ${FLOATING_IP} == "YES" ]; then
 			openstack server add floating ip ${MASTERKUBE_NODE} ${IPADDR}
-		else
-			IPADDR=${LOCALIP}
 		fi
 
-		echo_title "Wait ssh ready on ${KUBERNETES_USER}@${IPADDR}"
-		wait_ssh_ready ${KUBERNETES_USER}@${IPADDR}
+		echo_title "Wait ssh ready on ${KUBERNETES_USER}@${LOCALIP}"
+		wait_ssh_ready ${KUBERNETES_USER}@${LOCALIP}
 
-		echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${IPADDR}"
-		eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
+		echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${LOCALIP}"
+		eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${LOCALIP}:~ ${SILENT}
+		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${LOCALIP} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
+		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${LOCALIP} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
+		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${LOCALIP} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
 
 		# Update /etc/hosts
 		delete_host "${MASTERKUBE_NODE}"
-		add_host ${NODE_IP} ${MASTERKUBE_NODE} ${MASTERKUBE_NODE}.${DOMAIN_NAME}
+		add_host ${LOCALIP} ${MASTERKUBE_NODE} ${MASTERKUBE_NODE}.${DOMAIN_NAME}
+
+		if [ -n "${OS_DNS_ZONEID}" ]; then
+			echo_blue_bold "Register ${MASTERKUBE_NODE} address: ${LOCALIP} into dns zone ${PRIVATE_DOMAIN_NAME} id: ${OS_DNS_ZONEID}"
+			DNS_ENTRY=$(openstack recordset create -f json --record ${LOCALIP} --type A "${PRIVATE_DOMAIN_NAME}." ${MASTERKUBE_NODE} 2>/dev/null | jq -r '.id // ""')
+			cat > ${TARGET_CONFIG_LOCATION}/dns-${MASTERKUBE_NODE}.json <<EOF
+			{
+				"id": "${DNS_ENTRY}",
+				"zone_id": "${OS_DNS_ZONEID}",
+				"name": "${MASTERKUBE_NODE}"
+			}
+EOF
+		fi
+
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
 	fi
@@ -143,6 +161,19 @@ function delete_vm_by_name() {
 #
 #===========================================================================================================================================
 function unregister_dns() {
+	# Delete DNS entries
+	for FILE in ${TARGET_CONFIG_LOCATION}/dns-*.json
+	do
+        if [ -f ${FILE} ]; then
+			DNS_ENTRY_ID=$(cat ${FILE} | jq -r '.id // ""')
+			ZONEID=$(cat ${FILE} | jq -r '.zone_id // ""')
+
+			if [ -n "${DNS_ENTRY_ID}" ]; then
+				openstack recordset delete ${ZONEID} ${DNS_ENTRY_ID} 2>/dev/null
+			fi
+		fi
+	done
+
     echo
 }
 
@@ -197,13 +228,13 @@ export MAXTOTALNODES=${MAXTOTALNODES}
 export MEMORYTOTAL="${MEMORYTOTAL}"
 export METALLB_IP_RANGE=${METALLB_IP_RANGE}
 export MINNODES=${MINNODES}
-export NET_DNS=${NET_DNS}
-export NET_DOMAIN=${NET_DOMAIN}
-export NET_GATEWAY=${NET_GATEWAY}
-export NET_IF=${NET_IF}
-export NET_IP=${NET_IP}
-export NET_MASK_CIDR=${NET_MASK_CIDR}
-export NET_MASK=${NET_MASK}
+export PRIVATE_DNS=${PRIVATE_DNS}
+export PRIVATE_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
+export PRIVATE_GATEWAY=${PRIVATE_GATEWAY}
+export PRIVATE_NET_INF=${PRIVATE_NET_INF}
+export PRIVATE_IP=${PRIVATE_IP}
+export PRIVATE_MASK_CIDR=${PRIVATE_MASK_CIDR}
+export PRIVATE_NETMASK=${PRIVATE_NETMASK}
 export NETWORK_PRIVATE_ROUTES=(${NETWORK_PRIVATE_ROUTES[@]})
 export NETWORK_PUBLIC_ROUTES=(${NETWORK_PUBLIC_ROUTES[@]})
 export NFS_SERVER_ADDRESS=${NFS_SERVER_ADDRESS}

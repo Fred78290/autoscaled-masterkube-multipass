@@ -28,6 +28,7 @@ OPTIONS=(
 	"route53-secret-key:"
 	"dashboard-hostname:"
 	"public-domain:"
+	"external-dns-provider:"
 	"defs:"
 	"create-image-only"
 	"max-pods:"

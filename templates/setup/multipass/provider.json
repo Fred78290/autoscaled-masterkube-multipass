@@ -11,13 +11,13 @@
 	"csi-region": "${REGION}",
 	"csi-zone": "${ZONEID}",
 	"network": {
-		"domain": "${NET_DOMAIN}",
+		"domain": "${PRIVATE_DOMAIN_NAME}",
 		"dns": {
 			"search": [
-				"${NET_DOMAIN}"
+				"${PRIVATE_DOMAIN_NAME}"
 			],
 			"nameserver": [
-				"${NET_DNS}"
+				"${PRIVATE_DNS}"
 			]
 		},
 		"interfaces": [
@@ -32,8 +32,8 @@
 				"dhcp": ${SCALEDNODES_DHCP},
 				"use-dhcp-routes": ${USE_DHCP_ROUTES_PRIVATE},
 				"address": "${FIRST_WORKER_NODE_IP}",
-				"gateway": "${NET_GATEWAY}",
-				"netmask": "${NET_MASK}",
+				"gateway": "${PRIVATE_GATEWAY}",
+				"netmask": "${PRIVATE_NETMASK}",
 				"routes": ${PRIVATE_ROUTES_DEFS}
 			},
 			{

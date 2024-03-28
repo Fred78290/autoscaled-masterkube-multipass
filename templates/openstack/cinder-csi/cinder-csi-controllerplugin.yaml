@@ -1,0 +1,117 @@
+# This YAML file contains CSI Controller Plugin Sidecars
+# external-attacher, external-provisioner, external-snapshotter
+# external-resize, liveness-probe
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: csi-cinder-controllerplugin
+  namespace: kube-system
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: csi-cinder-controllerplugin
+  template:
+    metadata:
+      labels:
+        app: csi-cinder-controllerplugin
+    spec:
+      serviceAccount: csi-cinder-controller-sa
+      containers:
+        - name: csi-attacher
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.4.2
+          args:
+            - "--csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock"
+            - "--timeout=3m"
+            - "--leader-election=true"
+            - "--default-fstype=ext4"
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-provisioner
+          image: registry.k8s.io/sig-storage/csi-provisioner:v3.6.2
+          args:
+            - "--csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock"
+            - "--timeout=3m"
+            - "--default-fstype=ext4"
+            - "--feature-gates=Topology=true"
+            - "--extra-create-metadata"
+            - "--leader-election=true"
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-snapshotter
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v6.3.2
+          args:
+            - "--csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock"
+            - "--timeout=3m"
+            - "--extra-create-metadata"
+            - "--leader-election=true"
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+        - name: csi-resizer
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.9.2
+          args:
+            - "--csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock"
+            - "--timeout=3m"
+            - "--handle-volume-inuse-error=false"
+            - "--leader-election=true"
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: liveness-probe
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.11.0
+          args:
+            - "--csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock"
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+        - name: cinder-csi-plugin
+          image: registry.k8s.io/provider-os/cinder-csi-plugin:v1.29.0
+          args:
+            - /bin/cinder-csi-plugin
+            - "--endpoint=unix://csi/csi.sock"
+            - "--cloud-config=/etc/config/cloud.conf"
+            - "--cluster=kubernetes"
+            - "--v=1"
+          imagePullPolicy: "IfNotPresent"
+          envFrom:
+          - configMapRef:
+              name: openstack-env
+          ports:
+            - containerPort: 9808
+              name: healthz
+              protocol: TCP
+          # The probe
+          livenessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 60
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: openstack-cloud-config
+              mountPath: /etc/config
+              subPath: cloud.conf
+              readOnly: true
+      volumes:
+        - name: socket-dir
+          emptyDir:
+        - name: openstack-cloud-config
+          configMap:
+            name: openstack-cloud-config

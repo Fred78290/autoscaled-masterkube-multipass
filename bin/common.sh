@@ -22,21 +22,20 @@ export AWS_ROUTE53_TOKEN=
 export AWS_SECRETKEY=
 export AWS_TOKEN=
 export CACHE=${HOME}/.local/masterkube/${PLATEFORM}/cache
-export CERT_DOMAIN=
 export CERT_EMAIL=
-export CERT_GODADDY_API_KEY=${GODADDY_API_KEY}
-export CERT_GODADDY_API_SECRET=${GODADDY_API_SECRET}
-export CERT_ZEROSSL_EAB_HMAC_SECRET=${ZEROSSL_EAB_HMAC_SECRET}
-export CERT_ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID}
+export CERT_GODADDY_API_KEY=${GODADDY_API_KEY:=}
+export CERT_GODADDY_API_SECRET=${GODADDY_API_SECRET:=}
 export CERT_SELFSIGNED=NO
+export CERT_ZEROSSL_EAB_HMAC_SECRET=${ZEROSSL_EAB_HMAC_SECRET:=}
+export CERT_ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID:=}
 export CLOUD_IMAGES_UBUNTU=cloud-images.ubuntu.com
 export CLOUD_PROVIDER_CONFIG=
 export CLOUD_PROVIDER=external
 export CNI_PLUGIN=flannel
 export CNI_VERSION=v1.4.0
 export CONFIGURATION_LOCATION=${PWD}
-export CONTAINER_ENGINE=containerd
 export CONTAINER_CTL=docker
+export CONTAINER_ENGINE=containerd
 export CONTROL_PLANE_MACHINE="small"
 export CONTROLNODES=1
 export CONTROLPLANE_USE_PUBLICIP=false
@@ -48,10 +47,11 @@ export DISTRO=noble
 export DOMAIN_NAME=
 export ETCD_DST_DIR=
 export EXPOSE_PUBLIC_CLUSTER=false
+export EXTERNAL_DNS_PROVIDER=
 export EXTERNAL_ETCD_ARGS=
 export EXTERNAL_ETCD=false
-export FIRSTNODE=0
 export FIRST_WORKER_NODE_IP=
+export FIRSTNODE=0
 export GOVC_DATACENTER=${GOVC_DATACENTER:=}
 export GOVC_DATASTORE=${GOVC_DATASTORE:=}
 export GOVC_FOLDER=${GOVC_FOLDER:=}
@@ -65,8 +65,8 @@ export GOVC_USERNAME=${GOVC_USERNAME:=}
 export GOVC_VIM_VERSION=${GOVC_VIM_VERSION:='6.0'}
 export GRPC_PROVIDER=externalgrpc
 export HA_CLUSTER=false
-export IMAGE_CREDENTIALS_CONFIG=/etc/kubernetes/credential.yaml
 export IMAGE_CREDENTIALS_BIN=/usr/local/bin
+export IMAGE_CREDENTIALS_CONFIG=/etc/kubernetes/credential.yaml
 export KUBECONFIG=${HOME}/.kube/config
 export KUBERNETES_DISTRO=kubeadm
 export KUBERNETES_PASSWORD=
@@ -78,20 +78,13 @@ export MASTER_NODE_ALLOW_DEPLOYMENT=NO
 export MASTER_PROFILE_NAME="kubernetes-master-profile"
 export MAX_PODS=110
 export MAXAUTOPROVISIONNEDNODEGROUPCOUNT="1"
+export MAXNODEPROVISIONTIME=15m
 export MAXNODES=9
 export MAXTOTALNODES=${MAXNODES}
-export MAXNODEPROVISIONTIME=15m
 export MEMORYTOTAL="0:48"
 export METALLB_IP_RANGE=10.0.0.100-10.0.0.127
 export MICROK8S_CHANNEL=latest
 export MINNODES=0
-export NET_DNS=10.0.0.5
-export NET_DOMAIN=home
-export NET_GATEWAY=10.0.0.1
-export NET_IF=eth0
-export NET_IP=192.168.1.20
-export NET_MASK_CIDR=24
-export NET_MASK=255.255.255.0
 export NETWORK_PRIVATE_ROUTES=()
 export NETWORK_PUBLIC_ROUTES=()
 export NFS_SERVER_ADDRESS=
@@ -99,19 +92,31 @@ export NFS_SERVER_PATH=
 export NFS_STORAGE_CLASS=nfs-client
 export NGINX_MACHINE="tiny"
 export NODEGROUP_NAME=
-export OSDISTRO=$(uname -s)
+export OS_APPLICATION_CREDENTIAL_ID=
+export OS_APPLICATION_CREDENTIAL_NAME=
+export OS_APPLICATION_CREDENTIAL_SECRET=
 export OS_AUTH_URL=
+export OS_DOMAIN_ID=
+export OS_DOMAIN_NAME=
+export OS_PASSWORD=
 export OS_PROJECT_ID=
 export OS_PROJECT_NAME=
+export OS_REGION_NAME=RegionOne
+export OS_SYSTEM_SCOPE=
+export OS_TENANT_ID=
+export OS_TENANT_NAME=
 export OS_USER_DOMAIN_NAME=
 export OS_USERNAME=
-export OS_PASSWORD=
-export OS_REGION_NAME=
-export OS_INTERFACE=
-export OS_IDENTITY_API_VERSION=3
-export OS_CLOUD=
+export OS_ZONE_NAME=nova
+export OSDISTRO=$(uname -s)
 export PREFER_SSH_PUBLICIP=NO
-export PRIVATE_DOMAIN_NAME=
+export PRIVATE_DNS=10.0.0.5
+export PRIVATE_DOMAIN_NAME=home
+export PRIVATE_GATEWAY=10.0.0.1
+export PRIVATE_IP=192.168.1.20
+export PRIVATE_MASK_CIDR=24
+export PRIVATE_NET_INF=eth0
+export PRIVATE_NETMASK=255.255.255.0
 export PUBLIC_DOMAIN_NAME=
 export PUBLIC_IP=DHCP
 export PUBLIC_NETMASK=
@@ -124,21 +129,21 @@ export SCALEDOWNDELAYAFTERADD="1m"
 export SCALEDOWNDELAYAFTERDELETE="1m"
 export SCALEDOWNDELAYAFTERFAILURE="1m"
 export SCALEDOWNENABLED="true"
+export SCALEDOWNGPUUTILIZATIONTHRESHOLD="0.5"
 export SCALEDOWNUNEEDEDTIME="1m"
 export SCALEDOWNUNREADYTIME="1m"
 export SCALEDOWNUTILIZATIONTHRESHOLD="0.5"
-export SCALEDOWNGPUUTILIZATIONTHRESHOLD="0.5"
 export SEED_ARCH=amd64
 export SEED_IMAGE="${DISTRO}-server-cloudimg-seed"
 export SEED_USER=ubuntu
 export SILENT="&> /dev/null"
 export SSH_KEY_FNAME=
 export SSH_KEY=$(cat ${HOME}/.ssh/id_rsa.pub)
-export SSH_KEYNAME="aws-k8s-key"
+export SSH_KEYNAME="ssh-k8s-key"
 export SSH_OPTIONS="-o BatchMode=yes -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 export SSH_PRIVATE_KEY="${HOME}/.ssh/id_rsa"
 export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
-export SSL_LOCATION=${CONFIGURATION_LOCATION}/etc/ssl
+export SSL_LOCATION=
 export TARGET_CLUSTER_LOCATION=
 export TARGET_CONFIG_LOCATION=
 export TARGET_DEPLOY_LOCATION=
@@ -158,10 +163,10 @@ export USE_NLB=NO
 export USE_ZEROSSL=YES
 export VC_NETWORK_PRIVATE_TYPE=
 export VC_NETWORK_PRIVATE="bridged100"
-export VC_NETWORK_PUBLIC_TYPE=
-export VC_NETWORK_PUBLIC="en0"
 export VC_NETWORK_PUBLIC_ENABLED=true
 export VC_NETWORK_PUBLIC_NIC=eth1
+export VC_NETWORK_PUBLIC_TYPE=
+export VC_NETWORK_PUBLIC="en0"
 export VERBOSE=NO
 export VMREST_FOLDER=
 export VMREST_INSECURE=true
@@ -256,7 +261,7 @@ Options are:
 --public-domain=<value>                          # Specify the public domain to use, default ${PUBLIC_DOMAIN_NAME}
 --private-domain=<value>                         # Specify the private domain to use, default ${PRIVATE_DOMAIN_NAME}
 --dashboard-hostname=<value>                     # Specify the hostname for kubernetes dashboard, default ${DASHBOARD_HOSTNAME}
-
+--external-dns-provider=<aws|godaddy|designate>  # Specify external dns provider.
 ### Cert Manager
 
 --cert-email=<value>                             # Specify the mail for lets encrypt, default ${CERT_EMAIL}
@@ -603,22 +608,6 @@ mkdir -p ${CACHE}
 source ${CURDIR}/plateform/${PLATEFORM}/plateform.sh
 
 source ${PLATEFORMDEFS}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-
-if [ -f ${HOME}/etc/ssl/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
-    SSL_LOCATION=${HOME}/etc/ssl/${PUBLIC_DOMAIN_NAME}
-elif [ -f ${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
-    SSL_LOCATION=${HOME}/Library/etc/ssl/${PUBLIC_DOMAIN_NAME}
-elif [ -f $HOME/.acme.sh/${PUBLIC_DOMAIN_NAME}/cert.pem ]; then
-    SSL_LOCATION=$HOME/.acme.sh/${PUBLIC_DOMAIN_NAME}
-elif [ -f ${HOME}/Library/etc/ssl/${NET_DOMAIN}/cert.pem ]; then
-    SSL_LOCATION=${HOME}/Library/etc/ssl/${NET_DOMAIN}
-elif [ -f $HOME/.acme.sh/${NET_DOMAIN}/cert.pem ]; then
-    SSL_LOCATION=$HOME/.acme.sh/${NET_DOMAIN}
-fi
 
 #===========================================================================================================================================
 #

@@ -105,6 +105,13 @@
 							"--log-level=info"
 						],
 						"imagePullPolicy": "Always",
+						"envFrom":[
+							{
+								"configMapRef": {
+									"name": "openstack-env"
+								}
+							}
+						],			  
 						"volumeMounts": [
 							{
 								"name": "cluster-socket",
@@ -129,6 +136,12 @@
 							{
 								"name": "autoscaler-utility-cert",
 								"mountPath": "/etc/ssl/certs/autoscaler-utility",
+								"readOnly": true
+							},
+							{
+								"name": "openstack-cloud-config",
+								"mountPath": "/etc/openstack",
+								"subPath": "clouds.yaml",
 								"readOnly": true
 							}
 						]
@@ -232,6 +245,12 @@
 						"name": "kubernetes-pki",
 						"configMap": {
 							"name": "kubernetes-pki"
+						}
+					},
+					{
+						"name": "openstack-cloud-config",
+						"configMap": {
+							"name": "openstack-cloud-config"
 						}
 					}
 				]

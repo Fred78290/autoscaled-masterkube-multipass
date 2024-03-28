@@ -1,25 +1,46 @@
 {
-	"template-name": "${TARGET_IMAGE}",
+	"image": "${TARGET_IMAGE}",
 	"allow-upgrade": false,
-	"csi-region": "${REGION}",
-	"csi-zone": "${ZONEID}",
+	"csi-region": "${OS_REGION_NAME}",
+	"csi-zone": "${OS_ZONE_NAME}",
 	"timeout": 300,
-	"openstack": {
-		"auth": {
-			"auth_url": "${OS_AUTH_URL}",
-			"username": "${OS_USERNAME}",
-			"password": "${OS_PASSWORD}",
-			"project_id": "${OS_PROJECT_ID}",
-			"project_name": "${OS_PROJECT_NAME}",
-			"user_domain_name": "${OS_USER_DOMAIN_NAME}"
+	"clouds": {
+		"openstack": {
+			"auth": {
+				"auth_url": "${OS_AUTH_URL}",
+				"username": "${OS_USERNAME}",
+				"password": "${OS_PASSWORD}",
+				"project_id": "${OS_PROJECT_ID}",
+				"project_name": "${OS_PROJECT_NAME}",
+				"user_domain_name": "${OS_USER_DOMAIN_NAME}",
+				"tenant_id": "${OS_TENANT_ID}",
+				"tenant_name": "${OS_TENANT_NAME}",
+				"domain_id": "${OS_DOMAIN_ID}",
+				"domain_name": "${OS_DOMAIN_NAME}",
+				"application_credential_id": "${OS_APPLICATION_CREDENTIAL_ID}",
+				"application_credential_name": "${OS_APPLICATION_CREDENTIAL_NAME}",
+				"application_credential_secret": "${OS_APPLICATION_CREDENTIAL_SECRET}",
+				"system_scope": "${OS_SYSTEM_SCOPE}"
+			},
+			"region_name": "${OS_REGION_NAME}",
+			"interface": "public",
+			"verify": false,
+			"identity_api_version": 3
+		}
+	},
+	"floating-ip": {
+		"floating-ip-network": "${VC_NETWORK_PUBLIC}",
+		"floating-control-plane": {
+			"security-group":"${EXTERNAL_SECURITY_GROUP}",
+			"use-floating-ip": ${CONTROLPLANE_USE_PUBLICIP}
 		},
-		"region_name": "RegionOne",
-		"interface": "public",
-		"verify": false,
-		"identity_api_version": 3
+		"floating-worker-node": {
+			"security-group":"${INTERNAL_SECURITY_GROUP}",
+			"use-floating-ip": ${WORKERNODE_USE_PUBLICIP}
+		}
 	},
 	"network": {
-		"domain": "${NET_DOMAIN}",
+		"domain": "${PRIVATE_DOMAIN_NAME}",
 		"interfaces": [
 			{
 				"enabled": true,
@@ -30,7 +51,7 @@
 				"nic": "eth0",
 				"dhcp": ${SCALEDNODES_DHCP},
 				"address": "${FIRST_WORKER_NODE_IP}",
-				"netmask": "${NET_MASK}"
+				"netmask": "${PRIVATE_NETMASK}"
 			}
 		]
 	}

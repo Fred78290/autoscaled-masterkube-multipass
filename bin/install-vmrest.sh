@@ -18,7 +18,7 @@ if [ -z "${VMREST_HOME}" ] || [ "${VMREST_HOME}" == '{}' ]; then
 	if [ ${OSDISTRO} = "Darwin" ]; then
 		mkdir -p ${HOME}/Library/etc/ssl/vmrest/
 
-		${CURDIR}/create-cert.sh --domain ${NET_DOMAIN} --ssl-location ${HOME}/Library/etc/ssl/vmrest/ --cert-email ${CERT_EMAIL}
+		${CURDIR}/create-cert.sh --domain ${PRIVATE_DOMAIN_NAME} --ssl-location ${HOME}/Library/etc/ssl/vmrest/ --cert-email ${CERT_EMAIL}
 
 		cat > ${HOME}/Library/LaunchAgents/com.vmware.vmrest.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -52,7 +52,7 @@ EOF
 	else
 		mkdir -p ${HOME}/.config/systemd/user
 
-		${CURDIR}/create-cert.sh --domain ${NET_DOMAIN} --ssl-location ${HOME}/.config/systemd/user/ --cert-email ${CERT_EMAIL}
+		${CURDIR}/create-cert.sh --domain ${PRIVATE_DOMAIN_NAME} --ssl-location ${HOME}/.config/systemd/user/ --cert-email ${CERT_EMAIL}
 
 	cat > ${HOME}/.config/systemd/user/vmrest.service <<EOF
 [Unit]

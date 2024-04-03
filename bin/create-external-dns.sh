@@ -47,19 +47,13 @@ EOF
 	fi
 
 elif [ "${EXTERNAL_DNS_PROVIDER}" == "godaddy" ]; then
-
-	if [ -n "${CERT_GODADDY_API_KEY}" ]; then 
-		sed -e "s/__DOMAIN_NAME__/${DOMAIN_NAME}/g" \
-			-e "s/__GODADDY_API_KEY__/${CERT_GODADDY_API_KEY}/g" \
-			-e "s/__GODADDY_API_SECRET__/${CERT_GODADDY_API_SECRET}/g" \
-			-e "s/__NODEGROUP_NAME__/${NODEGROUP_NAME}/g" \
-			${KUBERNETES_TEMPLATE}/deploy-godaddy.yaml \
-			| tee ${ETC_DIR}/deploy.yaml \
-			| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
-	else
-		echo_red_bold "CERT_GODADDY_API_KEY is not defined"
-	fi
-
+	sed -e "s/__DOMAIN_NAME__/${DOMAIN_NAME}/g" \
+		-e "s/__GODADDY_API_KEY__/${CERT_GODADDY_API_KEY}/g" \
+		-e "s/__GODADDY_API_SECRET__/${CERT_GODADDY_API_SECRET}/g" \
+		-e "s/__NODEGROUP_NAME__/${NODEGROUP_NAME}/g" \
+		${KUBERNETES_TEMPLATE}/deploy-godaddy.yaml \
+		| tee ${ETC_DIR}/deploy.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 elif [ "${EXTERNAL_DNS_PROVIDER}" == "designate" ]; then
 	kubectl get cm openstack-env --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -n kube-system -o yaml \
 		| sed 's/kube-system/external-dns/g' \

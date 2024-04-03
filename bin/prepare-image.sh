@@ -1,6 +1,4 @@
 #!/bin/bash
-set -e
-
 ECR_PASSWORD=
 CNI_PLUGIN=
 CNI_VERSION=
@@ -99,8 +97,18 @@ echo "==========================================================================
 echo "= Install mandatories tools"
 echo "==============================================================================================================================="
 
+if [[ $(uname -r) != *aws* ]]; then
+	UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2)
+
+	if [ -n "$(apt search linux-generic-hwe-${UBUNTU_VERSION_ID} 2>/dev/null | grep linux-generic-hwe-${UBUNTU_VERSION_ID})"]; then
+		apt install -y linux-generic-hwe-${UBUNTU_VERSION_ID}
+	fi
+fi
+
 apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
 snap install yq
+
+set -e
 
 echo "==============================================================================================================================="
 echo "= Install aws cli"
@@ -397,11 +405,13 @@ EOF
 		UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2 | cut -d '.' -f 1)
 		
 		# Set NTP server
-		echo "set NTP server"
-		sed -i '/^NTP/d' /etc/systemd/timesyncd.conf
-		echo "NTP=169.254.169.123" >>/etc/systemd/timesyncd.conf
-		timedatectl set-timezone UTC
-		systemctl restart systemd-timesyncd.service
+		if [ -f  /etc/systemd/timesyncd.conf ]; then
+			echo "set NTP server"
+			sed -i '/^NTP/d' /etc/systemd/timesyncd.conf
+			echo "NTP=169.254.169.123" >>/etc/systemd/timesyncd.conf
+			timedatectl set-timezone UTC
+			systemctl restart systemd-timesyncd.service
+		fi
 
 		mkdir -p /etc/eks
 		mkdir -p /etc/sysconfig

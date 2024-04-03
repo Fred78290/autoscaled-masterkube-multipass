@@ -53,7 +53,7 @@ spec:
           args:
             - /bin/cinder-csi-plugin
             - "--endpoint=unix://csi/csi.sock"
-            - "--cloud-config=/etc/config/cloud.conf"
+            - "--cloud-config=/etc/openstack/cloud.conf"
             - "--v=1"
           envFrom:
           - configMapRef:
@@ -81,14 +81,8 @@ spec:
             - name: pods-probe-dir
               mountPath: /dev
               mountPropagation: "HostToContainer"
-            - name: openstack-cloud-config
-              mountPath: /etc/config
-              subPath: cloud.conf
-              readOnly: true
             - mountPath: /etc/openstack/
-              subPath: clouds.yaml
               name: openstack-cloud-config
-              readOnly: true
       volumes:
         - name: socket-dir
           hostPath:

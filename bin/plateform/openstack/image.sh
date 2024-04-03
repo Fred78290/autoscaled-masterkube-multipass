@@ -109,7 +109,7 @@ SEED_IMAGE_URL="https://cloud-images.ubuntu.com/${DISTRO}/current/${SEED_IMAGE}.
 SEED_IMAGE_ID=$(openstack image list --all -f json | jq -r --arg SEED_IMAGE ${SEED_IMAGE} '.[]|select(.Name == $SEED_IMAGE)|.ID')
 
 if [ -z "${NETWORK_ID}" ]; then
-	echo_bold_red "Network ${PRIMARY_NETWORK_NAME}, not found"
+	echo_red_bold "Network ${PRIMARY_NETWORK_NAME}, not found"
 	exit 1
 fi
 
@@ -121,7 +121,7 @@ if [ -z "${SEED_IMAGE_ID}" ]; then
 	SEED_IMAGE_ID=$(openstack image create --container-format bare --disk-format qcow2 --private --file ${CACHE}/${SEED_IMAGE}.img -f json ${SEED_IMAGE} | jq -r '.id//""')
 
 	if [ -z "${SEED_IMAGE_ID}" ]; then
-		echo_bold_red "Import failed"
+		echo_red_bold "Import failed"
 		exit 1
 	fi
 fi

@@ -60,7 +60,7 @@
 			]
 		},
 		"runcmd": [
-			"echo '${IPADDRS[0]} ${MASTERKUBE} ${MASTERKUBE}.${DOMAIN_NAME}' >> /etc/hosts"
+			"echo '${PRIVATE_ADDR_IPS[0]} ${MASTERKUBE} ${MASTERKUBE}.${DOMAIN_NAME}' >> /etc/hosts"
 		]
 	},
 	"ssh-infos": {

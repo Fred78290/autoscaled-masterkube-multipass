@@ -22,7 +22,7 @@
 			"accessKey": "${AWS_ROUTE53_ACCESSKEY}",
 			"secretKey": "${AWS_ROUTE53_SECRETKEY}",
 			"token": "${AWS_ROUTE53_TOKEN}",
-			"profile": "${AWS_PROFILE_ROUTE53}",
+			"profile": "${AWS_ROUTE53_PROFILE}",
 			"region": "${AWS_REGION}"
 		},
 		"eni": [

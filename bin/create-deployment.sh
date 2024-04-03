@@ -4,6 +4,10 @@ EXTERNAL_DNS_TARGET="${MASTERKUBE}.${DOMAIN_NAME}"
 mkdir -p ${TARGET_DEPLOY_LOCATION}/configmap
 mkdir -p ${TARGET_DEPLOY_LOCATION}/secrets
 
+if [ "${KUBERNETES_DISTRO}" == "microk8s" ] || [ "${KUBERNETES_DISTRO}" == "k3s" ] || [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
+  ANNOTE_MASTER=true
+fi
+
 kubectl create configmap config-cluster-autoscaler -n kube-system --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	--from-file ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} \

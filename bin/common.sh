@@ -5,7 +5,7 @@ fi
 
 set -eu
 
-export ACM_DOMAIN_NAME=
+export ANNOTE_MASTER=
 export APISERVER_ADVERTISE_PORT=6443
 export AUTOSCALE_MACHINE="medium"
 export AUTOSCALER_DESKTOP_UTILITY_ADDR=
@@ -14,6 +14,7 @@ export AUTOSCALER_DESKTOP_UTILITY_CERT=
 export AUTOSCALER_DESKTOP_UTILITY_KEY=
 export AUTOSCALER_DESKTOP_UTILITY_TLS=
 export AWS_ACCESSKEY=
+export AWS_ROUTE53_PROFILE=
 export AWS_ROUTE53_ACCESSKEY=
 export AWS_ROUTE53_PRIVATE_ZONE_ID=
 export AWS_ROUTE53_PUBLIC_ZONE_ID=
@@ -31,11 +32,13 @@ export CERT_ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID:=}
 export CLOUD_IMAGES_UBUNTU=cloud-images.ubuntu.com
 export CLOUD_PROVIDER_CONFIG=
 export CLOUD_PROVIDER=external
+export CLUSTER_NODES=
 export CNI_PLUGIN=flannel
 export CNI_VERSION=v1.4.0
 export CONFIGURATION_LOCATION=${PWD}
 export CONTAINER_CTL=docker
 export CONTAINER_ENGINE=containerd
+export CONTROL_PLANE_ENDPOINT=
 export CONTROL_PLANE_MACHINE="small"
 export CONTROLNODES=1
 export CONTROLPLANE_USE_PUBLICIP=false
@@ -43,13 +46,15 @@ export CORESTOTAL="0:16"
 export CREATE_IMAGE_ONLY=NO
 export DELETE_CLUSTER=NO
 export DEPLOY_COMPONENTS=YES
-export DISTRO=noble
+export DISTRO=jammy
 export DOMAIN_NAME=
 export ETCD_DST_DIR=
+export ETCD_ENDPOINT=
 export EXPOSE_PUBLIC_CLUSTER=false
 export EXTERNAL_DNS_PROVIDER=
 export EXTERNAL_ETCD_ARGS=
 export EXTERNAL_ETCD=false
+export FILL_ETC_HOSTS=YES
 export FIRST_WORKER_NODE_IP=
 export FIRSTNODE=0
 export GOVC_DATACENTER=${GOVC_DATACENTER:=}
@@ -73,6 +78,7 @@ export KUBERNETES_PASSWORD=
 export KUBERNETES_USER=kubernetes
 export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 export LAUNCH_CA=YES
+export LOAD_BALANCER_IP=
 export MASTER_INSTANCE_PROFILE_ARN=
 export MASTER_NODE_ALLOW_DEPLOYMENT=NO
 export MASTER_PROFILE_NAME="kubernetes-master-profile"
@@ -99,8 +105,10 @@ export OS_AUTH_URL=
 export OS_DOMAIN_ID=
 export OS_DOMAIN_NAME=
 export OS_PASSWORD=
+export OS_PRIVATE_DNS_ZONEID=
 export OS_PROJECT_ID=
 export OS_PROJECT_NAME=
+export OS_PUBLIC_DNS_ZONEID=
 export OS_REGION_NAME=RegionOne
 export OS_SYSTEM_SCOPE=
 export OS_TENANT_ID=
@@ -110,6 +118,8 @@ export OS_USERNAME=
 export OS_ZONE_NAME=nova
 export OSDISTRO=$(uname -s)
 export PREFER_SSH_PUBLICIP=NO
+export PRIVATE_ADDR_IPS=()
+export PRIVATE_DNS_NAMES=()
 export PRIVATE_DNS=10.0.0.5
 export PRIVATE_DOMAIN_NAME=home
 export PRIVATE_GATEWAY=10.0.0.1
@@ -117,13 +127,13 @@ export PRIVATE_IP=192.168.1.20
 export PRIVATE_MASK_CIDR=24
 export PRIVATE_NET_INF=eth0
 export PRIVATE_NETMASK=255.255.255.0
+export PUBLIC_ADDR_IPS=()
 export PUBLIC_DOMAIN_NAME=
 export PUBLIC_IP=DHCP
 export PUBLIC_NETMASK=
 export REGION=home
 export REGISTRY=fred78290
 export RESUME=NO
-export ROOT_IMG_NAME=${DISTRO}-kubernetes
 export SCALEDNODES_DHCP=true
 export SCALEDOWNDELAYAFTERADD="1m"
 export SCALEDOWNDELAYAFTERDELETE="1m"
@@ -148,7 +158,7 @@ export TARGET_CLUSTER_LOCATION=
 export TARGET_CONFIG_LOCATION=
 export TARGET_DEPLOY_LOCATION=
 export TARGET_IMAGE_AMI=
-export TARGET_IMAGE="${ROOT_IMG_NAME}-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${SEED_ARCH}-${CONTAINER_ENGINE}"
+export TARGET_IMAGE="${DISTRO}-kubernetes-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${SEED_ARCH}-${CONTAINER_ENGINE}"
 export TRACE_ARGS=
 export TRANSPORT="tcp"
 export UNREMOVABLENODERECHECKTIMEOUT="1m"
@@ -164,7 +174,7 @@ export USE_ZEROSSL=YES
 export VC_NETWORK_PRIVATE_TYPE=
 export VC_NETWORK_PRIVATE="bridged100"
 export VC_NETWORK_PUBLIC_ENABLED=true
-export VC_NETWORK_PUBLIC_NIC=eth1
+export VC_NETWORK_PUBLIC_NIC=eth0
 export VC_NETWORK_PUBLIC_TYPE=
 export VC_NETWORK_PUBLIC="en0"
 export VERBOSE=NO
@@ -176,9 +186,11 @@ export VMREST_USERNAME=
 export VOLUME_SIZE=20
 export VOLUME_TYPE=gp3
 export VPC_PRIVATE_SECURITY_GROUPID=
-export VPC_PRIVATE_SUBNET_ID=
+export VPC_PRIVATE_SUBNET_ID=()
+export VPC_PRIVATE_SUBNET_IDS=()
 export VPC_PUBLIC_SECURITY_GROUPID=
-export VPC_PUBLIC_SUBNET_ID=
+export VPC_PUBLIC_SUBNET_ID=()
+export VPC_PUBLIC_SUBNET_IDS=()
 export WORKER_INSTANCE_PROFILE_ARN=
 export WORKER_NODE_MACHINE="medium"
 export WORKER_PROFILE_NAME="kubernetes-worker-profile"
@@ -216,333 +228,9 @@ fi
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-function common_usage() {
-cat <<EOF
-$0 create a kubernetes simple cluster or HA cluster with 3 control planes
-Options are:
---help | -h                                      # Display usage
---plateform=[vsphere|aws|desktop|multipass]      # Where to deploy cluster
---verbose | -v                                   # Verbose
---trace | -x                                     # Trace execution
---resume | -r                                    # Allow to resume interrupted creation of cluster kubernetes
---delete | -d                                    # Delete cluster and exit
---distribution                                   # Ubuntu distribution to use ${DISTRO}
---create-image-only                              # Create image only
---upgrade                                        # Upgrade existing cluster to upper version of kubernetes
 
-### Flags to set some location informations
+source ${CURDIR}/functions.sh
 
---configuration-location=<path>                  # Specify where configuration will be stored, default ${CONFIGURATION_LOCATION}
---ssl-location=<path>                            # Specify where the etc/ssl dir is stored, default ${SSL_LOCATION}
---defs=<path>                                    # Specify the ${PLATEFORM} definitions, default ${PLATEFORMDEFS}
-
-### Design the kubernetes cluster
-
---autoscale-machine=<value>                      # Override machine type used for auto scaling, default ${AUTOSCALE_MACHINE}
---cni-plugin=<value>                             # Override CNI plugin, default: ${CNI_PLUGIN}
---cni-version=<value>                            # Override CNI plugin version, default: ${CNI_VERSION}
---container-runtime=<docker|containerd|cri-o>    # Specify which OCI runtime to use, default ${CONTAINER_ENGINE}
---control-plane-machine=<value>                  # Override machine type used for control plane, default ${CONTROL_PLANE_MACHINE}
---ha-cluster | -c                                # Allow to create an HA cluster, default ${HA_CLUSTER}
---k8s-distribution=<kubeadm|k3s|rke2>            # Which kubernetes distribution to use: kubeadm, k3s, rke2, default ${KUBERNETES_DISTRO}
---kubernetes-version | -k=<value>                # Override the kubernetes version, default ${KUBERNETES_VERSION}
---max-pods=<value>                               # Specify the max pods per created VM, default ${MAX_PODS}
---nginx-machine=<value>                          # Override machine type used for nginx as ELB, default ${NGINX_MACHINE}
---node-group=<value>                             # Override the node group name, default ${NODEGROUP_NAME}
---ssh-private-key=<path>                         # Override ssh key is used, default ${SSH_PRIVATE_KEY}
---transport=<value>                              # Override the transport to be used between autoscaler and kubernetes-cloud-autoscaler, default ${TRANSPORT}
---worker-node-machine=<value>                    # Override machine type used for worker nodes, default ${WORKER_NODE_MACHINE}
---worker-nodes=<value>                           # Specify the number of worker nodes created in HA cluster, default ${WORKERNODES}
---create-external-etcd | -e                      # Create an external HA etcd cluster, default ${EXTERNAL_ETCD}
---use-cloud-init                                 # Use cloud-init to configure autoscaled nodes instead off ssh, default ${USE_CLOUDINIT_TO_CONFIGURE}
-
-### Design domain
-
---public-domain=<value>                          # Specify the public domain to use, default ${PUBLIC_DOMAIN_NAME}
---private-domain=<value>                         # Specify the private domain to use, default ${PRIVATE_DOMAIN_NAME}
---dashboard-hostname=<value>                     # Specify the hostname for kubernetes dashboard, default ${DASHBOARD_HOSTNAME}
---external-dns-provider=<aws|godaddy|designate>  # Specify external dns provider.
-### Cert Manager
-
---cert-email=<value>                             # Specify the mail for lets encrypt, default ${CERT_EMAIL}
---use-zerossl                                    # Specify cert-manager to use zerossl, default ${USE_ZEROSSL}
---use-self-signed-ca                             # Specify if use self-signed CA, default ${CERT_SELFSIGNED}
---zerossl-eab-kid=<value>                        # Specify zerossl eab kid, default ${CERT_ZEROSSL_EAB_KID}
---zerossl-eab-hmac-secret=<value>                # Specify zerossl eab hmac secret, default ${CERT_ZEROSSL_EAB_HMAC_SECRET}
-
-  # GoDaddy
---godaddy-key                                    # Specify godaddy api key
---godaddy-secret                                 # Specify godaddy api secret
-
-  # Route53
---route53-zone-id                                # Specify the route53 zone id, default ${AWS_ROUTE53_PUBLIC_ZONE_ID}
---route53-access-key                             # Specify the route53 aws access key, default ${AWS_ROUTE53_ACCESSKEY}
---route53-secret-key                             # Specify the route53 aws secret key, default ${AWS_ROUTE53_SECRETKEY}
-
-### Flags for autoscaler
---cloudprovider=<value>                          # autoscaler flag <grpc|externalgrpc>, default: ${GRPC_PROVIDER}
---max-nodes-total=<value>                        # autoscaler flag, default: ${MAXTOTALNODES}
---cores-total=<value>                            # autoscaler flag, default: ${CORESTOTAL}
---memory-total=<value>                           # autoscaler flag, default: ${MEMORYTOTAL}
---max-autoprovisioned-node-group-count=<value>   # autoscaler flag, default: ${MAXAUTOPROVISIONNEDNODEGROUPCOUNT}
---scale-down-enabled=<value>                     # autoscaler flag, default: ${SCALEDOWNENABLED}
---scale-down-utilization-threshold=<value>       # autoscaler flag, default: ${SCALEDOWNUTILIZATIONTHRESHOLD}
---scale-down-gpu-utilization-threshold=<value>   # autoscaler flag, default: ${SCALEDOWNGPUUTILIZATIONTHRESHOLD}
---scale-down-delay-after-add=<value>             # autoscaler flag, default: ${SCALEDOWNDELAYAFTERADD}
---scale-down-delay-after-delete=<value>          # autoscaler flag, default: ${SCALEDOWNDELAYAFTERDELETE}
---scale-down-delay-after-failure=<value>         # autoscaler flag, default: ${SCALEDOWNDELAYAFTERFAILURE}
---scale-down-unneeded-time=<value>               # autoscaler flag, default: ${SCALEDOWNUNEEDEDTIME}
---scale-down-unready-time=<value>                # autoscaler flag, default: ${SCALEDOWNUNREADYTIME}
---max-node-provision-time=<value>                # autoscaler flag, default: ${MAXNODEPROVISIONTIME}
---unremovable-node-recheck-timeout=<value>       # autoscaler flag, default: ${UNREMOVABLENODERECHECKTIMEOUT}
-
-EOF
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function add_host() {
-	local LINE=
-
-	for ARG in $@
-	do
-		if [ -n "${LINE}" ]; then
-			LINE="${LINE} ${ARG}"
-		else
-			LINE="${ARG}     "
-		fi
-	done
-
-	sudo bash -c "echo '${LINE}' >> /etc/hosts"
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function verbose() {
-	if [ ${VERBOSE} = "YES" ]; then
-		eval "$1"
-	else
-		eval "$1 &> /dev/null"
-	fi
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function wait_jobs_finish() {
-	wait $(jobs -p)
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function echo_blue_dot() {
-	>&2 echo -n -e "\x1B[90m\x1B[39m\x1B[1m\x1B[34m.\x1B[0m\x1B[39m"
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function echo_blue_dot_title() {
-	# echo message in blue and bold
-	>&2 echo -n -e "\x1B[90m= $(date '+%Y-%m-%d %T') \x1B[39m\x1B[1m\x1B[34m$1\x1B[0m\x1B[39m"
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function echo_blue_bold() {
-	# echo message in blue and bold
-	>&2 echo -e "\x1B[90m= $(date '+%Y-%m-%d %T') \x1B[39m\x1B[1m\x1B[34m$1\x1B[0m\x1B[39m"
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function echo_title() {
-	# echo message in blue and bold
-	echo
-	echo_line
-	echo_blue_bold "$1"
-	echo_line
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function echo_grey() {
-	# echo message in light grey
-	>&2 echo -e "\x1B[90m$1\x1B[39m"
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function echo_red() {
-	# echo message in red
-	>&2 echo -e "\x1B[31m$1\x1B[39m"
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function echo_red_bold() {
-	# echo message in blue and bold
-	>&2 echo -e "\x1B[90m= $(date '+%Y-%m-%d %T') \x1B[31m\x1B[1m\x1B[31m$1\x1B[0m\x1B[39m"
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function echo_separator() {
-	echo_line
-	>&2 echo
-	>&2 echo
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function echo_line() {
-	echo_grey "============================================================================================================================="
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function wait_ssh_ready() {
-	while :
-	do
-		ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=1 $1 'exit 0' && break
- 
-		sleep 5
-	done
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function nextip()
-{
-	local IP=$1
-
-	if [ "${IP}" == "DHCP" ] || [ "${IP}" == "NONE" ]; then
-		echo "${IP}"
-	else
-		local IP_HEX=$(printf '%.2X%.2X%.2X%.2X\n' `echo ${IP} | tr '.' ' '`)
-		local NEXT_IP_HEX=$(printf %.8X `echo $(( 0x${IP_HEX} + 1 ))`)
-		local NEXT_IP=$(printf '%d.%d.%d.%d\n' `echo ${NEXT_IP_HEX} | sed -r 's/(..)/0x\1\ /g'`)
-
-		echo "${NEXT_IP}"
-	fi
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function build_routes() {
-	local ROUTES="[]"
-	local ROUTE=
-
-	for ROUTE in $@
-	do
-		local TO=
-		local VIA=
-		local METRIC=500
-
-		IFS=, read -a DEFS <<< "${ROUTE}"
-
-		for DEF in ${DEFS[@]}
-		do
-			IFS== read KEY VALUE <<< "${DEF}"
-			case ${KEY} in
-				to)
-					TO=${VALUE}
-					;;
-				via)
-					VIA=${VALUE}
-					;;
-				metric)
-					METRIC=${VALUE}
-					;;
-			esac
-		done
-
-		if [ -n "${TO}" ] && [ -n "${VIA}" ]; then
-			ROUTES=$(echo ${ROUTES} | jq --arg TO ${TO} --arg VIA ${VIA} --argjson METRIC ${METRIC} '. += [{ "to": $TO, "via": $VIA, "metric": $METRIC }]')
-		fi
-	done
-
-	echo -n ${ROUTES}
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function collect_cert_sans() {
-	local LOAD_BALANCER_IP=$1
-	local CLUSTER_NODES=$2
-	local CERT_EXTRA_SANS=$3
-
-	local LB_IP=
-	local CERT_EXTRA=
-	local CLUSTER_NODE=
-	local CLUSTER_IP=
-	local CLUSTER_HOST=
-	local TLS_SNA=(
-		"${LOAD_BALANCER_IP}"
-	)
-
-	for CERT_EXTRA in $(echo ${CERT_EXTRA_SANS} | tr ',' ' ')
-	do
-		if [[ ! ${TLS_SNA[*]} =~ "${CERT_EXTRA}" ]]; then
-			TLS_SNA+=("${CERT_EXTRA}")
-		fi
-	done
-
-	for CLUSTER_NODE in $(echo ${CLUSTER_NODES} | tr ',' ' ')
-	do
-		IFS=: read CLUSTER_HOST CLUSTER_IP <<< "${CLUSTER_NODE}"
-
-		if [ -n ${CLUSTER_IP} ] && [[ ! ${TLS_SNA[*]} =~ "${CLUSTER_IP}" ]]; then
-			TLS_SNA+=("${CLUSTER_IP}")
-		fi
-
-		if [ -n "${CLUSTER_HOST}" ]; then
-			if [[ ! ${TLS_SNA[*]} =~ "${CLUSTER_HOST}" ]]; then
-				TLS_SNA+=("${CLUSTER_HOST}")
-				TLS_SNA+=("${CLUSTER_HOST%%.*}")
-			fi
-		fi
-	done
-
-	echo -n "${TLS_SNA[*]}" | tr ' ' ','
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function cidr_to_netmask() {
-    value=$(( 0xffffffff ^ ((1 << (32 - $1)) - 1) ))
-    echo "$(( (value >> 24) & 0xff )).$(( (value >> 16) & 0xff )).$(( (value >> 8) & 0xff )).$(( value & 0xff ))"
-}
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function ipv4() {
-	local INF=$1
-	local LOCAL_IPADDR=
-
-	if [ "${OSDISTRO}" == "Darwin" ]; then
-		read -a LOCAL_IPADDR <<< "$(ifconfig ${INF} | grep -m 1 "inet\s" | sed -n 1p)"
-	else
-		read -a LOCAL_IPADDR <<< "$(ip addr show ${INF} | grep -m 1 "inet\s" | tr '/' ' ')"
-	fi
-
-	echo -n "${LOCAL_IPADDR[1]}"
-}
 #===========================================================================================================================================
 #
 #===========================================================================================================================================

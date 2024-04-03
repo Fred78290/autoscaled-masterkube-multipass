@@ -95,22 +95,20 @@ else
 			deploy cluster-issuer-route53
 		fi
 	elif [ "${EXTERNAL_DNS_PROVIDER}" == "godaddy" ]; then
-		if [ -n ${CERT_GODADDY_API_KEY} ]; then
-			echo_blue_bold "Register godaddy issuer"
-			helm upgrade -i godaddy-webhook godaddy-webhook/godaddy-webhook \
-				--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-				--version ${GODADDY_WEBHOOK_VERSION} \
-				--set groupName=${PUBLIC_DOMAIN_NAME} \
-				--set dnsPolicy=ClusterFirst \
-				--namespace cert-manager
+		echo_blue_bold "Register godaddy issuer"
+		helm upgrade -i godaddy-webhook godaddy-webhook/godaddy-webhook \
+			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+			--version ${GODADDY_WEBHOOK_VERSION} \
+			--set groupName=${PUBLIC_DOMAIN_NAME} \
+			--set dnsPolicy=ClusterFirst \
+			--namespace cert-manager
 
-			kubectl create secret generic godaddy-api-key-prod -n ${NAMESPACE} --dry-run=client -o yaml \
-				--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-				--from-literal=key=${CERT_GODADDY_API_KEY} \
-				--from-literal=secret=${CERT_GODADDY_API_SECRET} | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+		kubectl create secret generic godaddy-api-key-prod -n ${NAMESPACE} --dry-run=client -o yaml \
+			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+			--from-literal=key=${CERT_GODADDY_API_KEY} \
+			--from-literal=secret=${CERT_GODADDY_API_SECRET} | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
-			deploy cluster-issuer-godaddy
-		fi
+		deploy cluster-issuer-godaddy
 	elif [ "${EXTERNAL_DNS_PROVIDER}" == "designate" ]; then
 		helm repo add designate-certmanager-webhook https://fred78290.github.io/designate-certmanager/
 		helm repo update

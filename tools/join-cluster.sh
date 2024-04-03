@@ -365,7 +365,7 @@ EOF
 	echo -n "Start ${RKE2_SERVICE} service"
 
 	systemctl enable ${RKE2_SERVICE}.service
-	systemctl start ${RKE2_SERVICE}.service
+	systemctl start ${RKE2_SERVICE}.service --no-block
 
 elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 	ANNOTE_MASTER=true
@@ -400,7 +400,7 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 	echo -n "Start k3s service"
 
 	systemctl enable k3s.service
-	systemctl start k3s.service
+	systemctl start k3s.service --no-block
 
 else
 	CACERT=$(cat ./cluster/ca.cert)

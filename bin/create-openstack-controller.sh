@@ -3,6 +3,8 @@
 export KUBERNETES_TEMPLATE=./templates/openstack
 export ETC_DIR=${TARGET_DEPLOY_LOCATION}/openstack
 
+mkdir -p ${ETC_DIR}
+
 OSENV=(
 	"OS_AUTH_URL"
 	"OS_USERNAME"
@@ -22,13 +24,13 @@ OSENV=(
 	"OS_CLOUD"
 )
 
-echo -n > ${ETC_DIR}/openstack.env
+echo -n > ${ETC_DIR}/openstack-env.yaml
 
 for NAME in ${OSENV[@]}
 do
 	VALUE=${!NAME}
 	if [ -n "${VALUE}" ]; then
-		echo "${NAME}=${VALUE}" >> ${ETC_DIR}/openstack.env
+		echo "${NAME}=${VALUE}" >> ${ETC_DIR}/openstack-env.yaml
 	fi
 done
 
@@ -69,10 +71,9 @@ clouds:
     identity_api_version: 3
 EOF
 
-for 
 kubectl create configmap openstack-env -n kube-system --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--from-env-file=${ETC_DIR}/openstack.env \
+	--from-env-file=${ETC_DIR}/openstack-env.yaml \
 	| tee ${ETC_DIR}/openstack-env | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 kubectl create configmap openstack-cloud-config -n kube-system --dry-run=client -o yaml \
@@ -80,17 +81,15 @@ kubectl create configmap openstack-cloud-config -n kube-system --dry-run=client 
 	--from-file=${ETC_DIR}/clouds.yaml \
 	--from-file=${ETC_DIR}/cloud.conf | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
-kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f ${ETC_DIR}/cpi-${NODEGROUP_NAME}-secret.yaml
-
 kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	-f ${KUBERNETES_TEMPLATE}/controller/cloud-controller-manager-role-bindings.yaml
 
 kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	-f ${KUBERNETES_TEMPLATE}/controller/cloud-controller-manager-roles.yaml
 
-cat ${KUBERNETES_TEMPLATE}/openstack-cloud-controller-manager-ds.yaml | sed \
+cat ${KUBERNETES_TEMPLATE}/controller/openstack-cloud-controller-manager-ds.yaml | sed \
 	-e "s/__ANNOTE_MASTER__/${ANNOTE_MASTER}/g" \
-	| tee ${ETC_DIR}/controller/openstack-cloud-controller-manager-ds.yaml \
+	| tee ${ETC_DIR}/openstack-cloud-controller-manager-ds.yaml \
 	| kubectl --kubeconfig=${TARGET_CLUSTER_LOCATION}/config apply -f -
 
 kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
@@ -106,4 +105,4 @@ kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	-f ${KUBERNETES_TEMPLATE}/cinder-csi/cinder-csi-nodeplugin.yaml
 
 kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	-f ${KUBERNETES_TEMPLATE}/cinder-csi/cinder-3csi-driver.yaml
+	-f ${KUBERNETES_TEMPLATE}/cinder-csi/cinder-csi-driver.yaml

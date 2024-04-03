@@ -187,6 +187,8 @@ SSH_KEY="$(cat ${SSH_PUBLIC_KEY})"
 
 cat > "${CACHE}/user-data.yaml" <<EOF
 #cloud-config
+package_upgrade: false
+package_update: false
 timezone: ${TZ}
 ssh_authorized_keys:
   - ${SSH_KEY}
@@ -259,6 +261,12 @@ do
 done
 
 echo
+
+ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" <<EOF
+	export DEBIAN_FRONTEND=noninteractive
+	sudo apt update
+	sudo apt upgrade -y
+EOF
 
 ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo /usr/local/bin/prepare-image.sh \
 						--container-runtime ${CONTAINER_ENGINE} \

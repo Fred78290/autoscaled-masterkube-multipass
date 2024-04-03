@@ -75,6 +75,8 @@ fi
 
 source "${CURDIR}/common.sh"
 
+prepare_environment
+
 if [ -n "${OVERRIDE_AWS_PROFILE}" ]; then
 	AWS_PROFILE=${OVERRIDE_AWS_PROFILE}
 fi
@@ -103,34 +105,19 @@ TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
 
 echo_blue_bold "Delete masterkube ${MASTERKUBE} previous instance"
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function delete_all_vms() {
-	TOTALNODES=$((WORKERNODES + ${CONTROLNODES}))
-
-	for NODEINDEX in $(seq 0 ${TOTALNODES})
+	for NODEINDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
 	do
-		if [ ${NODEINDEX} = 0 ]; then
-			MASTERKUBE_NODE="${MASTERKUBE}"
-		elif [[ ${NODEINDEX} > ${CONTROLNODES} ]]; then
-			NODEINDEX=$((NODEINDEX - ${CONTROLNODES}))
-			MASTERKUBE_NODE="${NODEGROUP_NAME}-worker-0${NODEINDEX}"
-		else
-			MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${NODEINDEX}"
-		fi
-
-		delete_vm_by_name ${MASTERKUBE_NODE} || true
+		delete_vm_by_name $(get_vm_name ${NODEINDEX}) || true
 	done
 }
 
-if [ -f ${TARGET_CONFIG_LOCATION}/buildenv ]; then
-	source ${TARGET_CONFIG_LOCATION}/buildenv
-else
-	FORCE=YES
-fi
-
-if [ ! -f ${TARGET_CLUSTER_LOCATION}/config ]; then
-	FORCE=YES
-fi
-
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function delete_nodes() {
 	NODES=$(kubectl get node -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config | jq -r --arg LABEL $1 '.items | .[] | select(.metadata.labels[$LABEL]) | .metadata.name' | sort -r)
 
@@ -140,6 +127,19 @@ function delete_nodes() {
 		delete_vm_by_name ${NODE} || true
 	done
 }
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+if [ -f ${TARGET_CONFIG_LOCATION}/buildenv ]; then
+	source ${TARGET_CONFIG_LOCATION}/buildenv
+else
+	FORCE=YES
+fi
+
+if [ ! -f ${TARGET_CLUSTER_LOCATION}/config ]; then
+	FORCE=YES
+fi
 
 if [ "${FORCE}" = "YES" ]; then
 	delete_all_vms
@@ -152,7 +152,9 @@ elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
 fi
 
 wait_jobs_finish
+
 unregister_dns
+delete_load_balancers
 
 ./bin/kubeconfig-delete.sh ${NODEGROUP_NAME} &> /dev/null || true
 

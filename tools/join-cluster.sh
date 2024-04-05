@@ -210,7 +210,7 @@ if [ ${FILL_ETC_HOSTS} == "YES" ]; then
 	sed -i "/${CONTROL_PLANE_ENDPOINT}/d" /etc/hosts
 	echo "${CONTROL_PLANE_ENDPOINT_ADDR}   ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 
-	for CLUSTER_NODE in ${CLUSTER_NODES[*]}
+	for CLUSTER_NODE in ${CLUSTER_NODES[@]}
 	do
 		IFS=: read HOST IP <<< "${CLUSTER_NODE}"
 		if [ -n "${IP}" ]; then

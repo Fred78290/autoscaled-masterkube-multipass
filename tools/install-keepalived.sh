@@ -12,7 +12,7 @@ OPTIONS=(
 	"keep-alive-status:"
 )
 
-PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
 TEMP=$(getopt -o a:b:p:i:m:1:2:s: --long "${PARAMS}"  -n "$0" -- "$@")
 
 eval set -- "${TEMP}"

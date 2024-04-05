@@ -248,7 +248,7 @@ else
 fi
 
 if [ ${FILL_ETC_HOSTS} == "YES" ]; then
-	for CLUSTER_NODE in ${CLUSTER_NODES[*]}
+	for CLUSTER_NODE in ${CLUSTER_NODES[@]}
 	do
 		IFS=: read HOST IP <<< "${CLUSTER_NODE}"
 		if [ -n "${IP}" ]; then

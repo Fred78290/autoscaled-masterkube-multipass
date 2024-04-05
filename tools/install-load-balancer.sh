@@ -3,7 +3,7 @@
 set -e
 
 CONTROL_PLANE_ENDPOINT=
-CLUSTER_NODES=
+CLUSTER_NODES=()
 PRIVATE_IP=0.0.0.0
 LOAD_BALANCER_PORT=80,443,6443
 
@@ -23,7 +23,7 @@ while true; do
 		shift 2
 		;;
 	-n | --cluster-nodes)
-		CLUSTER_NODES="$2"
+		IFS=, read -a CLUSTER_NODES <<< "$2"
 		shift 2
 		;;
 	-l | --listen-ip)
@@ -42,11 +42,9 @@ while true; do
 	esac
 done
 
-IFS=, read -a CLUSTER_NODES <<< "${CLUSTER_NODES}"
-
 echo "127.0.0.1 ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 
-for CLUSTER_NODE in ${CLUSTER_NODES[*]}
+for CLUSTER_NODE in ${CLUSTER_NODES[@]}
 do
 	IFS=: read HOST IP <<< "${CLUSTER_NODE}"
 
@@ -84,7 +82,7 @@ function create_tcp_stream() {
 		echo "  upstream ${STREAM_NAME}_${PORT} {" >> ${NGINX_CONF}
 		echo "    least_conn;" >> ${NGINX_CONF}
 
-		for CLUSTER_NODE in ${CLUSTER_NODES[*]}
+		for CLUSTER_NODE in ${CLUSTER_NODES[@]}
 		do
 			IFS=: read HOST IP <<< "${CLUSTER_NODE}"
 

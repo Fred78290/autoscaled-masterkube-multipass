@@ -169,11 +169,10 @@ EOF
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
-
-		# Update /etc/hosts
-		register_dns ${INDEX} ${NODE_IP} ${MASTERKUBE_NODE}
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
+
+		PRIVATE_ADDR_IPS[${INDEX}]=$(govc vm.ip ${MASTERKUBE_NODE})
 	fi
 
 	#echo_separator

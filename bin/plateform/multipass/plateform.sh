@@ -122,19 +122,18 @@ EOF
 
 		IPADDR=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE}  '.info|.[$NAME].ipv4[1]')
 
-		PRIVATE_ADDR_IPS[${INDEX}]=${IPADDR}
-
 		echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${IPADDR}"
 		eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
-
-		# Update /etc/hosts
-		register_dns ${INDEX} ${NODE_IP} ${MASTERKUBE_NODE}
 	else
+		IPADDR=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE}  '.info|.[$NAME].ipv4[1]')
+
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
 	fi
+
+	PRIVATE_ADDR_IPS[${INDEX}]=${IPADDR}
 
 	#echo_separator
 }

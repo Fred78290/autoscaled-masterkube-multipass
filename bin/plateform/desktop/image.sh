@@ -32,7 +32,7 @@ OPTIONS=(
 	"container-runtime:"
 )
 
-PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
 TEMP=$(getopt -o d:i:k:n:p:s:a:u:v: --long "${PARAMS}"  -n "$0" -- "$@")
 
 eval set -- "${TEMP}"

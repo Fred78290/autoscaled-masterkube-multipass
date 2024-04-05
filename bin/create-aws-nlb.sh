@@ -127,12 +127,12 @@ PUBLIC_INSTANCES_IP=
 CONTROLPLANE_INSTANCES_IP=
 
 # Extract IP
-for INSTANCE in $(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids ${PUBLIC_INSTANCES_ID[*]} | jq '.Reservations[].Instances[].PrivateIpAddress')
+for INSTANCE in $(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids ${PUBLIC_INSTANCES_ID[@]} | jq '.Reservations[].Instances[].PrivateIpAddress')
 do
 	PUBLIC_INSTANCES_IP+=("Id=${INSTANCE}")
 done
 
-for INSTANCE in $(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids ${CONTROLPLANE_INSTANCES_ID[*]} | jq '.Reservations[].Instances[].PrivateIpAddress')
+for INSTANCE in $(aws ec2  describe-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids ${CONTROLPLANE_INSTANCES_ID[@]} | jq '.Reservations[].Instances[].PrivateIpAddress')
 do
 	CONTROLPLANE_INSTANCES_IP+=("Id=${INSTANCE}")
 done
@@ -191,10 +191,10 @@ function create_nlb() {
 }
 
 if [ ${AWS_USE_PUBLICIP} = "true" ]; then
-	create_nlb "p-${AWS_NLB_NAME}" internet-facing "${AWS_PUBLIC_SUBNETID[*]}" "80 443" network "${PUBLIC_INSTANCES_IP[*]}"
+	create_nlb "p-${AWS_NLB_NAME}" internet-facing "${AWS_PUBLIC_SUBNETID[@]}" "80 443" network "${PUBLIC_INSTANCES_IP[@]}"
 fi
 
-NLB_ARN=$(create_nlb "c-${AWS_NLB_NAME}" internal "${AWS_PRIVATE_SUBNETID[*]}" "${LOAD_BALANCER_PORT[*]}" network "${CONTROLPLANE_INSTANCES_IP[*]}")
+NLB_ARN=$(create_nlb "c-${AWS_NLB_NAME}" internal "${AWS_PRIVATE_SUBNETID[@]}" "${LOAD_BALANCER_PORT[@]}" network "${CONTROLPLANE_INSTANCES_IP[@]}")
 
 echo_blue_dot_title -n "Wait NLB to start ${NLB_ARN}"
 

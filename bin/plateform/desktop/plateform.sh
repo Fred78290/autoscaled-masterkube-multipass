@@ -159,8 +159,6 @@ EOF
 					exit 1
 				fi
 
-				PRIVATE_ADDR_IPS[${INDEX}]=${IPADDR}
-
 				echo_title "Wait ssh ready on ${KUBERNETES_USER}@${IPADDR}"
 				wait_ssh_ready ${KUBERNETES_USER}@${IPADDR}
 
@@ -176,8 +174,11 @@ EOF
 		fi
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
+
+		IPADDR=$(vmrest_waitip "${MASTERKUBE_NODE_UUID}")
 	fi
 
+	PRIVATE_ADDR_IPS[${INDEX}]=${NODE_IP}
 	#echo_separator
 }
 

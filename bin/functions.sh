@@ -150,7 +150,7 @@ function parse_arguments() {
 		"use-keepalived"
 	)
 
-	PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+	PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
 	TEMP=$(getopt -o hvxrdk:u:p: --long "${PARAMS}"  -n "$0" -- "$@")
 
 	eval set -- "${TEMP}"
@@ -839,23 +839,26 @@ function collect_cert_sans() {
 		"${NLB_IP}"
 	)
 
-	for CERT_EXTRA in $(echo ${CERT_EXTRA_SANS} | tr ',' ' ')
+	IFS=, read -a CLUSTER_NODES <<< "${CLUSTER_NODES}"
+	IFS=, read -a CERT_EXTRA_SANS <<< "${CERT_EXTRA_SANS}"
+
+	for CERT_EXTRA in ${CERT_EXTRA_SANS[@]}
 	do
-		if [[ ! ${TLS_SNA[*]} =~ "${CERT_EXTRA}" ]]; then
+		if [[ ! ${TLS_SNA[@]} =~ "${CERT_EXTRA}" ]]; then
 			TLS_SNA+=("${CERT_EXTRA}")
 		fi
 	done
 
-	for CLUSTER_NODE in $(echo ${CLUSTER_NODES} | tr ',' ' ')
+	for CLUSTER_NODE in ${CLUSTER_NODES[@]}
 	do
 		IFS=: read CLUSTER_HOST CLUSTER_IP <<< "${CLUSTER_NODE}"
 
-		if [ -n ${CLUSTER_IP} ] && [[ ! ${TLS_SNA[*]} =~ "${CLUSTER_IP}" ]]; then
+		if [ -n ${CLUSTER_IP} ] && [[ ! ${TLS_SNA[@]} =~ "${CLUSTER_IP}" ]]; then
 			TLS_SNA+=("${CLUSTER_IP}")
 		fi
 
 		if [ -n "${CLUSTER_HOST}" ]; then
-			if [[ ! ${TLS_SNA[*]} =~ "${CLUSTER_HOST}" ]]; then
+			if [[ ! ${TLS_SNA[@]} =~ "${CLUSTER_HOST}" ]]; then
 				TLS_SNA+=("${CLUSTER_HOST}")
 				TLS_SNA+=("${CLUSTER_HOST%%.*}")
 			fi
@@ -871,7 +874,7 @@ function collect_cert_sans() {
 		fi
 	done
 
-	echo -n "${TLS_SNA[*]}" | tr ' ' ','
+	echo -n "${TLS_SNA[@]}" | tr ' ' ','
 }
 
 #===========================================================================================================================================
@@ -965,8 +968,20 @@ function get_vm_name() {
 	local NODEINDEX=$(get_node_index ${INDEX})
 
 	if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
-		if [ ${HA_CLUSTER} = "true" ] && [ ${CONTROLNODE_INDEX} -gt 1 ]; then
-            MASTERKUBE_NODE="${MASTERKUBE}-$(named_index_suffix $NODEINDEX)"
+		if [ ${HA_CLUSTER} = "true" ]; then
+			if [ ${USE_NLB} = "YES" ] && [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
+				if [ ${CONTROLNODE_INDEX} -gt 1 ]; then
+					MASTERKUBE_NODE="${NODEGROUP_NAME}-gateway-$(named_index_suffix $NODEINDEX)"
+				else
+					MASTERKUBE_NODE="${NODEGROUP_NAME}-gateway"
+				fi
+			else
+				if [ ${CONTROLNODE_INDEX} -gt 1 ]; then
+					MASTERKUBE_NODE="${MASTERKUBE}-$(named_index_suffix $NODEINDEX)"
+				else
+					MASTERKUBE_NODE="${MASTERKUBE}"
+				fi
+			fi
 		else
 			MASTERKUBE_NODE="${MASTERKUBE}"
 		fi
@@ -1013,8 +1028,13 @@ EOF
 #
 #===========================================================================================================================================
 function create_vm() {
+	local INDEX=$1
+	local NAME=$(get_vm_name ${INDEX})
+
 	plateform_create_vm $@
-	plateform_info_vm $1
+	plateform_info_vm ${INDEX}
+
+	register_dns ${INDEX} ${PRIVATE_ADDR_IPS[${INDEX}]} ${NAME}
 }
 
 #===========================================================================================================================================
@@ -1049,13 +1069,13 @@ function prepare_node_indexes() {
 		elif [ "${USE_NLB}" = "YES" ]; then
 			if [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
 				if [ $PLATEFORM == "aws" ]; then
-					CONTROLNODE_INDEX=${#VPC_PUBLIC_SUBNET_IDS[*]}
+					CONTROLNODE_INDEX=${#VPC_PUBLIC_SUBNET_IDS[@]}
 				fi
 			else
 				FIRSTNODE=1
 			fi
 		else
-			CONTROLNODE_INDEX=${#VPC_PUBLIC_SUBNET_IDS[*]}
+			CONTROLNODE_INDEX=${#VPC_PUBLIC_SUBNET_IDS[@]}
 		fi
 
 	else
@@ -1388,7 +1408,7 @@ function find_public_dns_provider() {
 #===========================================================================================================================================
 function prepare_plateform() {
 	find_public_dns_provider
-	prepare_node_indexes 1
+	prepare_node_indexes
 }
 
 #===========================================================================================================================================
@@ -1748,8 +1768,11 @@ function prepare_networking() {
 	fi
 
 	# No external elb, use keep alived
-	if [ ${USE_KEEPALIVED} = "YES" ]; then
-		PRIVATE_ADDR_IPS[0]=${NODE_IP}
+	if [ ${USE_KEEPALIVED} = "YES" ] || [[ "${USE_NLB}" = "YES" && ${USE_NGINX_GATEWAY} = "NO" ]]; then
+		PRIVATE_ADDR_IPS[0]="${NODE_IP}"
+		PRIVATE_DNS_NAMES[0]=""
+		PUBLIC_ADDR_IPS[0]=${PUBLIC_NODE_IP}
+
 		NODE_IP=$(nextip ${NODE_IP})
 		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
 	fi
@@ -1787,6 +1810,44 @@ function create_extras_ip() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function collect_cluster_nodes() {
+	if [ "${HA_CLUSTER}" = "true" ]; then
+		for INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES} - 1)))
+		do
+			MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${INDEX}"
+			IPADDR="${PRIVATE_ADDR_IPS[${INDEX}]}"
+			NODE_DNS="${MASTERKUBE_NODE}.${DOMAIN_NAME}:${IPADDR}"
+
+			if [ -z "${CLUSTER_NODES}" ]; then
+				CLUSTER_NODES="${NODE_DNS}"
+			else
+				CLUSTER_NODES="${CLUSTER_NODES},${NODE_DNS}"
+			fi
+
+			if [ "${EXTERNAL_ETCD}" = "true" ]; then
+				if [ -z "${ETCD_ENDPOINT}" ]; then
+					ETCD_ENDPOINT="https://${IPADDR}:2379"
+				else
+					ETCD_ENDPOINT="${ETCD_ENDPOINT},https://${IPADDR}:2379"
+				fi
+			fi
+		done
+	else
+		IPADDR="${PRIVATE_ADDR_IPS[${CONTROLNODE_INDEX}]}"
+		IPRESERVED1=${PRIVATE_ADDR_IPS[$((LASTNODE_INDEX + 1))]}
+		IPRESERVED2=${PRIVATE_ADDR_IPS[$((LASTNODE_INDEX + 2))]}
+
+		if [ ${CONTROLNODE_INDEX} -gt 0 ]; then
+			CLUSTER_NODES="${NODEGROUP_NAME}-master-01.${DOMAIN_NAME}:${IPADDR},${NODEGROUP_NAME}-master-02.${DOMAIN_NAME}:${IPRESERVED1},${NODEGROUP_NAME}-master-03.${DOMAIN_NAME}:${IPRESERVED2}"
+		else
+			CLUSTER_NODES="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDR},${NODEGROUP_NAME}-master-02.${DOMAIN_NAME}:${IPRESERVED1},${NODEGROUP_NAME}-master-03.${DOMAIN_NAME}:${IPRESERVED2}"
+		fi
+	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function create_all_vms() {
 	local LAUNCH_IN_BACKGROUND="NO"
 
@@ -1796,7 +1857,7 @@ function create_all_vms() {
 
 	for INDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
 	do
-		PRIVATE_ADDR_IPS[${INDEX}]="X${NODE_IP}"
+		PRIVATE_ADDR_IPS[${INDEX}]="${NODE_IP}"
 		PRIVATE_DNS_NAMES[${INDEX}]=""
 		PUBLIC_ADDR_IPS[${INDEX}]=${PUBLIC_NODE_IP}
 	
@@ -1831,8 +1892,8 @@ function create_all_vms() {
 		done
 	fi
 
-	CONTROL_PLANE_ENDPOINT=${PRIVATE_ADDR_IPS[0]}
-	LOAD_BALANCER_IP="${PRIVATE_ADDR_IPS[0]}"
+	CONTROL_PLANE_ENDPOINT="${PRIVATE_ADDR_IPS[0]:-}"
+	LOAD_BALANCER_IP=${CONTROL_PLANE_ENDPOINT}
 
 	if [ ${WORKERNODES} -gt 0 ]; then
 		FIRST_WORKER_NODE_IP=${PRIVATE_ADDR_IPS[${WORKERNODE_INDEX}]}
@@ -1843,6 +1904,7 @@ function create_all_vms() {
 #echo_blue_bold "After PRIVATE_ADDR_IPS=${PRIVATE_ADDR_IPS[@]}"
 #echo_blue_bold "After PRIVATE_DNS_NAMES=${PRIVATE_DNS_NAMES[@]}"
 
+	collect_cluster_nodes
 }
 
 #===========================================================================================================================================
@@ -1920,39 +1982,35 @@ function create_nginx_gateway() {
 #
 #===========================================================================================================================================
 function register_nlb_dns() {
-	local PRIVATE_NLB_DNS=$1
-	local PUBLIC_NLB_DNS=$2
-	local RECORDTYPE=
+	local RECORDTYPE=$1
+	local PRIVATE_NLB_DNS=$2
+	local PUBLIC_NLB_DNS=$3
 
 	if [ -n "${PRIVATE_NLB_DNS}" ]; then
-		if valid_ip ${PRIVATE_NLB_DNS}; then
-			RECORDTYPE="A"
-		else
-			RECORDTYPE="CNAME"
-		fi
+		CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 
 		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 			echo_title "Register dns ${MASTERKUBE} in route53: ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
 
 			cat > ${TARGET_CONFIG_LOCATION}/dns-nlb.json <<EOF
-	{
-		"Comment": "${MASTERKUBE} private DNS entry",
-		"Changes": [
 			{
-				"Action": "UPSERT",
-				"ResourceRecordSet": {
-					"Name": "${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}",
-					"Type": "${RECORDTYPE}",
-					"TTL": 60,
-					"ResourceRecords": [
-						{
-							"Value": "${PRIVATE_NLB_DNS}"
+				"Comment": "${MASTERKUBE} private DNS entry",
+				"Changes": [
+					{
+						"Action": "UPSERT",
+						"ResourceRecordSet": {
+							"Name": "${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}",
+							"Type": "${RECORDTYPE}",
+							"TTL": 60,
+							"ResourceRecords": [
+								{
+									"Value": "${PRIVATE_NLB_DNS}"
+								}
+							]
 						}
-					]
-				}
+					}
+				]
 			}
-		]
-	}
 EOF
 
 			aws route53 change-resource-record-sets --profile ${AWS_ROUTE53_PROFILE} \
@@ -1961,29 +2019,24 @@ EOF
 				--change-batch file://${TARGET_CONFIG_LOCATION}/dns-nlb.json > /dev/null
 
 			add_host "${PRIVATE_NLB_DNS} ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}"
-		fi
-	elif [ -n "${OS_PRIVATE_DNS_ZONEID}" ]; then
-		echo_title "Register dns ${MASTERKUBE} designate, id: ${OS_PRIVATE_DNS_ZONEID}"
-		
-		DNS_ENTRY=$(openstack recordset create -f json --record ${PRIVATE_NLB_DNS} --type ${RECORDTYPE} "${PRIVATE_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
-		
-		cat > ${TARGET_CONFIG_LOCATION}/designate-nlb.json <<EOF
-		{
-			"id": "${DNS_ENTRY}",
-			"zone_id": "${OS_PRIVATE_DNS_ZONEID}",
-			"name": "${MASTERKUBE}",
-			"record": "${PRIVATE_NLB_DNS}"
-		}
+		elif [ -n "${OS_PRIVATE_DNS_ZONEID}" ]; then
+			echo_title "Register dns ${MASTERKUBE} designate, id: ${OS_PRIVATE_DNS_ZONEID}"
+			
+			DNS_ENTRY=$(openstack recordset create -f json --record ${PRIVATE_NLB_DNS} --type ${RECORDTYPE} "${PRIVATE_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
+			CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
+
+			cat > ${TARGET_CONFIG_LOCATION}/designate-nlb.json <<EOF
+			{
+				"id": "${DNS_ENTRY}",
+				"zone_id": "${OS_PRIVATE_DNS_ZONEID}",
+				"name": "${MASTERKUBE}",
+				"record": "${PRIVATE_NLB_DNS}"
+			}
 EOF
+		fi
 	fi
 
 	if [ -n "${PUBLIC_NLB_DNS}" ]; then
-		if valid_ip ${PUBLIC_NLB_DNS}; then
-			RECORDTYPE="A"
-		else
-			RECORDTYPE="CNAME"
-		fi
-
 		if [ "${EXTERNAL_DNS_PROVIDER}" = "aws" ]; then
 			echo_title "Register public dns ${MASTERKUBE} in route53: ${AWS_ROUTE53_PUBLIC_ZONE_ID}"
 
@@ -2024,16 +2077,19 @@ EOF
 
 			DNS_ENTRY=$(openstack recordset create -f json --record ${PUBLIC_NLB_DNS} --type ${RECORDTYPE} "${PUBLIC_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
 
-		cat > ${TARGET_CONFIG_LOCATION}/designate-public.json <<EOF
-		{
-			"id": "${DNS_ENTRY}",
-			"zone_id": "${OS_PUBLIC_DNS_ZONEID}",
-			"name": "${MASTERKUBE}",
-			"record": "${PUBLIC_NLB_DNS}"
-		}
+			cat > ${TARGET_CONFIG_LOCATION}/designate-public.json <<EOF
+			{
+				"id": "${DNS_ENTRY}",
+				"zone_id": "${OS_PUBLIC_DNS_ZONEID}",
+				"name": "${MASTERKUBE}",
+				"record": "${PUBLIC_NLB_DNS}"
+			}
 EOF
 		fi
 	fi
+
+	echo "export PRIVATE_NLB_DNS=${PRIVATE_NLB_DNS}" >> ${TARGET_CONFIG_LOCATION}/buildenv
+	echo "export PUBLIC_NLB_DNS=${PUBLIC_NLB_DNS}" >> ${TARGET_CONFIG_LOCATION}/buildenv
 }
 
 #===========================================================================================================================================
@@ -2068,6 +2124,7 @@ function create_load_balancer() {
 function create_dns_rentries() {
     local RECORDS=()
     local GODADDY_REGISTER="[]"
+	local DESIGNATE_REGISTER=()
     local PRIVATE_ROUTE53_REGISTER=$(cat << EOF
     {
         "Changes": [
@@ -2125,10 +2182,12 @@ EOF
             PRIVATE_ROUTE53_REGISTER=$(echo ${PRIVATE_ROUTE53_REGISTER} | jq --arg IPADDR "${PRIVATEIPADDR}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
 
             if [ -z "${PUBLICIPADDR}" ]; then
+				DESIGNATE_REGISTER+=(${PRIVATEIPADDR})
                 GODADDY_REGISTER=$(echo ${GODADDY_REGISTER} | jq --arg IPADDR "${PRIVATEIPADDR}" '. += [ { "data": $IPADDR } ]')
                 RECORDS+=("--record ${PRIVATEIPADDR}")
                 PUBLIC_ROUTE53_REGISTER=$(echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg IPADDR "${PRIVATEIPADDR}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
             else
+				DESIGNATE_REGISTER+=(${PUBLICIPADDR})
                 GODADDY_REGISTER=$(echo ${GODADDY_REGISTER} | jq --arg IPADDR "${PUBLICIPADDR}" '. += [ { "data": $IPADDR } ]')
                 RECORDS+=("--record ${PUBLICIPADDR}")
                 PUBLIC_ROUTE53_REGISTER=$(echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg IPADDR "${PUBLICIPADDR}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
@@ -2185,7 +2244,7 @@ EOF
 				"id": "${DNS_ENTRY}",
 				"zone_id": "${OS_PUBLIC_DNS_ZONEID}",
 				"name": "${MASTERKUBE}",
-				"record": "${GODADDY_REGISTER[@]}"
+				"record": "${DESIGNATE_REGISTER[@]}"
 			}
 EOF
 		fi
@@ -2197,27 +2256,6 @@ EOF
 #===========================================================================================================================================
 function create_etcd() {
 	if [ "${HA_CLUSTER}" = "true" ]; then
-		for INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES})))
-		do
-			MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${INDEX}"
-			IPADDR="${PRIVATE_ADDR_IPS[${INDEX}]}"
-			NODE_DNS="${MASTERKUBE_NODE}.${DOMAIN_NAME}:${IPADDR}"
-
-			if [ -z "${CLUSTER_NODES}" ]; then
-				CLUSTER_NODES="${NODE_DNS}"
-			else
-				CLUSTER_NODES="${CLUSTER_NODES},${NODE_DNS}"
-			fi
-
-			if [ "${EXTERNAL_ETCD}" = "true" ]; then
-				if [ -z "${ETCD_ENDPOINT}" ]; then
-					ETCD_ENDPOINT="https://${IPADDR}:2379"
-				else
-					ETCD_ENDPOINT="${ETCD_ENDPOINT},https://${IPADDR}:2379"
-				fi
-			fi
-		done
-
 		if [ "${EXTERNAL_ETCD}" = "true" ]; then
 			echo_title "Created etcd cluster: ${CLUSTER_NODES}"
 
@@ -2242,19 +2280,14 @@ function create_etcd() {
 				fi
 			done
 		fi
-	else
-		IPADDR="${PRIVATE_ADDR_IPS[${CONTROLNODE_INDEX}]}"
-		IPRESERVED1=${PRIVATE_ADDR_IPS[$((LASTNODE_INDEX + 1))]}
-		IPRESERVED2=${PRIVATE_ADDR_IPS[$((LASTNODE_INDEX + 2))]}
-
-		if [ ${CONTROLNODE_INDEX} -gt 0 ]; then
-			CLUSTER_NODES="${NODEGROUP_NAME}-master-01.${DOMAIN_NAME}:${IPADDR},${NODEGROUP_NAME}-master-02.${DOMAIN_NAME}:${IPRESERVED1},${NODEGROUP_NAME}-master-03.${DOMAIN_NAME}:${IPRESERVED2}"
-		else
-			CLUSTER_NODES="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDR},${NODEGROUP_NAME}-master-02.${DOMAIN_NAME}:${IPRESERVED1},${NODEGROUP_NAME}-master-03.${DOMAIN_NAME}:${IPRESERVED2}"
-		fi
 	fi
 
-	echo "export CLUSTER_NODES=${CLUSTER_NODES}" >> ${TARGET_CONFIG_LOCATION}/buildenv
+	cat >> ${TARGET_CONFIG_LOCATION}/buildenv <<EOF
+export CLUSTER_NODES=${CLUSTER_NODES}
+export CONTROL_PLANE_ENDPOINT=${CONTROL_PLANE_ENDPOINT}
+export LOAD_BALANCER_IP=${LOAD_BALANCER_IP}
+export FIRST_WORKER_NODE_IP=${FIRST_WORKER_NODE_IP}
+EOF
 }
 
 #===========================================================================================================================================
@@ -2335,7 +2368,7 @@ function create_cluster() {
 					--use-external-etcd=${EXTERNAL_ETCD} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
-					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${PRIVATE_ADDR_IPS[0]}" \
+					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${MASTER_IP}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--tls-san="${CERT_SANS}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
@@ -2364,7 +2397,7 @@ function create_cluster() {
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
 					--join-master="${MASTER_IP}" \
-					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${PRIVATE_ADDR_IPS[0]}" \
+					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${MASTER_IP}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--tls-san="${CERT_SANS}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \

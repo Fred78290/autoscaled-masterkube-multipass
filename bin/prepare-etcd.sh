@@ -2,6 +2,7 @@
 set -eu
 
 CURDIR=$(dirname $0)
+CLUSTER_NODES=()
 
 TEMP=$(getopt -o c:g:l: --long target-location:,node-group:,cluster-nodes: -n "$0" -- "$@")
 
@@ -11,7 +12,7 @@ eval set -- "${TEMP}"
 while true; do
 	case "$1" in
 		-c|--cluster-nodes)
-			CLUSTER_NODES="$2"
+			IFS=, read -a CLUSTER_NODES <<< "$2"
 			shift 2
 			;;
 		-g|--node-group)
@@ -38,7 +39,7 @@ ETCDIPS=()
 ETCDHOSTS=()
 ETCDNAMES=()
 
-for CLUSTER_NODE in $(echo -n ${CLUSTER_NODES} | tr ',' ' ')
+for CLUSTER_NODE in ${CLUSTER_NODES[@]}
 do
 	IFS=: read HOST IP <<< "${CLUSTER_NODE}"
 

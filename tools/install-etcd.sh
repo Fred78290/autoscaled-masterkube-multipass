@@ -1,5 +1,5 @@
 #!/bin/bash
-CLUSTER_NODES=
+CLUSTER_NODES=()
 NODE_INDEX=
 ETCD_VER=v3.5.12
 GOOGLE_URL=https://storage.googleapis.com/etcd
@@ -19,7 +19,7 @@ eval set -- "${TEMP}"
 while true; do
 	case "$1" in
 	-c|--cluster-nodes)
-		CLUSTER_NODES="$2"
+		IFS=, read -a CLUSTER_NODES <<< "$2"
 		shift 2
 		;;
 
@@ -45,7 +45,7 @@ while true; do
 	esac
 done
 
-for CLUSTER_NODE in $(echo -n ${CLUSTER_NODES} | tr ',' ' ')
+for CLUSTER_NODE in ${CLUSTER_NODES[@]}
 do
 	IFS=: read HOST IP <<< "${CLUSTER_NODE}"
 

@@ -29,7 +29,7 @@ OPTIONS=(
 	"second-adapter:"
 )
 
-PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
 TEMP=$(getopt -o d:i:k:n:p:s:a:u:v:o --long "${PARAMS}"  -n "$0" -- "$@")
 
 eval set -- "${TEMP}"

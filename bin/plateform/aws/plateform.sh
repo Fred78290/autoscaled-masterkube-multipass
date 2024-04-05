@@ -82,7 +82,7 @@ function parse_arguments() {
         "worker-node-public"
     )
 
-    PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+    PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
     TEMP=$(getopt -o hvxrdk:u:p: --long "${PARAMS}"  -n "$0" -- "$@")
 
     eval set -- "${TEMP}"
@@ -627,7 +627,7 @@ function prepare_plateform() {
     fi
 
     # Tag VPC & Subnet
-    for SUBNET in ${VPC_PUBLIC_SUBNET_IDS[*]}
+    for SUBNET in ${VPC_PUBLIC_SUBNET_IDS[@]}
     do
         TAGGED=$(aws ec2 describe-subnets \
             --profile ${AWS_PROFILE} \
@@ -655,7 +655,7 @@ function prepare_plateform() {
     fi
 
     # Tag VPC & Subnet
-    for SUBNET in ${VPC_PRIVATE_SUBNET_IDS[*]}
+    for SUBNET in ${VPC_PRIVATE_SUBNET_IDS[@]}
     do
         NETINFO=$(aws ec2 describe-subnets --profile ${AWS_PROFILE} --filters "Name=subnet-id,Values=${SUBNET}")
         TAGGED=$(echo "${NETINFO}" | jq -r ".Subnets[].Tags[]|select(.Key == \"kubernetes.io/cluster/${NODEGROUP_NAME}\")|.Value")
@@ -738,7 +738,7 @@ function create_plateform_nlb() {
 
     # NLB + NGINX Gateway
 	if [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
-		for INSTANCE_INDEX in $(seq ${FIRSTNODE} $((FIRSTNODE + ${#VPC_PUBLIC_SUBNET_IDS[*]} - 1)))
+		for INSTANCE_INDEX in $(seq ${FIRSTNODE} $((FIRSTNODE + ${#VPC_PUBLIC_SUBNET_IDS[@]} - 1)))
 		do
 			LAUNCHED_INSTANCE=${LAUNCHED_INSTANCES[${INSTANCE_INDEX}]}
 			INSTANCE_ID=$(echo ${LAUNCHED_INSTANCE} | jq -r '.InstanceId // ""')
@@ -785,10 +785,7 @@ function create_plateform_nlb() {
 	fi
 
 	# Record Masterkube in Route53 DNS
-	register_nlb_dns ${PRIVATE_NLB_DNS} ${PUBLIC_NLB_DNS}
-
-	echo "export PRIVATE_NLB_DNS=${PRIVATE_NLB_DNS}" >> ${TARGET_CONFIG_LOCATION}/buildenv
-	echo "export PUBLIC_NLB_DNS=${PUBLIC_NLB_DNS}" >> ${TARGET_CONFIG_LOCATION}/buildenv
+	register_nlb_dns CNAME ${PRIVATE_NLB_DNS} ${PUBLIC_NLB_DNS}
 }
 
 #===========================================================================================================================================
@@ -980,8 +977,6 @@ EOF
 				| jq -r '.NetworkInterfaces[0]//""')
 			echo ${ENI} | jq . > ${TARGET_CONFIG_LOCATION}/eni-${SUFFIX}.json
 		fi
-
-		register_dns ${INDEX} ${IPADDR} ${MASTERKUBE_NODE}
 
 		echo -n ${LAUNCHED_INSTANCE} | jq . > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json
 

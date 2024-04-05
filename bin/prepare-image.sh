@@ -19,7 +19,7 @@ OPTIONS=(
 	"k8s-distribution:"
 )
 
-PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
 TEMP=$(getopt -o r:c:p:v:d: --long "${PARAMS}"  -n "$0" -- "$@")
 
 eval set -- "${TEMP}"

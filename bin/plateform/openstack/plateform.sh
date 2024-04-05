@@ -8,6 +8,8 @@ AUTOSCALE_MACHINE="k8s.medium"
 REGION=${OS_REGION_NAME}
 ZONEID=${OS_ZONE_NAME}
 PUBLIC_NODE_IP=NONE
+PUBLIC_VIP_ADDRESS=
+PRIVATE_VIP_ADDRESS=
 
 #===========================================================================================================================================
 #
@@ -73,7 +75,7 @@ function parse_arguments() {
 		"private-domain:"
 	)
 
-	PARAMS=$(echo ${OPTIONS[*]} | tr ' ' ',')
+	PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
 	TEMP=$(getopt -o hvxrdk:u:p: --long "${PARAMS}"  -n "$0" -- "$@")
 
 	eval set -- "${TEMP}"
@@ -388,10 +390,6 @@ function parse_arguments() {
 			USE_NLB=YES
 			shift 1
 			;;
-		--create-nginx-apigateway)
-			USE_NGINX_GATEWAY=YES
-			shift 1
-			;;
 		--internal-security-group)
 			INTERNAL_SECURITY_GROUP=$2
 			shift 2
@@ -430,11 +428,13 @@ function parse_arguments() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-function use_floating_ip() {
+function vm_use_floating_ip() {
 	local INDEX=$1
 
 	if [ ${HA_CLUSTER} = "true" ]; then
-		if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
+		if [ ${USE_NLB} = "YES" ]; then
+			echo -n false
+		elif [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
 			echo -n ${EXPOSE_PUBLIC_CLUSTER}
 		elif [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
 			echo -n ${CONTROLPLANE_USE_PUBLICIP}
@@ -458,7 +458,7 @@ function plateform_create_vm() {
 	local PUBLIC_IP=$2
 	local NODE_IP=$3
 	local SECURITY_GROUP=$(get_security_group ${INDEX})
-	local FLOATING_IP=$(use_floating_ip ${INDEX})
+	local FLOATING_IP=$(vm_use_floating_ip ${INDEX})
 	local MACHINE_TYPE=
 	local MASTERKUBE_NODE=
 	local VMHOST=
@@ -500,7 +500,7 @@ EOF
 fi
 
 		echo_line
-		echo_blue_bold "Launch ${MASTERKUBE_NODE} index: with ${TARGET_IMAGE} and flavor=${MACHINE_TYPE} TARGET_IMAGE=${TARGET_IMAGE} MASTERKUBE_NODE=${MASTERKUBE_NODE}"
+		echo_blue_bold "Launch ${MASTERKUBE_NODE} index: ${INDEX} with ${TARGET_IMAGE} and flavor=${MACHINE_TYPE} TARGET_IMAGE=${TARGET_IMAGE} MASTERKUBE_NODE=${MASTERKUBE_NODE}"
 		echo_line
 
 		if [ ${FLOATING_IP} == "true" ]; then
@@ -513,10 +513,6 @@ fi
 			else
 				echo_blue_bold "Use floating ip: ${PUBLIC_IP} for ${MASTERKUBE_NODE} on network ${VC_NETWORK_PUBLIC}"
 			fi
-
-			PUBLIC_ADDR_IPS[${INDEX}]=${PUBLIC_NODE_IP}
-		else
-			PUBLIC_ADDR_IPS[${INDEX}]=""
 		fi
 
 		if [ ${NODE_IP} == "AUTO" ] || [ ${NODE_IP} == "DHCP" ]; then
@@ -539,8 +535,6 @@ fi
 			eval openstack server add floating ip ${MASTERKUBE_NODE} ${PUBLIC_IP} ${SILENT}
 		fi
 
-		PRIVATE_ADDR_IPS[${INDEX}]=${LOCALIP}
-
 		echo_title "Wait ssh ready on ${KUBERNETES_USER}@${LOCALIP}"
 		wait_ssh_ready ${KUBERNETES_USER}@${LOCALIP}
 
@@ -549,12 +543,18 @@ fi
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${LOCALIP} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${LOCALIP} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${LOCALIP} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
-
-		# Update /etc/hosts
-		register_dns ${INDEX} ${LOCALIP} ${MASTERKUBE_NODE}
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
+
+		LOCALIP=$(openstack server show -f json ${MASTERKUBE_NODE} 2/dev/null | jq -r --arg NETWORK ${VC_NETWORK_PRIVATE}  '.addresses|.[$NETWORK][0]')
+
+		if [ ${FLOATING_IP} == "true" ]; then
+			PUBLIC_IP=$(openstack floating ip list --fixed-ip-address ${LOCALIP} -f json | jq -r '.[0]."Floating IP Address"')
+		fi
 	fi
+
+	PRIVATE_ADDR_IPS[${INDEX}]=${LOCALIP}
+	PUBLIC_ADDR_IPS[${INDEX}]=${PUBLIC_IP}
 }
 
 #===========================================================================================================================================
@@ -597,6 +597,13 @@ function delete_load_balancer() {
 function delete_load_balancers() {
 	delete_load_balancer "nlb-external-${MASTERKUBE}"
 	delete_load_balancer "nlb-internal-${MASTERKUBE}"
+
+	FLOATING_ID=$(openstack floating ip list --network ${VC_NETWORK_PUBLIC} --tags nlb-internal-${MASTERKUBE} -f json 2>/dev/null | jq -r '.[0].ID // ""')
+
+	if [ -n "${FLOATING_ID}" ]; then
+		echo_blue_bold "Delete floating ip: ${FLOATING_ID} for nlb-internal-${MASTERKUBE} on network ${VC_NETWORK_PUBLIC}"
+		openstack floating ip delete ${FLOATING_ID}
+	fi
 }
 
 #===========================================================================================================================================
@@ -661,7 +668,18 @@ function prepare_ssh() {
 #
 #===========================================================================================================================================
 function prepare_plateform() {
-	prepare_node_indexes 1
+	if [ ${USE_NLB} = "YES" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
+		PUBLIC_VIP_ADDRESS="${NODE_IP}"
+		NODE_IP=$(nextip ${NODE_IP})
+
+		if [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
+			PRIVATE_VIP_ADDRESS="${NODE_IP}"
+			NODE_IP=$(nextip ${NODE_IP})
+		fi
+
+	fi
+
+	prepare_node_indexes
 
 	# Check if dns service is present
 	if [ -n "$(openstack service show -f json dns 2>/dev/null | jq -r '.id // ""')" ]; then
@@ -669,6 +687,7 @@ function prepare_plateform() {
 			OS_PUBLIC_DNS_ZONEID=$(openstack zone show -f json "${PUBLIC_DOMAIN_NAME}." 2>/dev/null | jq -r '.id // ""')
 
 			if [ -n "${OS_PUBLIC_DNS_ZONEID}" ]; then
+				echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} handled by designate: ${OS_PUBLIC_DNS_ZONEID}"
 				EXTERNAL_DNS_PROVIDER=designate
 			fi
 		fi
@@ -755,23 +774,27 @@ function create_nlb() {
 	local NLB_PUBLIC=$2
 	local NLB_PORTS=$3
 	local NLB_TYPE=$4
-	local NBL_TARGETS=$5
-
-	local VIP_NETWORK=
+	local NLB_TARGETS=$5
+	local NLB_VIP_ADDRESS=$6
+	local NLB_FLOATING_IP=$7
 	local NLB_PORT=
 	local NBL_TARGET=
 	local NLB_SUBNET=$(openstack network show ${VC_NETWORK_PRIVATE} -f json | jq -r '.subnets[0]//""')
 
-	if [ ${NLB_PUBLIC} = "true" ]; then
-		VIP_NETWORK=${VC_NETWORK_PUBLIC}
-	else
-		VIP_NETWORK=${VC_NETWORK_PRIVATE}
+	NLB_ID=$(openstack loadbalancer create --vip-address ${NLB_VIP_ADDRESS} --vip-network-id ${VC_NETWORK_PRIVATE} -f json --name ${NLB_NAME} | jq -r '.id//""')
+
+	IFS=,  read -a NLB_PORTS <<< "${NLB_PORTS}"
+	IFS=,  read -a NLB_TARGETS <<< "${NLB_TARGETS}"
+
+	if [ ${NLB_FLOATING_IP} = "YES" ]; then
+		FLOATIP_ID=$(openstack floating ip create  --tag ${NLB_NAME} ${VC_NETWORK_PUBLIC} -f json  | jq -r '.floating_ip_address // ""')
+		PORT_ID=$(openstack loadbalancer show -f json ${NLB_NAME} | jq -r '.vip_port_id')
+
+		eval openstack floating ip set --port ${PORT_ID} ${FLOATIP_ID} ${SILENT}
 	fi
 
-	NLB_ID=$(openstack loadbalancer create --vip-network-id ${VIP_NETWORK} -f json --name ${NLB_NAME} | jq -r '.id//""')
-
 	if [ -n ${NLB_ID} ]; then
-		for NLB_PORT in $(tr ',' ' ' <<<"${NLB_PORTS}")
+		for NLB_PORT in ${NLB_PORTS[@]}
 		do
 			# Create load balancer listener
 			LISTENER_ID=$(openstack loadbalancer listener create -f json \
@@ -786,10 +809,17 @@ function create_nlb() {
 				--lb-algorithm SOURCE_IP_PORT \
 				--listener ${NLB_NAME}-listen-${NLB_PORT} | jq -r '.id')
 
+			eval openstack loadbalancer healthmonitor create \
+				--name ${NLB_NAME}-health-${NLB_PORT} \
+				--delay 15 \
+				--max-retries 5 \
+				--timeout 5 \
+				--type TCP ${POOL_ID} ${SILENT}
+
 			# Append member
-			for NBL_TARGET in $(tr ',' ' ' <<<"${NBL_TARGETS}")
+			for NLB_TARGET in ${NLB_TARGETS[@]}
 			do
-				IFS=: read NAME IP <<< "${NBL_TARGET}"
+				IFS=: read NAME IP <<< "${NLB_TARGET}"
 				eval openstack loadbalancer member create \
 					--subnet-id ${NLB_SUBNET} \
 					--address ${IP} \
@@ -806,10 +836,20 @@ function create_plateform_nlb() {
 	local LOAD_BALANCER=
     local PRIVATE_NLB_DNS=
     local PUBLIC_NLB_DNS=
+	local NLB_TARGETS=
+	local VIP_ADDRESS=
 
-	echo_title "Create NLB ${MASTERKUBE}"
-set -x
-	create_nlb "nlb-internal-${MASTERKUBE}" false "${LOAD_BALANCER_PORT[*]}" network "${CLUSTER_NODES[*]}"
+	if [ ${USE_NGINX_GATEWAY} = "YES" ]; then
+		NLB_TARGETS="${MASTERKUBE}:${PRIVATE_ADDR_IPS[0]}"
+		VIP_ADDRESS=${PRIVATE_VIP_ADDRESS}
+	else
+		NLB_TARGETS=${CLUSTER_NODES}
+		VIP_ADDRESS=${PRIVATE_ADDR_IPS[0]}
+	fi
+
+	echo_title "Create internal NLB ${MASTERKUBE} with target: ${NLB_TARGETS} at: ${VIP_ADDRESS}"
+
+	create_nlb "nlb-internal-${MASTERKUBE}" false "${LOAD_BALANCER_PORT}" network "${NLB_TARGETS}" "${VIP_ADDRESS}" NO
 
 	LOAD_BALANCER=$(openstack loadbalancer show -f json nlb-internal-${MASTERKUBE} 2>/dev/null)
 	CONTROL_PLANE_ENDPOINT=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address')
@@ -817,17 +857,15 @@ set -x
 	PRIVATE_NLB_DNS=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address')
 
 	if [ ${EXPOSE_PUBLIC_CLUSTER} = "true" ]; then
-		create_nlb "nlb-external-${MASTERKUBE}" true "80,443" network "${CLUSTER_NODES[*]}"
+		echo_title "Create external NLB ${MASTERKUBE} with target: ${NLB_TARGETS} at: ${PUBLIC_VIP_ADDRESS}"
+
+		create_nlb "nlb-external-${MASTERKUBE}" true "80,443" network "${NLB_TARGETS}" "${PUBLIC_VIP_ADDRESS}" "YES"
 
 		LOAD_BALANCER=$(openstack loadbalancer show -f json nlb-external-${MASTERKUBE} 2>/dev/null)
-		PUBLIC_NLB_DNS=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address')
+		PUBLIC_NLB_DNS=$(openstack floating ip list --fixed-ip-address ${PUBLIC_VIP_ADDRESS} -f json | jq -r '.[0]."Floating IP Address"')
 	else
 		PUBLIC_NLB_DNS=${PRIVATE_NLB_DNS}
 	fi
-set +x
 
-	register_nlb_dns ${PRIVATE_NLB_DNS} ${PUBLIC_NLB_DNS}
-
-	echo "export PRIVATE_NLB_DNS=${PRIVATE_NLB_DNS}" >> ${TARGET_CONFIG_LOCATION}/buildenv
-	echo "export PUBLIC_NLB_DNS=${PUBLIC_NLB_DNS}" >> ${TARGET_CONFIG_LOCATION}/buildenv
+	register_nlb_dns A ${PRIVATE_NLB_DNS} ${PUBLIC_NLB_DNS}
 }

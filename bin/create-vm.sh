@@ -25,11 +25,11 @@ prepare_deployment
 prepare_vendordata
 prepare_networking
 create_all_vms
-exit
 create_load_balancer
 create_dns_rentries
 create_etcd
 echo_red_bold ${PRIVATE_ADDR_IPS[@]}
+echo_blue_bold ${CONTROL_PLANE_ENDPOINT}
 exit
 create_cluster
 create_config

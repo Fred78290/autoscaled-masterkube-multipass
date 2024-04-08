@@ -37,6 +37,7 @@ function usage() {
 --vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
 --vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default ${VC_NETWORK_PUBLIC}
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
+--dhcp-autoscaled-node                         # Autoscaled node use DHCP, default ${SCALEDNODES_DHCP}
 --private-domain=<value>                       # Override the domain name, default ${PRIVATE_DOMAIN_NAME}
 --net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${PRIVATE_IP}
 --net-gateway=<value>                          # Override the IP gateway, default ${PRIVATE_GATEWAY}
@@ -668,9 +669,11 @@ function prepare_ssh() {
 #
 #===========================================================================================================================================
 function prepare_plateform() {
-	if [ ${USE_NLB} = "YES" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
-		PUBLIC_VIP_ADDRESS="${NODE_IP}"
-		NODE_IP=$(nextip ${NODE_IP})
+	if [ ${USE_NLB} = "YES" ]; then
+		if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
+			PUBLIC_VIP_ADDRESS="${NODE_IP}"
+			NODE_IP=$(nextip ${NODE_IP})
+		fi
 
 		if [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
 			PRIVATE_VIP_ADDRESS="${NODE_IP}"
@@ -853,7 +856,7 @@ function create_plateform_nlb() {
 
 	LOAD_BALANCER=$(openstack loadbalancer show -f json nlb-internal-${MASTERKUBE} 2>/dev/null)
 	CONTROL_PLANE_ENDPOINT=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address')
-	LOAD_BALANCER_IP=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address , .additional_vips[] | .' | tr '[:space:]' ',')
+	LOAD_BALANCER_IP=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address' | tr '[:space:]' ',')
 	PRIVATE_NLB_DNS=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address')
 
 	if [ ${EXPOSE_PUBLIC_CLUSTER} = "true" ]; then
@@ -866,6 +869,7 @@ function create_plateform_nlb() {
 	else
 		PUBLIC_NLB_DNS=${PRIVATE_NLB_DNS}
 	fi
-
+set -x
 	register_nlb_dns A ${PRIVATE_NLB_DNS} ${PUBLIC_NLB_DNS}
+set +x
 }

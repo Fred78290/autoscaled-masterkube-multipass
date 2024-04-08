@@ -28,8 +28,7 @@ create_all_vms
 create_load_balancer
 create_dns_rentries
 create_etcd
-echo_red_bold ${PRIVATE_ADDR_IPS[@]}
-echo_blue_bold ${CONTROL_PLANE_ENDPOINT}
-exit
+#echo_red_bold "$(typeset -p PRIVATE_ADDR_IPS)"
+#echo_blue_bold ${CONTROL_PLANE_ENDPOINT}
 create_cluster
 create_config

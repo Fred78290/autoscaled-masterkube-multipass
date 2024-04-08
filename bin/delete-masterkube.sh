@@ -119,13 +119,24 @@ function delete_all_vms() {
 #
 #===========================================================================================================================================
 function delete_nodes() {
-	NODES=$(kubectl get node -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config | jq -r --arg LABEL $1 '.items | .[] | select(.metadata.labels[$LABEL]) | .metadata.name' | sort -r)
+	local ROLE=
 
-	for NODE in ${NODES}
+	for ROLE in "node-role.kubernetes.io/worker" "node-role.kubernetes.io/master"
 	do
-		kubectl delete no ${NODE}
-		delete_vm_by_name ${NODE} || true
+		local ALLNODES=$(kubectl get node -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config)
+		local NODES=$(echo ${ALLNODES} | jq -r --arg LABEL ${ROLE} '.items | .[] | select(.metadata.labels[$LABEL]) | .metadata.name' | sort -r)
+
+		for NODE in ${NODES}
+		do
+			kubectl drain --ignore-daemonsets ${NODE}
+#			kubectl delete no ${NODE}
+		done
 	done
+
+	rm ${TARGET_CLUSTER_LOCATION}/config
+	
+	delete_vm_by_name ${MASTERKUBE} || true
+	delete_all_vms
 }
 
 #===========================================================================================================================================
@@ -144,11 +155,7 @@ fi
 if [ "${FORCE}" = "YES" ]; then
 	delete_all_vms
 elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
-	delete_nodes "node-role.kubernetes.io/worker"
-	delete_nodes "node-role.kubernetes.io/master"
-	
-	delete_vm_by_name ${MASTERKUBE} || true
-	delete_all_vms
+	delete_nodes
 fi
 
 wait_jobs_finish

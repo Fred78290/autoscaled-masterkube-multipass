@@ -111,6 +111,7 @@ function usage() {
 --vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
 --vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default ${VC_NETWORK_PUBLIC}
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
+--dhcp-autoscaled-node                         # Autoscaled node use DHCP, default ${SCALEDNODES_DHCP}
 --private-domain=<value>                       # Override the domain name, default ${PRIVATE_DOMAIN_NAME}
 --net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${PRIVATE_IP}
 --net-gateway=<value>                          # Override the IP gateway, default ${PRIVATE_GATEWAY}
@@ -145,6 +146,7 @@ function parse_arguments() {
 		"net-dns:"
 		"private-domain:"
 		"no-dhcp-autoscaled-node"
+		"dhcp-autoscaled-node"
 		"public-address:"
 		"metallb-ip-range:"
 		"use-keepalived"
@@ -485,6 +487,10 @@ function parse_arguments() {
 			PRIVATE_DOMAIN_NAME="$2"
 			shift 2
 			;;
+		--dhcp-autoscaled-node)
+			SCALEDNODES_DHCP=true
+			shift 1
+			;;
 		--no-dhcp-autoscaled-node)
 			SCALEDNODES_DHCP=false
 			shift 1
@@ -624,6 +630,15 @@ EOF
 		curl -s -X PUT "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/A/${NAME}" \
 			-H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
 			-H "Content-Type: application/json" -d "[{\"data\": \"${IPADDR}\"}]"
+
+		cat > ${TARGET_CONFIG_LOCATION}/godaddy-public-${SUFFIX}.json <<EOF
+		{
+			"zone": "${PUBLIC_DOMAIN_NAME}",
+			"type": "A",
+			"name": "${NAME}",
+			"record": [ "${IPADDR}" ]
+		}
+EOF
 
 	elif [ "${EXTERNAL_DNS_PROVIDER}" = "designate" ]; then
 
@@ -986,7 +1001,11 @@ function get_vm_name() {
 			MASTERKUBE_NODE="${MASTERKUBE}"
 		fi
 	elif [[ ${INDEX} -lt ${WORKERNODE_INDEX} ]]; then
-		MASTERKUBE_NODE="${NODEGROUP_NAME}-master-$(named_index_suffix $NODEINDEX)"
+		if [ ${HA_CLUSTER} = "false" ] && [ ${INDEX} -eq ${CONTROLNODE_INDEX} ]; then
+			MASTERKUBE_NODE="${MASTERKUBE}"
+		else
+			MASTERKUBE_NODE="${NODEGROUP_NAME}-master-$(named_index_suffix $NODEINDEX)"
+		fi
 	else
 		MASTERKUBE_NODE="${NODEGROUP_NAME}-worker-$(named_index_suffix $NODEINDEX)"
 	fi
@@ -1002,15 +1021,22 @@ function plateform_info_vm() {
 	local NAME=$(get_vm_name $1)
 	local SUFFIX=$(named_index_suffix $1)
 	local DNSNAME=${NAME}.${PRIVATE_DOMAIN_NAME}
-	
+	local PRIVATE_IP=${PRIVATE_ADDR_IPS[${INDEX}]}
+	local PUBLIC_IP=${PUBLIC_ADDR_IPS[${INDEX}]}
+
 	PRIVATE_DNS_NAMES[${INDEX}]=${DNSNAME}
+
+	if [ "${PUBLIC_IP}" == "DHCP" ] || [ "${PUBLIC_IP}" == "NONE" ] || [ -z "${PUBLIC_IP}" ]; then
+		PUBLIC_IP=${PRIVATE_IP}
+	fi
 
 	local INSTANCE=$(cat <<EOF
 {
+	"Index": ${INDEX},
 	"InstanceId": "$(get_vmuuid ${NAME})",
-	"PrivateIpAddress": "${PRIVATE_ADDR_IPS[${INDEX}]}",
+	"PrivateIpAddress": "${PRIVATE_IP}",
 	"PrivateDnsName": "${DNSNAME}",
-	"PublicIpAddress": "${PUBLIC_ADDR_IPS[${INDEX}]}",
+	"PublicIpAddress": "${PUBLIC_IP}",
 	"PublicDnsName": "${DNSNAME}",
 	"Tags": [
 		{
@@ -1463,6 +1489,11 @@ echo -n
 #
 #===========================================================================================================================================
 function prepare_cert() {
+	if [ -z "${PRIVATE_DOMAIN_NAME}" ]; then
+		echo_red_bold "PRIVATE_DOMAIN_NAME is not defined"
+		exit
+	fi
+
 	# If CERT doesn't exist, create one autosigned
 	if [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
 		DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
@@ -1816,7 +1847,7 @@ function collect_cluster_nodes() {
 		do
 			MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${INDEX}"
 			IPADDR="${PRIVATE_ADDR_IPS[${INDEX}]}"
-			NODE_DNS="${MASTERKUBE_NODE}.${DOMAIN_NAME}:${IPADDR}"
+			NODE_DNS="${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}:${IPADDR}"
 
 			if [ -z "${CLUSTER_NODES}" ]; then
 				CLUSTER_NODES="${NODE_DNS}"
@@ -1838,9 +1869,9 @@ function collect_cluster_nodes() {
 		IPRESERVED2=${PRIVATE_ADDR_IPS[$((LASTNODE_INDEX + 2))]}
 
 		if [ ${CONTROLNODE_INDEX} -gt 0 ]; then
-			CLUSTER_NODES="${NODEGROUP_NAME}-master-01.${DOMAIN_NAME}:${IPADDR},${NODEGROUP_NAME}-master-02.${DOMAIN_NAME}:${IPRESERVED1},${NODEGROUP_NAME}-master-03.${DOMAIN_NAME}:${IPRESERVED2}"
+			CLUSTER_NODES="${NODEGROUP_NAME}-master-01.${PRIVATE_DOMAIN_NAME}:${IPADDR},${NODEGROUP_NAME}-master-02.${PRIVATE_DOMAIN_NAME}:${IPRESERVED1},${NODEGROUP_NAME}-master-03.${PRIVATE_DOMAIN_NAME}:${IPRESERVED2}"
 		else
-			CLUSTER_NODES="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDR},${NODEGROUP_NAME}-master-02.${DOMAIN_NAME}:${IPRESERVED1},${NODEGROUP_NAME}-master-03.${DOMAIN_NAME}:${IPRESERVED2}"
+			CLUSTER_NODES="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${IPADDR},${NODEGROUP_NAME}-master-02.${PRIVATE_DOMAIN_NAME}:${IPRESERVED1},${NODEGROUP_NAME}-master-03.${PRIVATE_DOMAIN_NAME}:${IPRESERVED2}"
 		fi
 	fi
 }
@@ -1960,7 +1991,7 @@ function create_nginx_gateway() {
 	for INDEX in $(seq ${FIRSTNODE} $((CONTROLNODE_INDEX - 1)) )
 	do
 		MASTERKUBE_NODE=$(get_vm_name ${INDEX})
-		IPADDR=${PRIVATE_ADDR_IPS[$((INDEX - 1))]}
+		IPADDR=${PRIVATE_ADDR_IPS[${INDEX}]}
 
 		if [ ${INDEX} -eq ${FIRSTNODE} ]; then
 			LOAD_BALANCER_IP="${PRIVATE_ADDR_IPS[${INDEX}]}"
@@ -1968,14 +1999,18 @@ function create_nginx_gateway() {
 			LOAD_BALANCER_IP="${LOAD_BALANCER_IP},${PRIVATE_ADDR_IPS[${INDEX}]}"
 		fi
 
-		echo_blue_bold "Start load balancer ${MASTERKUBE_NODE} instance"
+		echo_blue_bold "Start load balancer ${MASTERKUBE_NODE} instance ${INDEX} with IP: ${IPADDR}"
 
 		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-load-balancer.sh \
 			--listen-port=${LOAD_BALANCER_PORT} \
 			--cluster-nodes="${CLUSTER_NODES}" \
-			--control-plane-endpoint=${MASTERKUBE}.${DOMAIN_NAME} \
+			--control-plane-endpoint=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} \
 			--listen-ip=0.0.0.0 ${SILENT}
+
+		echo ${MASTERKUBE_NODE} > ${TARGET_CONFIG_LOCATION}/node-0${INDEX}-prepared
 	done
+
+echo LOAD_BALANCER_IP=$LOAD_BALANCER_IP
 }
 
 #===========================================================================================================================================
@@ -1990,7 +2025,7 @@ function register_nlb_dns() {
 		CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 
 		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
-			echo_title "Register dns ${MASTERKUBE} in route53: ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
+			echo_title "Register dns ${MASTERKUBE} in route53: ${AWS_ROUTE53_PRIVATE_ZONE_ID}, record: ${PRIVATE_NLB_DNS}"
 
 			cat > ${TARGET_CONFIG_LOCATION}/dns-nlb.json <<EOF
 			{
@@ -2020,9 +2055,9 @@ EOF
 
 			add_host "${PRIVATE_NLB_DNS} ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}"
 		elif [ -n "${OS_PRIVATE_DNS_ZONEID}" ]; then
-			echo_title "Register dns ${MASTERKUBE} designate, id: ${OS_PRIVATE_DNS_ZONEID}"
+			echo_title "Register dns ${MASTERKUBE} designate, id: ${OS_PRIVATE_DNS_ZONEID}, record: ${PRIVATE_NLB_DNS}"
 			
-			DNS_ENTRY=$(openstack recordset create -f json --record ${PRIVATE_NLB_DNS} --type ${RECORDTYPE} "${PRIVATE_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
+			DNS_ENTRY=$(openstack recordset create -f json --record ${PRIVATE_NLB_DNS} --type ${RECORDTYPE} "${PRIVATE_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
 			CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 
 			cat > ${TARGET_CONFIG_LOCATION}/designate-nlb.json <<EOF
@@ -2030,6 +2065,7 @@ EOF
 				"id": "${DNS_ENTRY}",
 				"zone_id": "${OS_PRIVATE_DNS_ZONEID}",
 				"name": "${MASTERKUBE}",
+				"type": "${RECORDTYPE}",
 				"record": "${PRIVATE_NLB_DNS}"
 			}
 EOF
@@ -2071,6 +2107,15 @@ EOF
 				-H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
 				-H "Content-Type: application/json" \
 				-d "[{\"data\": \"${PUBLIC_NLB_DNS}\"}]"
+
+			cat > ${TARGET_CONFIG_LOCATION}/godaddy-public.json <<EOF
+			{
+				"zone": "${PUBLIC_DOMAIN_NAME}",
+				"type": "${RECORDTYPE}",
+				"name": "${MASTERKUBE}",
+				"record": [ "${PUBLIC_NLB_DNS}" ]
+			}
+EOF
 
 		elif [ "${EXTERNAL_DNS_PROVIDER}" = "designate" ]; then
 			echo_title "Register public dns ${MASTERKUBE} in designate"
@@ -2192,12 +2237,6 @@ EOF
                 RECORDS+=("--record ${PUBLICIPADDR}")
                 PUBLIC_ROUTE53_REGISTER=$(echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg IPADDR "${PUBLICIPADDR}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
             fi
-
-            if [ -z ${LOAD_BALANCER_IP} ]; then
-                LOAD_BALANCER_IP=${PRIVATEIPADDR}
-            else
-                LOAD_BALANCER_IP=${LOAD_BALANCER_IP},${PRIVATEIPADDR}
-            fi
         fi
     done
 
@@ -2232,6 +2271,15 @@ EOF
 				-H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
 				-H "Content-Type: application/json" \
 				-d "${GODADDY_REGISTER}"
+
+			cat > ${TARGET_CONFIG_LOCATION}/godaddy-public.json <<EOF
+			{
+				"zone": "${PUBLIC_DOMAIN_NAME}",
+				"type": "A",
+				"name": "${MASTERKUBE}",
+				"record": ${GODADDY_REGISTER}
+			}
+EOF
 
 		elif [ "${EXTERNAL_DNS_PROVIDER}" = "designate" ]; then
 			echo_title "Register public dns ${MASTERKUBE} in designate"
@@ -2296,7 +2344,7 @@ EOF
 function create_cluster() {
     local MASTER_IP=
 
-	CERT_SANS=$(collect_cert_sans "${LOAD_BALANCER_IP}" "${CLUSTER_NODES}" "${MASTERKUBE}.${DOMAIN_NAME}")
+	CERT_SANS=$(collect_cert_sans "${LOAD_BALANCER_IP}" "${CLUSTER_NODES}" "${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}")
 
 	for INDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
 	do
@@ -2310,7 +2358,9 @@ function create_cluster() {
 		else
 			echo_title "Prepare VM ${MASTERKUBE_NODE}, index=${INDEX}, UUID=${VMUUID} with IP:${IPADDR}"
 
-			if [ ${INDEX} = ${CONTROLNODE_INDEX} ]; then
+			if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
+				create_nginx_gateway
+			elif [ ${INDEX} = ${CONTROLNODE_INDEX} ]; then
 				# Start create first master node
 				echo_blue_bold "Start control plane ${MASTERKUBE_NODE} index=${INDEX}, kubernetes version=${KUBERNETES_VERSION}"
 
@@ -2332,7 +2382,7 @@ function create_cluster() {
 					--node-index=${INDEX} \
 					--load-balancer-ip=${LOAD_BALANCER_IP} \
 					--cluster-nodes="${CLUSTER_NODES}" \
-					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
 					--fill-etc-hosts=${FILL_ETC_HOSTS} \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--tls-san="${CERT_SANS}" \
@@ -2368,7 +2418,7 @@ function create_cluster() {
 					--use-external-etcd=${EXTERNAL_ETCD} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
-					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${MASTER_IP}" \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${MASTER_IP}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--tls-san="${CERT_SANS}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
@@ -2397,7 +2447,7 @@ function create_cluster() {
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
 					--join-master="${MASTER_IP}" \
-					--control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${MASTER_IP}" \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${MASTER_IP}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--tls-san="${CERT_SANS}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
@@ -2429,13 +2479,13 @@ function unregister_dns() {
     for FILE in ${TARGET_CONFIG_LOCATION}/dns-*.json
     do
         if [ -f ${FILE} ]; then
-            local DNSNAME=$(echo ${DNS} | jq -r '.Changes[0].ResourceRecordSet.Name')
 			local DNS=$(cat ${FILE} | jq '.Changes[0].Action = "DELETE"')
+            local DNSNAME=$(echo ${DNS} | jq -r '.Changes[0].ResourceRecordSet.Name')
 			local ZONEID=
 
 			echo ${DNS} | jq . > ${FILE}
 
-			echo_blue_bold "Delete DNS entry: ${DNSNAME}"
+			echo_blue_bold "Delete DNS entry: ${DNSNAME} in route53"
 			if [[ "${DNSNAME}" == *.${PUBLIC_DOMAIN_NAME} ]]; then
 				ZONEID=${AWS_ROUTE53_PUBLIC_ZONE_ID}
 			else
@@ -2461,31 +2511,27 @@ function unregister_dns() {
 			local ZONEID=$(cat ${FILE} | jq -r '.zone_id // ""')
 
 			if [ -n "${DNS_ENTRY_ID}" ]; then
-				echo_blue_bold "Delete DNS entry: ${DNSNAME}"
+				echo_blue_bold "Delete DNS entry: ${DNSNAME} in designate"
 				openstack recordset delete ${ZONEID} ${DNS_ENTRY_ID} &>/dev/null
 			fi
 		fi
 	done
 
-    if [ -n "${CERT_GODADDY_API_KEY}" ] && [ -n "${PUBLIC_DOMAIN_NAME}" ] && [ -z "${AWS_ROUTE53_PUBLIC_ZONE_ID}" ]; then
-        echo_blue_bold "Delete DNS ${MASTERKUBE} in godaddy"
+	# Delete DNS entries
+	for FILE in ${TARGET_CONFIG_LOCATION}/godaddy-*.json
+	do
+        if [ -f ${FILE} ]; then
+			local TYPE=$(cat ${FILE} | jq -r '.type // ""')
+			local NAME=$(cat ${FILE} | jq -r '.name // ""')
+			local ZONE=$(cat ${FILE} | jq -r '.zone // ""')
 
-        if [ "${USE_NLB}" = "YES" ]; then
-            curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
-                "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/CNAME/${MASTERKUBE}" &> /dev/null
-        else
-            curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
-                "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/A/${MASTERKUBE}" &> /dev/null
-        fi
-
-        echo_blue_bold "Delete DNS ${DASHBOARD_HOSTNAME} in godaddy"
-        curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
-            "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/CNAME/${DASHBOARD_HOSTNAME}" &> /dev/null
-
-        echo_blue_bold "Delete DNS helloworld-${PLATEFORM} in godaddy"
-        curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
-            "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/CNAME/helloworld-${PLATEFORM}" &> /dev/null
-    fi
+			if [ -n "${TYPE}" ]; then
+				echo_blue_bold "Delete DNS entry: ${NAME} in godaddy"
+				curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
+					"https://api.godaddy.com/v1/domains/${ZONE}/records/${TYPE}/${NAME}" &> /dev/null
+			fi
+		fi
+	done
 }
 
 #===========================================================================================================================================
@@ -2529,7 +2575,7 @@ EOF
 
 	cp ${PWD}/templates/setup/${PLATEFORM}/machines.json ${TARGET_CONFIG_LOCATION}/machines.json
 
-	if [ -n "${AWS_ACCESSKEY}"  &&  -n "${AWS_SECRETKEY}" ] || [ "${PLATEFORM}" == "aws" ]; then
+	if [[ -n "${AWS_ACCESSKEY}" && -n "${AWS_SECRETKEY}" ]] || [ "${PLATEFORM}" == "aws" ]; then
 		echo_title "Create ${TARGET_CONFIG_LOCATION}/image-credential-provider-config.json"
 		echo $(eval "cat <<EOF
 	$(<${PWD}/templates/setup/image-credential-provider-config.json)

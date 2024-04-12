@@ -1,4 +1,5 @@
 {
+	"cloud": "${OS_CLOUD}",
 	"image": "${TARGET_IMAGE}",
 	"allow-upgrade": false,
 	"csi-region": "${OS_REGION_NAME}",
@@ -28,26 +29,22 @@
 			"identity_api_version": 3
 		}
 	},
-	"floating-ip": {
-		"floating-ip-network": "${VC_NETWORK_PUBLIC}",
-		"floating-control-plane": {
-			"security-group":"${EXTERNAL_SECURITY_GROUP}",
-			"use-floating-ip": ${CONTROLPLANE_USE_PUBLICIP}
-		},
-		"floating-worker-node": {
-			"security-group":"${INTERNAL_SECURITY_GROUP}",
-			"use-floating-ip": ${WORKERNODE_USE_PUBLICIP}
-		}
-	},
 	"network": {
+		"security-group": {
+			"control-plane": "${EXTERNAL_SECURITY_GROUP}",
+			"worker-node": "${INTERNAL_SECURITY_GROUP}"
+		},
+		"floating-ip": {
+			"network": "${VC_NETWORK_PUBLIC}",
+			"control-plane": ${CONTROLPLANE_USE_PUBLICIP},
+			"worker-node": ${WORKERNODE_USE_PUBLICIP}
+		},
 		"domain": "${PRIVATE_DOMAIN_NAME}",
 		"interfaces": [
 			{
 				"enabled": true,
 				"primary": true,
-				"exists": true,
 				"network": "${VC_NETWORK_PRIVATE}",
-				"mac-address": "generate",
 				"nic": "eth0",
 				"dhcp": ${SCALEDNODES_DHCP},
 				"address": "${FIRST_WORKER_NODE_IP}",

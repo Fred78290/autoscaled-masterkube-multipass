@@ -12,10 +12,10 @@ set -eu
 #
 #===========================================================================================================================================
 parse_arguments $@
+prepare_kubernetes_distribution
 prepare_environment
 prepare_transport
 prepare_ssh
-prepare_kubernetes_distribution
 delete_previous_masterkube
 prepare_plateform
 prepare_image
@@ -28,7 +28,5 @@ create_all_vms
 create_load_balancer
 create_dns_rentries
 create_etcd
-#echo_red_bold "$(typeset -p PRIVATE_ADDR_IPS)"
-#echo_blue_bold ${CONTROL_PLANE_ENDPOINT}
 create_cluster
 create_config

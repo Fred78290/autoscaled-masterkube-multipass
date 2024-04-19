@@ -5,6 +5,7 @@ AUTOSCALE_MACHINE="t3a.medium"
 CONTROL_PLANE_MACHINE="t3a.medium"
 NGINX_MACHINE="t3a.small"
 WORKER_NODE_MACHINE="t3a.medium"
+PUBLIC_NODE_IP=NONE
 
 export SEED_IMAGE_AMD64="ami-0c1c30571d2dae5c9"
 export SEED_IMAGE_ARM64="ami-0c5789c17ae99a2fa"
@@ -792,6 +793,8 @@ function create_plateform_nlb() {
 #
 #===========================================================================================================================================
 function plateform_info_vm() {
+    # Empty
+    echo > /dev/null
 }
 
 #===========================================================================================================================================
@@ -803,8 +806,8 @@ function plateform_create_vm() {
 	local IPADDR=${RESERVED_ADDR_IPS[${INDEX}]}
 	local MACHINE_TYPE=${WORKER_NODE_MACHINE}
 	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
-	local SUFFIX=$(named_index_suffix $INDEX)
-	local NODEINDEX=$(get_node_index get_node_index)
+	local SUFFIX=$(named_index_suffix ${INDEX})
+	local NODEINDEX=$(get_node_index ${INDEX})
 	local INSTANCE_ID=
 
 	LAUNCHED_INSTANCE=$(aws ec2  describe-instances \
@@ -1131,6 +1134,7 @@ function create_network_interfaces() {
 function create_extras_ip() {
 	local VPC_LENGTH=${#VPC_PRIVATE_SUBNET_IDS[@]}
 	local SUBNET_INDEX=0
+	local EXTRAS_INDEX=$(($LASTNODE_INDEX + 1))
 
 	if [ ${CONTROLNODE_INDEX} -gt 0 ]; then
 		SUBNET_INDEX=$(( $((CONTROLNODE_INDEX - 1)) % ${VPC_LENGTH} ))
@@ -1140,9 +1144,14 @@ function create_extras_ip() {
 	do
 		if [ ${SUBNET_INDEX} != ${INDEX} ]; then
 			local ENIINDEX=$((INDEX + ${LASTNODE_INDEX} + 1))
-			local NODE_INDEX=$((INDEX + ${CURRENT} + 1))
+			local NODE_INDEX=$((INDEX + 1))
 
-			create_network_interfaces ${ENIINDEX} ${NODEGROUP_NAME}-master-$(named_index_suffix ${NODE_INDEX})
+            create_network_interfaces ${ENIINDEX} ${NODEGROUP_NAME}-master-$(named_index_suffix ${NODE_INDEX})
+
+			PRIVATE_ADDR_IPS[${EXTRAS_INDEX}]=${RESERVED_ADDR_IPS[${ENIINDEX}]}
+    		PUBLIC_ADDR_IPS[${EXTRAS_INDEX}]=${PUBLIC_NODE_IP}
+
+            EXTRAS_INDEX=$((EXTRAS_INDEX + 1))
 		fi
 	done
 }
@@ -1326,6 +1335,18 @@ function update_provider_config() {
     PROVIDER_AUTOSCALER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
 
     echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE "${TARGET_IMAGE_AMI}" '.ami = $TARGET_IMAGE' > ${TARGET_CONFIG_LOCATION}/provider.json
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function get_vmuuid() {
+    local VMNAME=$1
+
+    aws ec2  describe-instances \
+		--profile ${AWS_PROFILE} \
+		--filters "Name=tag:Name,Values=${MASTERKUBE_NODE}" \
+		| jq -r '.Reservations[0].Instances[0].InstanceId//""' 2>/dev/null
 }
 
 #===========================================================================================================================================

@@ -710,9 +710,19 @@ function prepare_plateform() {
 	local NUM_VCPUS=
 	local DISK_SIZE=
 
+	for SECURITY_GROUP in ${INTERNAL_SECURITY_GROUP} ${INTERNAL_SECURITY_GROUP}
+	do
+		SECURITY_GROUP_ID=$(openstack security group show -f json ${SECURITY_GROUP} 2>/dev/null | jq -r '.id')
+
+		if [ -z "${SECURITY_GROUP_ID}" ]; then
+			echo_red_bold "The security group: ${SECURITY_GROUP} doesn't exists"
+			exit 1
+		fi
+	done
+
 	for FLAVOR in ${FLAVORS_KEYS}
 	do
-		if [ -z "$(echo "${FLAVORS_INSTALLED}" jq -r --arg NAME "${FLAVOR}" '.[]|select(.Name == $NAME)|.ID')" ]; then
+		if [ -z "$(echo "${FLAVORS_INSTALLED}" | jq -r --arg NAME "${FLAVOR}" '.[]|select(.Name == $NAME)|.ID')" ]; then
 			read MEMSIZE NUM_VCPUS DISK_SIZE <<<"$(echo ${FLAVORS} | jq -r --arg FLAVOR ${FLAVOR} '.[$FLAVOR]|.memsize,.vcpus,.disksize' | tr '\n' ' ')"
 
 			echo_blue_bold "Create flavor: ${FLAVOR}, disk: ${DISK_SIZE}MB memory: ${MEMSIZE} vcpus: ${NUM_VCPUS}"

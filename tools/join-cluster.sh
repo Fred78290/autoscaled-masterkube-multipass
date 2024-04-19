@@ -30,7 +30,7 @@ SERVICE_NETWORK_CIDR="10.96.0.0/12"
 TOKEN=$(cat ./cluster/token)
 ZONEID=office
 
-TEMP=$(getopt -o i:g:k:c:n:r:x --long kubernetes-version:,cni-plugin:,container-runtime:,trace,fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,csi-region:,csi-zone:,vm-uuid: -n "$0" -- "$@")
+TEMP=$(getopt -o i:g:k:c:n:r:x --long kubernetes-version:,cni-plugin:,container-runtime:,trace,fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,region:,zone:,vm-uuid: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -145,11 +145,11 @@ while true; do
 		PRIVATE_NET_INF=$2
 		shift 2
 		;;
-	--csi-region)
+	--region)
 		REGION=$2
 		shift 2
 		;;
-	--csi-zone)
+	--zone)
 		ZONEID=$2
 		shift 2
 		;;

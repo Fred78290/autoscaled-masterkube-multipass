@@ -128,7 +128,7 @@ function delete_nodes() {
 
 		for NODE in ${NODES}
 		do
-			kubectl drain --ignore-daemonsets ${NODE}
+			kubectl drain --ignore-daemonsets --delete-emptydir-data ${NODE}
 #			kubectl delete no ${NODE}
 		done
 	done

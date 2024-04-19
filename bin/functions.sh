@@ -543,122 +543,6 @@ function add_host() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-function register_dns() {
-    local INDEX=$1
-    local IPADDR=$2
-    local NAME=$3
-	local SUFFIX=$(named_index_suffix ${INDEX})
-
-	delete_host ${NAME}
-	add_host ${IPADDR} ${NAME} ${NAME}.${PRIVATE_DOMAIN_NAME}
-
-    if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
-		echo_blue_bold "Register ${NAME} address: ${IPADDR} into Route53 dns zone ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
-
-		# Record kubernetes node in Route53 DNS
-        cat > ${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json <<EOF
-{
-	"Comment": "${NAME} private DNS entry",
-	"Changes": [
-		{
-			"Action": "UPSERT",
-			"ResourceRecordSet": {
-				"Name": "${NAME}.${PRIVATE_DOMAIN_NAME}",
-				"Type": "A",
-				"TTL": 60,
-				"ResourceRecords": [
-					{
-						"Value": "${IPADDR}"
-					}
-				]
-			}
-		}
-	]
-}
-EOF
-
-        aws route53 change-resource-record-sets \
-            --profile ${AWS_ROUTE53_PROFILE} \
-            --hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
-            --change-batch file://${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json > /dev/null
-	elif [ -n "${OS_PRIVATE_DNS_ZONEID}" ]; then
-		echo_blue_bold "Register ${NAME} address: ${IPADDR} into private dns zone ${PRIVATE_DOMAIN_NAME} id: ${OS_PRIVATE_DNS_ZONEID}"
-		
-		DNS_ENTRY=$(openstack recordset create -f json --record ${IPADDR} --type A "${PRIVATE_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
-		
-		cat > ${TARGET_CONFIG_LOCATION}/designate-private-${SUFFIX}.json <<EOF
-		{
-			"id": "${DNS_ENTRY}",
-			"zone_id": "${OS_PRIVATE_DNS_ZONEID}",
-			"name": "${NAME}",
-			"record": "${IPADDR}"
-		}
-EOF
-    # Register node in public zone DNS if we don't use private DNS
-    elif [ "${EXTERNAL_DNS_PROVIDER}" = "aws" ]; then
-		echo_blue_bold "Register ${NAME} address: ${IPADDR} into public Route33 dns zone ${PUBLIC_DOMAIN_NAME}"
-		cat > ${TARGET_CONFIG_LOCATION}/dns-public-${SUFFIX}.json <<EOF
-{
-	"Comment": "${NAME} private DNS entry",
-	"Changes": [
-		{
-			"Action": "UPSERT",
-			"ResourceRecordSet": {
-				"Name": "${NAME}.${PUBLIC_DOMAIN_NAME}",
-				"Type": "A",
-				"TTL": 60,
-				"ResourceRecords": [
-					{
-						"Value": "${IPADDR}"
-					}
-				]
-			}
-		}
-	]
-}
-EOF
-
-		# Register kubernetes nodes in route53
-		aws route53 change-resource-record-sets \
-			--profile ${AWS_ROUTE53_PROFILE} \
-			--hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
-			--change-batch file://${TARGET_CONFIG_LOCATION}/dns-public-${SUFFIX}.json > /dev/null
-
-	elif [ "${EXTERNAL_DNS_PROVIDER}" = "godaddy" ]; then
-
-		# Register kubernetes nodes in godaddy if we don't use route53
-		curl -s -X PUT "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/A/${NAME}" \
-			-H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
-			-H "Content-Type: application/json" -d "[{\"data\": \"${IPADDR}\"}]"
-
-		cat > ${TARGET_CONFIG_LOCATION}/godaddy-public-${SUFFIX}.json <<EOF
-		{
-			"zone": "${PUBLIC_DOMAIN_NAME}",
-			"type": "A",
-			"name": "${NAME}",
-			"record": [ "${IPADDR}" ]
-		}
-EOF
-
-	elif [ "${EXTERNAL_DNS_PROVIDER}" = "designate" ]; then
-
-		# Register in designate IP addresses point in public IP
-		DNS_ENTRY=$(openstack recordset create -f json --record ${IPADDR} --type A "${PUBLIC_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
-
-		cat > ${TARGET_CONFIG_LOCATION}/designate-public-${SUFFIX}.json <<EOF
-		{
-			"id": "${DNS_ENTRY}",
-			"zone_id": "${OS_PUBLIC_DNS_ZONEID}",
-			"name": "${NAME}",
-			"record": "${IPADDR}"
-		}
-EOF
-	fi
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
 function verbose() {
 	if [ ${VERBOSE} = "YES" ]; then
 		eval "$1"
@@ -1053,6 +937,122 @@ EOF
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function register_dns() {
+    local INDEX=$1
+    local IPADDR=$2
+    local NAME=$3
+	local SUFFIX=$(named_index_suffix ${INDEX})
+
+	delete_host ${NAME}
+	add_host ${IPADDR} ${NAME} ${NAME}.${PRIVATE_DOMAIN_NAME}
+
+    if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+		echo_blue_bold "Register ${NAME} address: ${IPADDR} into Route53 dns zone ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
+
+		# Record kubernetes node in Route53 DNS
+        cat > ${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json <<EOF
+{
+	"Comment": "${NAME} private DNS entry",
+	"Changes": [
+		{
+			"Action": "UPSERT",
+			"ResourceRecordSet": {
+				"Name": "${NAME}.${PRIVATE_DOMAIN_NAME}",
+				"Type": "A",
+				"TTL": 60,
+				"ResourceRecords": [
+					{
+						"Value": "${IPADDR}"
+					}
+				]
+			}
+		}
+	]
+}
+EOF
+
+        aws route53 change-resource-record-sets \
+            --profile ${AWS_ROUTE53_PROFILE} \
+            --hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
+            --change-batch file://${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json > /dev/null
+	elif [ -n "${OS_PRIVATE_DNS_ZONEID}" ]; then
+		echo_blue_bold "Register ${NAME} address: ${IPADDR} into private dns zone ${PRIVATE_DOMAIN_NAME} id: ${OS_PRIVATE_DNS_ZONEID}"
+		
+		DNS_ENTRY=$(openstack recordset create -f json --record ${IPADDR} --type A "${PRIVATE_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
+		
+		cat > ${TARGET_CONFIG_LOCATION}/designate-private-${SUFFIX}.json <<EOF
+		{
+			"id": "${DNS_ENTRY}",
+			"zone_id": "${OS_PRIVATE_DNS_ZONEID}",
+			"name": "${NAME}",
+			"record": "${IPADDR}"
+		}
+EOF
+    # Register node in public zone DNS if we don't use private DNS
+    elif [ "${EXTERNAL_DNS_PROVIDER}" = "aws" ]; then
+		echo_blue_bold "Register ${NAME} address: ${IPADDR} into public Route33 dns zone ${PUBLIC_DOMAIN_NAME}"
+		cat > ${TARGET_CONFIG_LOCATION}/dns-public-${SUFFIX}.json <<EOF
+{
+	"Comment": "${NAME} private DNS entry",
+	"Changes": [
+		{
+			"Action": "UPSERT",
+			"ResourceRecordSet": {
+				"Name": "${NAME}.${PUBLIC_DOMAIN_NAME}",
+				"Type": "A",
+				"TTL": 60,
+				"ResourceRecords": [
+					{
+						"Value": "${IPADDR}"
+					}
+				]
+			}
+		}
+	]
+}
+EOF
+
+		# Register kubernetes nodes in route53
+		aws route53 change-resource-record-sets \
+			--profile ${AWS_ROUTE53_PROFILE} \
+			--hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
+			--change-batch file://${TARGET_CONFIG_LOCATION}/dns-public-${SUFFIX}.json > /dev/null
+
+	elif [ "${EXTERNAL_DNS_PROVIDER}" = "godaddy" ]; then
+
+		# Register kubernetes nodes in godaddy if we don't use route53
+		curl -s -X PUT "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/A/${NAME}" \
+			-H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
+			-H "Content-Type: application/json" -d "[{\"data\": \"${IPADDR}\"}]"
+
+		cat > ${TARGET_CONFIG_LOCATION}/godaddy-public-${SUFFIX}.json <<EOF
+		{
+			"zone": "${PUBLIC_DOMAIN_NAME}",
+			"type": "A",
+			"name": "${NAME}",
+			"record": [ "${IPADDR}" ]
+		}
+EOF
+
+	elif [ "${EXTERNAL_DNS_PROVIDER}" = "designate" ]; then
+
+		# Register in designate IP addresses point in public IP
+		DNS_ENTRY=$(openstack recordset create -f json --record ${IPADDR} --type A "${PUBLIC_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
+
+		cat > ${TARGET_CONFIG_LOCATION}/designate-public-${SUFFIX}.json <<EOF
+		{
+			"id": "${DNS_ENTRY}",
+			"zone_id": "${OS_PUBLIC_DNS_ZONEID}",
+			"name": "${NAME}",
+			"record": "${IPADDR}"
+		}
+EOF
+	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function create_vm() {
 	local INDEX=$1
 	local NAME=$(get_vm_name ${INDEX})
@@ -1282,6 +1282,8 @@ function prepare_environment() {
 
 	if [ ${PLATEFORM} == "multipass" ]; then
 		TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}.img"
+	elif [ ${PLATEFORM} == "aws" ]; then
+		TARGET_IMAGE="$(echo -n ${TARGET_IMAGE} | tr '+' '_')"
 	fi
 
 	if [ ${WORKERNODES} -eq 0 ]; then
@@ -1932,8 +1934,9 @@ function create_all_vms() {
 		FIRST_WORKER_NODE_IP=${NODE_IP}
 	fi
 
-#echo_blue_bold "After PRIVATE_ADDR_IPS=${PRIVATE_ADDR_IPS[@]}"
-#echo_blue_bold "After PRIVATE_DNS_NAMES=${PRIVATE_DNS_NAMES[@]}"
+	# echo_red_bold "LASTNODE_INDEX=${LASTNODE_INDEX}"
+	# echo_red_bold "$(typeset -p PRIVATE_ADDR_IPS)"
+	# echo_red_bold "$(typeset -p PRIVATE_DNS_NAMES)"
 
 	collect_cluster_nodes
 }
@@ -2372,8 +2375,8 @@ function create_cluster() {
 					--advertise-port=${APISERVER_ADVERTISE_PORT} \
 					--k8s-distribution=${KUBERNETES_DISTRO} \
 					--vm-uuid=${VMUUID} \
-					--csi-region=${REGION} \
-					--csi-zone=${ZONEID} \
+					--region=${REGION} \
+					--zone=${ZONEID} \
 					--max-pods=${MAX_PODS} \
 					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
 					--container-runtime=${CONTAINER_ENGINE} \
@@ -2410,8 +2413,8 @@ function create_cluster() {
 					--kubernetes-version="${KUBERNETES_VERSION}" \
 					--container-runtime=${CONTAINER_ENGINE} \
 					--cni-plugin=${CNI_PLUGIN} \
-					--csi-region=${REGION} \
-					--csi-zone=${ZONEID} \
+					--region=${REGION} \
+					--zone=${ZONEID} \
 					--max-pods=${MAX_PODS} \
 					--vm-uuid=${VMUUID} \
 					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
@@ -2439,8 +2442,8 @@ function create_cluster() {
 					--kubernetes-version="${KUBERNETES_VERSION}" \
 					--container-runtime=${CONTAINER_ENGINE} \
 					--cni-plugin=${CNI_PLUGIN} \
-					--csi-region=${REGION} \
-					--csi-zone=${ZONEID} \
+					--region=${REGION} \
+					--zone=${ZONEID} \
 					--max-pods=${MAX_PODS} \
 					--vm-uuid=${VMUUID} \
 					--use-external-etcd=${EXTERNAL_ETCD} \

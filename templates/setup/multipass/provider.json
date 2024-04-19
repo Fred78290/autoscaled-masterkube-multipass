@@ -7,9 +7,8 @@
 	"timeout": 300,
 	"template-name": "file://${TARGET_IMAGE}",
 	"netplan-name": "10-custom.yaml",
-	"allow-upgrade": false,
-	"csi-region": "${REGION}",
-	"csi-zone": "${ZONEID}",
+	"region": "${REGION}",
+	"zone": "${ZONEID}",
 	"network": {
 		"domain": "${PRIVATE_DOMAIN_NAME}",
 		"dns": {

@@ -1,9 +1,9 @@
 {
 	"cloud": "${OS_CLOUD}",
 	"image": "${TARGET_IMAGE}",
-	"allow-upgrade": false,
-	"csi-region": "${OS_REGION_NAME}",
-	"csi-zone": "${OS_ZONE_NAME}",
+	"region": "${OS_REGION_NAME}",
+	"zone": "${OS_ZONE_NAME}",
+	"keyName": "${SSH_KEYNAME}",
 	"timeout": 300,
 	"clouds": {
 		"openstack": {

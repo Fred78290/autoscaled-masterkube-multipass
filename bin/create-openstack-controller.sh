@@ -37,6 +37,7 @@ done
 cat > ${ETC_DIR}/cloud.conf <<EOF
 [Global]
 use-clouds=true
+tls-insecure=true
 cloud=${OS_CLOUD}
 EOF
 

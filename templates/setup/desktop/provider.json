@@ -8,9 +8,8 @@
 	"template-name": "${TARGET_IMAGE_UUID}",
 	"linked": false,
 	"autostart": ${AUTOSTART},
-	"allow-upgrade": false,
-	"csi-region": "${REGION}",
-	"csi-zone": "${ZONEID}",
+	"region": "${REGION}",
+	"zone": "${ZONEID}",
 	"network": {
 		"domain": "${PRIVATE_DOMAIN_NAME}",
 		"dns": {

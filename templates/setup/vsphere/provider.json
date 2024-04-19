@@ -11,10 +11,9 @@
 	"template-name": "${TARGET_IMAGE}",
 	"template": false,
 	"linked": false,
-	"allow-upgrade": false,
 	"customization": "${GOVC_CUSTOMIZATION}",
-	"csi-region": "${REGION}",
-	"csi-zone": "${ZONEID}",
+	"region": "${REGION}",
+	"zone": "${ZONEID}",
 	"network": {
 		"domain": "${PRIVATE_DOMAIN_NAME}",
 		"dns": {

@@ -93,17 +93,21 @@ apt update
 apt upgrade -y
 echo
 
-echo "==============================================================================================================================="
-echo "= Install mandatories tools"
-echo "==============================================================================================================================="
-
 if [[ $(uname -r) != *aws* ]]; then
 	UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2)
 
-	if [ -n "$(apt search linux-generic-hwe-${UBUNTU_VERSION_ID} 2>/dev/null | grep linux-generic-hwe-${UBUNTU_VERSION_ID})"]; then
+	if [ -n "$(apt search linux-generic-hwe-${UBUNTU_VERSION_ID} 2>/dev/null | grep linux-generic-hwe-${UBUNTU_VERSION_ID})" ]; then
+		echo "==============================================================================================================================="
+		echo "= Install linux-generic-hwe-${UBUNTU_VERSION_ID}"
+		echo "==============================================================================================================================="
+
 		apt install -y linux-generic-hwe-${UBUNTU_VERSION_ID}
 	fi
 fi
+
+echo "==============================================================================================================================="
+echo "= Install mandatories tools"
+echo "==============================================================================================================================="
 
 apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
 snap install yq

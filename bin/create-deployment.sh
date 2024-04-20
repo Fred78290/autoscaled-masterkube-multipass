@@ -95,8 +95,10 @@ fi
 if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
 	# Create Pods
 	if [ ${PLATEFORM} != "aws" ]; then
-		echo_title "Create MetalLB"
-		create-metallb.sh
+		if [ ${PLATEFORM} != "openstack" ]; then
+			echo_title "Create MetalLB"
+			create-metallb.sh
+		fi
 
 		echo_title "Create NFS provisionner"
 		create-nfs-provisionner.sh

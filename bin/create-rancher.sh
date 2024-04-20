@@ -2,7 +2,7 @@
 CURDIR=$(dirname $0)
 KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | awk -F. '{ print $2 }')
 
-source "${CURDIR}/common.sh"
+source "${CURDIR}/echo.sh"
 
 mkdir -p ${TARGET_DEPLOY_LOCATION}/rancher
 pushd ${TARGET_DEPLOY_LOCATION} &>/dev/null

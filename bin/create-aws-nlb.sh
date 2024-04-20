@@ -3,7 +3,7 @@ set -eu
 
 CURDIR=$(dirname $0)
 
-source "${CURDIR}/common.sh"
+source "${CURDIR}/echo.sh"
 
 AWS_PROFILE=
 AWS_REGION=

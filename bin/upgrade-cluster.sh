@@ -3,7 +3,7 @@ set -eu
 
 CURDIR=$(dirname $0)
 
-source "${CURDIR}/common.sh"
+source "${CURDIR}/echo.sh"
 
 KUBECONFIG_CONTEXT=k8s-${MASTERKUBE}-admin@${NODEGROUP_NAME}
 

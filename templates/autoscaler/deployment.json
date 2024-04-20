@@ -141,7 +141,6 @@
 							{
 								"name": "openstack-cloud-config",
 								"mountPath": "/etc/openstack",
-								"subPath": "clouds.yaml",
 								"readOnly": true
 							}
 						]

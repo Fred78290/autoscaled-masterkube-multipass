@@ -1,5 +1,5 @@
 # Recopy config file on master node
-EXTERNAL_DNS_TARGET="${MASTERKUBE}.${DOMAIN_NAME}"
+export EXTERNAL_DNS_TARGET="${MASTERKUBE}.${DOMAIN_NAME}"
 
 mkdir -p ${TARGET_DEPLOY_LOCATION}/configmap
 mkdir -p ${TARGET_DEPLOY_LOCATION}/secrets
@@ -125,7 +125,7 @@ if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
 	echo_title "Create External DNS"
 	create-external-dns.sh
 
-	if [ ${PLATEFORM} != "aws" ]; then
+	if [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ]; then
 		NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o json | jq -r '.status.loadBalancer.ingress[0].ip//""')
 
 		sudo sed -i '' -e "/masterkube-${PLATEFORM}/d" /etc/hosts

@@ -41,6 +41,7 @@ EOF
 		sed -e "s/__ZONE_TYPE__/${ZONE_TYPE}/g" \
 			-e "s/__AWS_REGION__/${AWS_REGION}/g" \
 			-e "s/__DOMAIN_NAME__/${DOMAIN_NAME}/g" \
+			-e "s/__PLATEFORM__/${PLATEFORM}/g" \
 			${KUBERNETES_TEMPLATE}/deploy-route53.yaml | tee ${ETC_DIR}/deploy.yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 	else
 		echo "AWS_ROUTE53_PUBLIC_ZONE_ID is not defined"
@@ -51,16 +52,22 @@ elif [ "${EXTERNAL_DNS_PROVIDER}" == "godaddy" ]; then
 		-e "s/__GODADDY_API_KEY__/${CERT_GODADDY_API_KEY}/g" \
 		-e "s/__GODADDY_API_SECRET__/${CERT_GODADDY_API_SECRET}/g" \
 		-e "s/__NODEGROUP_NAME__/${NODEGROUP_NAME}/g" \
+		-e "s/__PLATEFORM__/${PLATEFORM}/g" \
 		${KUBERNETES_TEMPLATE}/deploy-godaddy.yaml \
 		| tee ${ETC_DIR}/deploy.yaml \
 		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 elif [ "${EXTERNAL_DNS_PROVIDER}" == "designate" ]; then
+	kubectl create ns external-dns --dry-run=client -o yaml \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+
 	kubectl get cm openstack-env --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -n kube-system -o yaml \
-		| sed 's/kube-system/external-dns/g' \
+		| sed -e 's/kube-system/external-dns/g' \
+		| tee ${ETC_DIR}/openstack-env.yaml \
 		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 	sed -e "s/__DOMAIN_NAME__/${DOMAIN_NAME}/g" \
 		-e "s/__NODEGROUP_NAME__/${NODEGROUP_NAME}/g" \
+		-e "s/__PLATEFORM__/${PLATEFORM}/g" \
 		${KUBERNETES_TEMPLATE}/deploy-designate.yaml \
 			| tee ${ETC_DIR}/deploy.yaml \
 			| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -

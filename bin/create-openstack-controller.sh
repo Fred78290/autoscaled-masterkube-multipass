@@ -14,6 +14,8 @@ OSENV=(
 	"OS_TENANT_ID"
 	"OS_TENANT_NAME"
 	"OS_DOMAIN_ID"
+	"OS_USER_DOMAIN_NAME"
+	"OS_USER_DOMAIN_ID"
 	"OS_DOMAIN_NAME"
 	"OS_APPLICATION_CREDENTIAL_ID"
 	"OS_APPLICATION_CREDENTIAL_NAME"
@@ -24,13 +26,13 @@ OSENV=(
 	"OS_CLOUD"
 )
 
-echo -n > ${ETC_DIR}/openstack-env.yaml
+echo -n > ${ETC_DIR}/openstack-env
 
 for NAME in ${OSENV[@]}
 do
 	VALUE=${!NAME}
 	if [ -n "${VALUE}" ]; then
-		echo "${NAME}=${VALUE}" >> ${ETC_DIR}/openstack-env.yaml
+		echo "${NAME}=${VALUE}" >> ${ETC_DIR}/openstack-env
 	fi
 done
 
@@ -74,8 +76,8 @@ EOF
 
 kubectl create configmap openstack-env -n kube-system --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--from-env-file=${ETC_DIR}/openstack-env.yaml \
-	| tee ${ETC_DIR}/openstack-env | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+	--from-env-file=${ETC_DIR}/openstack-env \
+	| tee ${ETC_DIR}/openstack-env.yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 kubectl create configmap openstack-cloud-config -n kube-system --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \

@@ -73,12 +73,15 @@ spec:
             - --domain-filter=__DOMAIN_NAME__
             - --annotation-filter=external-dns.alpha.kubernetes.io/register=true
             - --ignore-ingress-tls-spec
-            - --txt-prefix=${PLATEFORM}.
-            - --txt-owner-id=${PLATEFORM}.
+            - --txt-prefix=__PLATEFORM__.
+            - --txt-owner-id=__PLATEFORM__.
             - --provider=designate
+          env:
+            - name: OPENSTACK_TLS_INSECURE
+              value: "true"
           envFrom:
           - configMapRef:
-              name: kube-system/openstack-env
+              name: openstack-env
 ---
 apiVersion: v1
 kind: ServiceAccount

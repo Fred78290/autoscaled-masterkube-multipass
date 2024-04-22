@@ -9,10 +9,11 @@ OVERRIDE_AWS_PROFILE=
 OVERRIDE_AWS_REGION=
 OVERRIDE_NODEGROUP_NAME=
 OVERRIDE_CONFIGURATION_LOCATION=
+OVERRIDE_KUBERNETES_DISTRO=
 
 pushd ${CURDIR}/../ &>/dev/null
 
-TEMP=$(getopt -o ftg:p:r: --long trace,configuration-location:,defs:,force,node-group:,profile:,region:,plateform: -n "$0" -- "$@")
+TEMP=$(getopt -o ftg:p:r: --long k8s-distribution:,trace,configuration-location:,defs:,force,node-group:,profile:,region:,plateform: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -28,6 +29,18 @@ while true; do
 			;;
 		--plateform)
 			PLATEFORM="$2"
+			shift 2
+			;;
+		--k8s-distribution)
+			case "$2" in
+				kubeadm|k3s|rke2|microk8s)
+					OVERRIDE_KUBERNETES_DISTRO=$2
+					;;
+				*)
+					echo "Unsupported kubernetes distribution: $2"
+					exit 1
+					;;
+			esac
 			shift 2
 			;;
 		-f|--force)
@@ -75,7 +88,9 @@ fi
 
 source "${CURDIR}/common.sh"
 
-prepare_environment
+if [ -n ${OVERRIDE_KUBERNETES_DISTRO} ]; then
+	KUBERNETES_DISTRO=${OVERRIDE_KUBERNETES_DISTRO}
+fi
 
 if [ -n "${OVERRIDE_AWS_PROFILE}" ]; then
 	AWS_PROFILE=${OVERRIDE_AWS_PROFILE}
@@ -99,9 +114,7 @@ if [ -n "${OVERRIDE_PLATEFORMDEFS}" ]; then
 	source ${PLATEFORMDEFS}
 fi
 
-TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
-TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
-TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+prepare_environment
 
 echo_blue_bold "Delete masterkube ${MASTERKUBE} previous instance"
 
@@ -128,15 +141,23 @@ function delete_nodes() {
 
 		for NODE in ${NODES}
 		do
-			kubectl drain --ignore-daemonsets --delete-emptydir-data --kubeconfig ${TARGET_CLUSTER_LOCATION}/config ${NODE}
-#			kubectl delete no --kubeconfig ${TARGET_CLUSTER_LOCATION}/config ${NODE}
+			kubectl drain --force --ignore-daemonsets --delete-emptydir-data --kubeconfig ${TARGET_CLUSTER_LOCATION}/config ${NODE}
+			#kubectl delete no --force --kubeconfig ${TARGET_CLUSTER_LOCATION}/config ${NODE}
 		done
 	done
 
-	rm ${TARGET_CLUSTER_LOCATION}/config
+	INSTANCENAMES=$(echo ${ALLNODES} | jq -r '.items | .[] | .metadata.annotations["cluster.autoscaler.nodegroup/instance-name"]' | sort -r)
+
+	for VM in ${INSTANCENAMES}
+	do
+		delete_vm_by_name ${VM} || true
+	done
 	
 	delete_vm_by_name ${MASTERKUBE} || true
+	wait_jobs_finish
 	delete_all_vms
+
+	rm ${TARGET_CLUSTER_LOCATION}/config
 }
 
 #===========================================================================================================================================

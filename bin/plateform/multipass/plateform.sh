@@ -14,6 +14,26 @@ if [ "${LAUNCH_CA}" == YES ]; then
     AUTOSCALER_DESKTOP_UTILITY_CACERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CACERT})"
 fi
 
+if [ -n "${VC_NETWORK_PRIVATE}" ]; then
+	SUBNET=$(ipv4 ${VC_NETWORK_PRIVATE})
+	SUBNET=${SUBNET%.*}
+
+	METALLB_IP_RANGE=${SUBNET}.20-${SUBNET}.24
+	PRIVATE_GATEWAY=${SUBNET}.1
+	PRIVATE_IP=${SUBNET}.10
+fi
+
+if [ -n "${VC_NETWORK_PUBLIC}" ] && [ ${PUBLIC_IP} != "NONE" ]; then
+	SUBNET=$(ipv4 ${VC_NETWORK_PRIVATE})
+	SUBNET=${SUBNET%.*}
+
+	METALLB_IP_RANGE=${SUBNET}.20-${SUBNET}.24
+
+	if [ ${PUBLIC_IP} != "DHCP" ]; then
+		PUBLIC_IP=${SUBNET}.10/24
+	fi
+fi
+
 #===========================================================================================================================================
 #
 #===========================================================================================================================================

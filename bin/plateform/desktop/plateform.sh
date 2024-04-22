@@ -4,11 +4,9 @@ else
     PATH=${HOME}/.local/vmware:${PATH}
 fi
 
-export TRACE_CURL=NO
-export TRACE_FILE_CURL="utility-$(date +%s).log"
-
 CMD_MANDATORIES="helm kubectl vmrun vmrest jq yq cfssl ovftool kubernetes-desktop-autoscaler-utility vmware-vdiskmanager"
 CLOUD_PROVIDER=
+DEPLOY_MODE="$(hostname | cut -d '.' -f 1 | cut -d '-' -f 1)"
 
 AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)
 AUTOSCALER_DESKTOP_UTILITY_KEY="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientKey)"
@@ -24,6 +22,33 @@ fi
 
 if [ "${OSDISTRO}" == "Darwin" ] && [ -z "$(command -v vmware-vdiskmanager)" ]; then
 	sudo ln -s /Applications/VMware\ Fusion.app/Contents/Library/vmware-vdiskmanager /usr/local/bin/vmware-vdiskmanager
+fi
+
+if [ -n ${VC_NETWORK_PRIVATE} ]; then
+	VNET_HOSTONLY_SUBNET=$(get_vmnet_subnet ${VC_NETWORK_PRIVATE})
+
+	if [ -z "${VNET_HOSTONLY_SUBNET}" ]; then
+		echo_red_bold "Can't determine VNET_HOSTONLY_SUBNET for ${VC_NETWORK_PRIVATE}"
+	fi
+
+	METALLB_IP_RANGE=${VNET_HOSTONLY_SUBNET}.78-${VNET_HOSTONLY_SUBNET}.79
+
+	PRIVATE_GATEWAY=${VNET_HOSTONLY_SUBNET}.2
+	PRIVATE_IP=${VNET_HOSTONLY_SUBNET}.70
+fi
+
+if [ -n "${VC_NETWORK_PUBLIC}" ] && [ "${PUBLIC_IP}" != "NONE" ]; then
+	VNET_HOSTONLY_SUBNET=$(get_vmnet_subnet ${VC_NETWORK_PUBLIC})
+
+	if [ -z "${VNET_HOSTONLY_SUBNET}" ]; then
+		echo_red_bold "Can't determine VNET_HOSTONLY_SUBNET for ${VC_NETWORK_PUBLIC}"
+	fi
+
+	METALLB_IP_RANGE=${VNET_HOSTONLY_SUBNET}.78-${VNET_HOSTONLY_SUBNET}.79
+
+	if [ "${PUBLIC_IP}" != "DHCP" ]; then
+		PUBLIC_IP=${VNET_HOSTONLY_SUBNET}.70/24
+	fi
 fi
 
 source ${CURDIR}/vmrest-utility.sh

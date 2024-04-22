@@ -1,15 +1,14 @@
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl openstack packer"
-VC_NETWORK_PRIVATE="private"
-VC_NETWORK_PUBLIC="public"
-NGINX_MACHINE="k8s.tiny"
-CONTROL_PLANE_MACHINE="k8s.small"
-WORKER_NODE_MACHINE="k8s.medium"
-AUTOSCALE_MACHINE="k8s.medium"
+
 REGION=${OS_REGION_NAME}
 ZONEID=${OS_ZONE_NAME}
 PUBLIC_NODE_IP=NONE
 PUBLIC_VIP_ADDRESS=
 PRIVATE_VIP_ADDRESS=
+CERT_SELFSIGNED_FORCED=YES
+SEED_ARCH=amd64
+PRIVATE_IP=$(openstack subnet show $(openstack network show ${VC_NETWORK_PRIVATE} -f json | jq -r '.subnets[0]') -f json | jq -r '.cidr' | cut -d '/' -f 1)
+PRIVATE_IP="${PRIVATE_IP::-2}.10"
 
 #===========================================================================================================================================
 #
@@ -283,6 +282,9 @@ function parse_arguments() {
 			;;
 		-k|--kubernetes-version)
 			KUBERNETES_VERSION="$2"
+			if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
+				KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
+			fi
 			shift 2
 			;;
 		-u|--kubernetes-user)
@@ -691,7 +693,9 @@ function prepare_plateform() {
 
 			if [ -n "${OS_PUBLIC_DNS_ZONEID}" ]; then
 				echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} handled by designate: ${OS_PUBLIC_DNS_ZONEID}"
+    			echo_red_bold "Designate will be used to register public domain hosts"
 				EXTERNAL_DNS_PROVIDER=designate
+				CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
 			fi
 		fi
 	fi

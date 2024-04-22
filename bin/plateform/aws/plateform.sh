@@ -23,6 +23,18 @@ export RESERVED_ADDR_IPS=()
 export RESERVED_ENI=()
 export TARGET_IMAGE_AMI=
 
+if [ ${SEED_ARCH} == "amd64" ]; then
+	AUTOSCALE_MACHINE="t3a.medium"
+	CONTROL_PLANE_MACHINE="t3a.medium"
+	WORKER_NODE_MACHINE="t3a.medium"
+	NGINX_MACHINE="t3a.small"
+else
+	AUTOSCALE_MACHINE="t4g.medium"
+	CONTROL_PLANE_MACHINE="t4g.medium"
+	WORKER_NODE_MACHINE="t4g.medium"
+	NGINX_MACHINE="t4g.small"
+fi
+
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
@@ -294,6 +306,9 @@ function parse_arguments() {
             ;;
         -k|--kubernetes-version)
             KUBERNETES_VERSION="$2"
+			if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
+				KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
+			fi
             shift 2
             ;;
         -u|--kubernetes-user)

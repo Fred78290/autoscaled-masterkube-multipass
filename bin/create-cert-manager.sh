@@ -49,11 +49,18 @@ case ${KUBERNETES_MINOR_RELEASE} in
 		GODADDY_WEBHOOK_VERSION=v1.28.4
 		;;
 	29)
-		CERT_MANAGER_VERSION=v1.13.3
-		GODADDY_WEBHOOK_VERSION=v1.28.4
+		CERT_MANAGER_VERSION=v1.14.4
+		GODADDY_WEBHOOK_VERSION=v1.29.0
 		;;
+	30)
+		CERT_MANAGER_VERSION=v1.14.4
+		GODADDY_WEBHOOK_VERSION=v1.29.0
+		;;
+	*)
+		echo_red_bold "Unsupported k8s release: ${KUBERNETES_VERSION}"
+		exit 1
 esac
-
+set -x
 mkdir -p ${ETC_DIR}
 
 kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml \

@@ -53,7 +53,7 @@ Options are:
 
 --cert-email=<value>                             # Specify the mail for lets encrypt, default ${CERT_EMAIL}
 --use-zerossl                                    # Specify cert-manager to use zerossl, default ${USE_ZEROSSL}
---use-self-signed-ca                             # Specify if use self-signed CA, default ${CERT_SELFSIGNED}
+--use-self-signed-ca                             # Specify if use self-signed CA, default ${CERT_SELFSIGNED_FORCED}
 --zerossl-eab-kid=<value>                        # Specify zerossl eab kid, default ${CERT_ZEROSSL_EAB_KID}
 --zerossl-eab-hmac-secret=<value>                # Specify zerossl eab hmac secret, default ${CERT_ZEROSSL_EAB_HMAC_SECRET}
 
@@ -216,7 +216,7 @@ function parse_arguments() {
 			shift 1
 			;;
 		--use-self-signed-ca)
-			CERT_SELFSIGNED=YES
+			CERT_SELFSIGNED_FORCED=YES
 			shift 1
 			;;
 		--use-cloud-init)
@@ -359,6 +359,9 @@ function parse_arguments() {
 			;;
 		-k|--kubernetes-version)
 			KUBERNETES_VERSION="$2"
+			if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
+				KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
+			fi
 			shift 2
 			;;
 		-u|--kubernetes-user)
@@ -688,7 +691,9 @@ function collect_cert_sans() {
 		local PRIVATEDNS=${PRIVATE_DNS_NAMES[${INDEX}]:-}
 
 		if [ -n "${PRIVATEDNS}" ]; then
-			TLS_SNA+=("${CLUSTER_HOST}")
+			if [[ ! ${TLS_SNA[@]} =~ "${PRIVATEDNS}" ]]; then
+				TLS_SNA+=("${CLUSTER_HOST}")
+			fi
 		fi
 	done
 
@@ -1050,6 +1055,16 @@ function prepare_node_indexes() {
 #
 #===========================================================================================================================================
 function prepare_environment() {
+	if [ -z "${NODEGROUP_NAME}" ]; then
+		NODEGROUP_NAME=${PLATEFORM}-${DEPLOY_MODE}-${KUBERNETES_DISTRO}
+	fi
+
+	TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
+	TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
+	TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+	MASTERKUBE="${NODEGROUP_NAME}-masterkube"
+	DASHBOARD_HOSTNAME=${NODEGROUP_NAME}-dashboard
+
 	NODE_IP=${PRIVATE_IP}
 	
     [ -z "${AWS_ROUTE53_PROFILE}" ] && AWS_ROUTE53_PROFILE=${AWS_PROFILE}
@@ -1297,7 +1312,12 @@ function prepare_kubernetes_distribution() {
 function delete_previous_masterkube() {
 	# Delete previous existing version
 	if [ "${RESUME}" = "NO" ] && [ "${UPGRADE_CLUSTER}" == "NO" ]; then
-		delete-masterkube.sh --plateform=${PLATEFORM} --configuration-location=${CONFIGURATION_LOCATION} --defs=${PLATEFORMDEFS} --node-group=${NODEGROUP_NAME}
+		delete-masterkube.sh \
+			--plateform=${PLATEFORM} \
+			--configuration-location=${CONFIGURATION_LOCATION} \
+			--defs=${PLATEFORMDEFS} \
+			--node-group=${NODEGROUP_NAME}
+
 		if [ "${DELETE_CLUSTER}" = "YES" ]; then
 			exit
 		fi
@@ -1334,6 +1354,7 @@ function find_public_dns_provider() {
 			echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} AWS_ROUTE53_PUBLIC_ZONE_ID=$AWS_ROUTE53_PUBLIC_ZONE_ID"
 			echo_red_bold "Route53 will be used to register public domain hosts"
             EXTERNAL_DNS_PROVIDER=aws
+			CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
 		elif [ -n "${CERT_GODADDY_API_KEY}" ]; then
             local REGISTERED=$(curl -s "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}" \
 				-H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
@@ -1343,10 +1364,14 @@ function find_public_dns_provider() {
     			echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} from godaddy"
     			echo_red_bold "Godaddy will be used to register public domain hosts"
                 EXTERNAL_DNS_PROVIDER=godaddy
+				CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
             fi
         else
 			echo_red_bold "No DNS provider found for PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}"
+			CERT_SELFSIGNED=YES
 		fi
+	else
+		CERT_SELFSIGNED=YES
 	fi
 }
 

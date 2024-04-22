@@ -98,6 +98,10 @@ while true ; do
 	esac
 done
 
+if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
+	KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
+fi
+
 SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 

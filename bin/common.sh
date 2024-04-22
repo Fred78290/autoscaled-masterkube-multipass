@@ -13,20 +13,22 @@ export AUTOSCALER_DESKTOP_UTILITY_CACERT=
 export AUTOSCALER_DESKTOP_UTILITY_CERT=
 export AUTOSCALER_DESKTOP_UTILITY_KEY=
 export AUTOSCALER_DESKTOP_UTILITY_TLS=
+export AUTOSTART=true
 export AWS_ACCESSKEY=
-export AWS_ROUTE53_PROFILE=
 export AWS_ROUTE53_ACCESSKEY=
 export AWS_ROUTE53_PRIVATE_ZONE_ID=
+export AWS_ROUTE53_PROFILE=
 export AWS_ROUTE53_PUBLIC_ZONE_ID=
 export AWS_ROUTE53_SECRETKEY=
 export AWS_ROUTE53_TOKEN=
 export AWS_SECRETKEY=
 export AWS_TOKEN=
 export CACHE=${HOME}/.local/masterkube/${PLATEFORM}/cache
-export CERT_EMAIL=
+export CERT_EMAIL=${USER}@acme.com
 export CERT_GODADDY_API_KEY=${GODADDY_API_KEY:=}
 export CERT_GODADDY_API_SECRET=${GODADDY_API_SECRET:=}
-export CERT_SELFSIGNED=NO
+export CERT_SELFSIGNED=YES
+export CERT_SELFSIGNED_FORCED=NO
 export CERT_ZEROSSL_EAB_HMAC_SECRET=${ZEROSSL_EAB_HMAC_SECRET:=}
 export CERT_ZEROSSL_EAB_KID=${ZEROSSL_EAB_KID:=}
 export CLOUD_IMAGES_UBUNTU=cloud-images.ubuntu.com
@@ -39,13 +41,15 @@ export CONFIGURATION_LOCATION=${PWD}
 export CONTAINER_CTL=docker
 export CONTAINER_ENGINE=containerd
 export CONTROL_PLANE_ENDPOINT=
-export CONTROL_PLANE_MACHINE="small"
+export CONTROL_PLANE_MACHINE="medium"
 export CONTROLNODES=1
 export CONTROLPLANE_USE_PUBLICIP=false
-export CORESTOTAL="0:16"
+export CORESTOTAL="0:24"
 export CREATE_IMAGE_ONLY=NO
+export DASHBOARD_HOSTNAME=
 export DELETE_CLUSTER=NO
 export DEPLOY_COMPONENTS=YES
+export DEPLOY_MODE=dev
 export DISTRO=jammy
 export DOMAIN_NAME=
 export ETCD_DST_DIR=
@@ -82,19 +86,20 @@ export LOAD_BALANCER_IP=
 export MASTER_INSTANCE_PROFILE_ARN=
 export MASTER_NODE_ALLOW_DEPLOYMENT=NO
 export MASTER_PROFILE_NAME="kubernetes-master-profile"
+export MASTERKUBE=
 export MAX_PODS=110
 export MAXAUTOPROVISIONNEDNODEGROUPCOUNT="1"
 export MAXNODEPROVISIONTIME=15m
 export MAXNODES=9
 export MAXTOTALNODES=${MAXNODES}
-export MEMORYTOTAL="0:48"
-export METALLB_IP_RANGE=10.0.0.100-10.0.0.127
+export MEMORYTOTAL="0:96"
+export METALLB_IP_RANGE=10.0.0.88-10.0.0.89
 export MICROK8S_CHANNEL=latest
 export MINNODES=0
 export NETWORK_PRIVATE_ROUTES=()
 export NETWORK_PUBLIC_ROUTES=()
-export NFS_SERVER_ADDRESS=
-export NFS_SERVER_PATH=
+export NFS_SERVER_ADDRESS=10.0.0.5
+export NFS_SERVER_PATH=/mnt/Home/home/vmware
 export NFS_STORAGE_CLASS=nfs-client
 export NGINX_MACHINE="tiny"
 export NODEGROUP_NAME=
@@ -120,19 +125,21 @@ export OSDISTRO=$(uname -s)
 export PREFER_SSH_PUBLICIP=NO
 export PRIVATE_ADDR_IPS=()
 export PRIVATE_DNS_NAMES=()
-export PRIVATE_DNS=10.0.0.5
-export PRIVATE_DOMAIN_NAME=
-export PRIVATE_GATEWAY=10.0.0.1
-export PRIVATE_IP=192.168.1.20
+export PRIVATE_DNS=192.168.2.1
+export PRIVATE_DOMAIN_NAME=acme.com
+export PRIVATE_GATEWAY=192.168.2.254
+export PRIVATE_IP=192.168.2.80
 export PRIVATE_MASK_CIDR=24
 export PRIVATE_NET_INF=eth0
 export PRIVATE_NETMASK=255.255.255.0
 export PUBLIC_ADDR_IPS=()
-export PUBLIC_DOMAIN_NAME=
+export PUBLIC_DOMAIN_NAME=acme.com
 export PUBLIC_IP=DHCP
 export PUBLIC_NETMASK=
+export PUBLIC_DNS=
+export PUBLIC_GATEWAY=
 export REGION=home
-export REGISTRY=fred78290
+export REGISTRY=devregistry.aldunelabs.com
 export RESUME=NO
 export SCALEDNODES_DHCP=true
 export SCALEDOWNDELAYAFTERADD="1m"
@@ -143,7 +150,7 @@ export SCALEDOWNGPUUTILIZATIONTHRESHOLD="0.5"
 export SCALEDOWNUNEEDEDTIME="1m"
 export SCALEDOWNUNREADYTIME="1m"
 export SCALEDOWNUTILIZATIONTHRESHOLD="0.5"
-export SEED_ARCH=amd64
+export SEED_ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
 export SEED_IMAGE="${DISTRO}-server-cloudimg-seed"
 export SEED_USER=ubuntu
 export SILENT="&> /dev/null"
@@ -160,6 +167,8 @@ export TARGET_DEPLOY_LOCATION=
 export TARGET_IMAGE_AMI=
 export TARGET_IMAGE="${DISTRO}-kubernetes-cni-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${SEED_ARCH}-${CONTAINER_ENGINE}"
 export TRACE_ARGS=
+export TRACE_CURL=NO
+export TRACE_FILE_CURL="utility-$(date +%s).log"
 export TRANSPORT="tcp"
 export UNREMOVABLENODERECHECKTIMEOUT="1m"
 export UPDATE_PACKAGE=false
@@ -200,12 +209,9 @@ export ZONEID=office
 
 export SCP_OPTIONS="${SSH_OPTIONS} -p -r"
 
-export NODEGROUP_NAME="${PLATEFORM}-ca-k8s"
-export MASTERKUBE=${NODEGROUP_NAME}-masterkube
-export DASHBOARD_HOSTNAME=masterkube-${PLATEFORM}-dashboard
-export TARGET_CONFIG_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/config
-export TARGET_DEPLOY_LOCATION=${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}/deployment
-export TARGET_CLUSTER_LOCATION=${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}
+export TARGET_CONFIG_LOCATION=
+export TARGET_DEPLOY_LOCATION=
+export TARGET_CLUSTER_LOCATION=
 
 export PLATEFORMDEFS=${CURDIR}/plateform/${PLATEFORM}/vars.def
 
@@ -294,8 +300,11 @@ fi
 #===========================================================================================================================================
 mkdir -p ${CACHE}
 
-source ${CURDIR}/plateform/${PLATEFORM}/plateform.sh
+if [ -f ${CURDIR}/plateform/${PLATEFORM}/override.sh ]; then
+	source ${CURDIR}/plateform/${PLATEFORM}/override.sh
+fi
 
+source ${CURDIR}/plateform/${PLATEFORM}/plateform.sh
 source ${PLATEFORMDEFS}
 
 #===========================================================================================================================================

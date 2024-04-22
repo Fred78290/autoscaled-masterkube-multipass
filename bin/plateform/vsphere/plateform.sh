@@ -1,6 +1,7 @@
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl govc"
-VC_NETWORK_PRIVATE="VM Private"
-VC_NETWORK_PUBLIC="VM Network"
+#VC_NETWORK_PRIVATE="VM Private"
+#VC_NETWORK_PUBLIC="VM Network"
+SEED_ARCH=amd64
 FOLDER_OPTIONS=
 
 if [ "${GOVC_INSECURE}" == "1" ]; then
@@ -70,12 +71,16 @@ EOF
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
 					--arg USE_DHCP_ROUTES_PUBLIC "${USE_DHCP_ROUTES_PUBLIC}" \
 					'.|.network.ethernets += { "eth1": { "dhcp4": true, "dhcp4-overrides": { "use-routes": $USE_DHCP_ROUTES_PUBLIC } } }')
+			elif [ -z "${PUBLIC_GATEWAY}" ] && [ -z "${PUBLIC_DNS}" ]; then
+				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
+					--arg NODE_IP "${EXTERNAL_IP}/${PUBLIC_MASK_CIDR}" \
+					'.|.network.ethernets += { "eth1": { "addresses": [ $NODE_IP ] }}')
 			else
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
-					--arg PRIVATE_GATEWAY ${PRIVATE_GATEWAY} \
+					--arg PUBLIC_GATEWAY ${PUBLIC_GATEWAY} \
 					--arg NODE_IP "${EXTERNAL_IP}/${PUBLIC_MASK_CIDR}" \
-					--arg PRIVATE_DNS ${PRIVATE_DNS} \
-					'.|.network.ethernets += { "eth1": { "gateway4": $PRIVATE_GATEWAY, "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $PRIVATE_DNS ] } }}')
+					--arg PUBLIC_DNS ${PUBLIC_DNS} \
+					'.|.network.ethernets += { "eth1": { "gateway4": $PUBLIC_GATEWAY, "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $PUBLIC_DNS ] } }}')
 			fi
 
 			if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then

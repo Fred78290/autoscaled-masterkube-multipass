@@ -87,6 +87,10 @@ while true ; do
 	esac
 done
 
+if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
+	KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
+fi
+
 if [ -z "${TARGET_IMAGE}" ]; then
 	TARGET_IMAGE=${CURDIR}/../images/${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
 fi

@@ -300,8 +300,6 @@ addons:
   - name: rbac
   - name: hostpath-storage
     disable: ${HA_CLUSTER}
-  - name: ha-cluster
-    disable: ${DISABLE_HA_CLUSTER}
 extraKubeAPIServerArgs:
   --advertise-address: ${APISERVER_ADVERTISE_ADDRESS}
   --authorization-mode: RBAC,Node

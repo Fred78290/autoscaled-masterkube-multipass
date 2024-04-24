@@ -19,7 +19,7 @@ if [ ${KUBERNETES_MINOR_RELEASE} -lt 27 ]; then
 else
 	REPO=/tmp/rancher/
 
-	curl -sL https://releases.rancher.com/server-charts/latest/rancher-2.8.0.tgz | tar zxvf - -C /tmp
+	curl -sL https://releases.rancher.com/server-charts/latest/rancher-2.8.3.tgz | tee /tmp/rancher-2.8.3.tgz | tar zxvf - -C /tmp
 
 	sed -i -e '/kubeVersion/d' /tmp/rancher/Chart.yaml
 fi

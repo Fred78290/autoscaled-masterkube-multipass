@@ -250,8 +250,10 @@ if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
 
 	if [ "${HA_CLUSTER}" == "true" ]; then
 		WORKER_NODE=
+		WORKER=false
 	else
 		WORKER_NODE=--worker
+		WORKER=true
 	fi
 
 	mkdir -p /var/snap/microk8s/common/
@@ -259,9 +261,9 @@ if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
 	cat >  ${MICROK8S_CONFIG} <<EOF
 version: 0.1.0
 persistentClusterToken: ${TOKEN}
-#join:
-#  url: ${MASTER_IP%%:*}:25000/${TOKEN}
-#  worker: ${WORKER_NODE}
+join:
+  url: ${MASTER_IP%%:*}:25000/${TOKEN}
+  worker: ${WORKER}
 extraMicroK8sAPIServerProxyArgs:
   --refresh-interval: "0"
 extraKubeletArgs:
@@ -282,7 +284,6 @@ EOF
 		echo "addons:" >> ${MICROK8S_CONFIG}
 		echo "  - name: dns" >> ${MICROK8S_CONFIG}
 		echo "  - name: rbac" >> ${MICROK8S_CONFIG}
-		echo "  - name: ha-cluster" >> ${MICROK8S_CONFIG}
 
 		echo "extraKubeAPIServerArgs:" >> ${MICROK8S_CONFIG}
 		echo "  --advertise-address: ${APISERVER_ADVERTISE_ADDRESS}" >> ${MICROK8S_CONFIG}
@@ -308,11 +309,11 @@ EOF
 	echo "Install microk8s ${MICROK8S_CHANNEL}"
 	snap install microk8s --classic --channel=${MICROK8S_CHANNEL}
 
-	echo "Wait microk8s get ready"
-	microk8s status --wait-ready -t 120
+#	echo "Wait microk8s get ready"
+#	microk8s status --wait-ready -t 120
 
-	echo "Join master node ${MASTER_IP%%:*}:25000 ${WORKER_NODE}"
-	microk8s join ${MASTER_IP%%:*}:25000/${TOKEN} ${WORKER_NODE}
+#	echo "Join master node ${MASTER_IP%%:*}:25000 ${WORKER_NODE}"
+#	microk8s join ${MASTER_IP%%:*}:25000/${TOKEN} ${WORKER_NODE}
 
 elif [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 	ANNOTE_MASTER=true

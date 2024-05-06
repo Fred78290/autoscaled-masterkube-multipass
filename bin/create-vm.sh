@@ -25,6 +25,7 @@ prepare_deployment
 prepare_vendordata
 prepare_networking
 create_all_vms
+exit
 create_load_balancer
 create_dns_rentries
 create_etcd

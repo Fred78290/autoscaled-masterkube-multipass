@@ -20,10 +20,14 @@
 	"controlplane-name-prefix": "master",
 	"nodePrice": 0.0,
 	"podPrice": 0.0,
+	"use-etc-hosts": ${USE_ETC_HOSTS},
 	"use-cloudinit-config": ${USE_CLOUDINIT_TO_CONFIGURE},
 	"cloudinit-file-owner": "root:adm",
 	"cloudinit-file-mode": 420,
 	"allow-upgrade": ${UPDATE_PACKAGE},
+	"use-bind9": ${USE_BIND9_SERVER},
+	"bind9-host": "${BIND9_HOST}",
+	"rndc-key-file": "/etc/kubernetes/rndc.key",
 	"optionals": {
 		"pricing": false,
 		"getAvailableMachineTypes": false,
@@ -40,6 +44,7 @@
 		"extras-args": [
 			"--ignore-preflight-errors=All"
 		],
+		"use-nlb": ${USE_LOADBALANCER},
 		"channel": "${MICROK8S_CHANNEL}",
 		"extras-commands": [],
 		"join-command": "/usr/local/bin/join-cluster.sh",

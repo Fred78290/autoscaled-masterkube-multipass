@@ -9,6 +9,9 @@ CERT_SELFSIGNED_FORCED=YES
 SEED_ARCH=amd64
 PRIVATE_IP=$(openstack subnet show $(openstack network show ${VC_NETWORK_PRIVATE} -f json | jq -r '.subnets[0]') -f json | jq -r '.cidr' | cut -d '/' -f 1)
 PRIVATE_IP="${PRIVATE_IP::-2}.10"
+NLB_POOLS=()
+NLB_LISTENERS=()
+NLB_ID=
 
 #===========================================================================================================================================
 #
@@ -59,20 +62,25 @@ EOF
 #===========================================================================================================================================
 function parse_arguments() {
 	OPTIONS+=(
+		"control-plane-public"
+		"create-nginx-apigateway"
+		"external-security-group:"
+		"internal-security-group:"
+		"internet-facing"
 		"nfs-server-adress:"
 		"nfs-server-mount:"
 		"nfs-storage-class:"
-		"vm-private-network:"
-		"vm-public-network:"
-		"internet-facing"
-		"control-plane-public"
-		"worker-node-public"
-		"use-nlb"
-		"create-nginx-apigateway"
-		"internal-security-group:"
-		"external-security-group:"
 		"prefer-ssh-publicip"
 		"private-domain:"
+		"use-nlb"
+		"vm-private-network:"
+		"vm-public-network:"
+		"worker-node-public"
+		"use-named-server"
+		"install-named-server"
+		"named-server-host:"
+		"named-server-port:"
+		"named-server-key:"
 	)
 
 	PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
@@ -360,6 +368,27 @@ function parse_arguments() {
 			UNREMOVABLENODERECHECKTIMEOUT="$2"
 			shift 2
 			;;
+	### Bind9 space
+		--use-named-server)
+			USE_BIND9_SERVER="true"
+			shift 1
+			;;
+		--install-named-server)
+			INSTALL_BIND9_SERVER=YES
+			shift 1
+			;;
+		--named-server-host)
+			BIND9_HOST=$2
+			shift 2
+			;;
+		--named-server-port)
+			BIND9_PORT=$2
+			shift 2
+			;;
+		--named-server-key)
+			BIND9_RNDCKEY=$2
+			shift 2
+			;;
 	### Plateform specific
 		--nfs-server-adress)
 			NFS_SERVER_ADDRESS="$2"
@@ -475,7 +504,7 @@ function plateform_create_vm() {
 	MASTERKUBE_NODE_UUID=$(get_vmuuid ${MASTERKUBE_NODE})
 
 	if [ -z "${MASTERKUBE_NODE_UUID}" ]; then
-		NETWORK_ID=$(openstack network show -f json private | jq -r '.id//""')
+		NETWORK_ID=$(openstack network show -f json ${VC_NETWORK_PRIVATE} | jq -r '.id//""')
 
 		# Cloud init user-data
 		cat > ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
@@ -587,10 +616,17 @@ function delete_vm_by_name() {
 #===========================================================================================================================================
 function delete_load_balancer() {
 	local NAME=$1
+	local NBL=$(openstack loadbalancer show ${NAME} -f json 2>/dev/null || echo '{}')
 
-	if [ -n "$(openstack loadbalancer show -f json ${NAME} 2>/dev/null | jq -r '.id')" ]; then
+	if [ -n "$(echo ${NBL} | jq -r '.id//""')" ]; then
 		echo_blue_bold "Delete load balancer: ${NAME}"
 		openstack loadbalancer delete --cascade --wait ${NAME} &>/dev/null
+
+		local PORTID=$(echo ${NBL} | jq -r '.vip_port_id//""')
+
+		echo_blue_bold "Delete port: ${PORTID}"
+
+		openstack port delete ${PORTID} &>/dev/null
 	fi
 }
 
@@ -660,10 +696,10 @@ function prepare_ssh() {
 	KEYEXISTS=$(openstack keypair show -f json "${SSH_KEYNAME}" 2>/dev/null | jq -r '.id // ""')
 
 	if [ -z ${KEYEXISTS} ]; then
-		echo_grey "SSH Public key doesn't exist"
+		echo_blue_bold "SSH Public key doesn't exist"
 		eval openstack keypair create --public-key ${SSH_PUBLIC_KEY} --type ssh ${SSH_KEYNAME} ${SILENT}
 	else
-		echo_grey "SSH Public key already exists"
+		echo_blue_bold "SSH Public key already exists"
 	fi
 }
 
@@ -687,21 +723,26 @@ function prepare_plateform() {
 	prepare_node_indexes
 
 	# Check if dns service is present
-	if [ -n "$(openstack service show -f json dns 2>/dev/null | jq -r '.id // ""')" ]; then
-		if [ -n "${PUBLIC_DOMAIN_NAME}" ] && [ "${PUBLIC_DOMAIN_NAME}" != "${PRIVATE_DOMAIN_NAME}" ]; then
-			OS_PUBLIC_DNS_ZONEID=$(openstack zone show -f json "${PUBLIC_DOMAIN_NAME}." 2>/dev/null | jq -r '.id // ""')
+	if [ "${USE_BIND9_SERVER}" = "true" ]; then
+		find_private_dns_provider
+		find_public_dns_provider
+	else
+		if [ -n "$(openstack service show -f json dns 2>/dev/null | jq -r '.id // ""')" ]; then
+			if [ -n "${PUBLIC_DOMAIN_NAME}" ] && [ "${PUBLIC_DOMAIN_NAME}" != "${PRIVATE_DOMAIN_NAME}" ]; then
+				OS_PUBLIC_DNS_ZONEID=$(openstack zone show -f json "${PUBLIC_DOMAIN_NAME}." 2>/dev/null | jq -r '.id // ""')
 
-			if [ -n "${OS_PUBLIC_DNS_ZONEID}" ]; then
-				echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} handled by designate: ${OS_PUBLIC_DNS_ZONEID}"
-    			echo_red_bold "Designate will be used to register public domain hosts"
-				EXTERNAL_DNS_PROVIDER=designate
-				CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
+				if [ -n "${OS_PUBLIC_DNS_ZONEID}" ]; then
+					echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} handled by designate: ${OS_PUBLIC_DNS_ZONEID}"
+					echo_red_bold "Designate will be used to register public domain hosts"
+					EXTERNAL_DNS_PROVIDER=designate
+					CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
+				fi
 			fi
 		fi
-	fi
 
-	if [ -z "${OS_PUBLIC_DNS_ZONEID}" ]; then
-		find_public_dns_provider
+		if [ -z "${OS_PUBLIC_DNS_ZONEID}" ]; then
+			find_public_dns_provider
+		fi
 	fi
 
 	echo_title "Prepare flavors"
@@ -743,18 +784,33 @@ function prepare_plateform() {
 #
 #===========================================================================================================================================
 function prepare_dns() {
-	if [ -n "$(openstack service show -f json dns 2>/dev/null | jq -r '.id // ""')" ]; then
-		OS_PRIVATE_DNS_ZONEID=$(openstack zone show -f json "${PRIVATE_DOMAIN_NAME}." 2>/dev/null | jq -r '.id // ""')
-
-		if [ -z "${OS_PRIVATE_DNS_ZONEID}" ]; then
-			echo_blue_bold "Register zone: ${PRIVATE_DOMAIN_NAME}. with email: ${CERT_EMAIL}"
-			OS_PRIVATE_DNS_ZONEID=$(openstack zone create -f json --email ${CERT_EMAIL} --ttl 60 "${PRIVATE_DOMAIN_NAME}." 2>/dev/null | jq -r '.id // ""')
-		else
-			echo_blue_bold "Zone: ${PRIVATE_DOMAIN_NAME}. already registered with ID: ${OS_PRIVATE_DNS_ZONEID}"
+	if [ "${USE_BIND9_SERVER}" != "true" ]; then
+		if [ "${PUBLIC_DOMAIN_NAME}" == "${PRIVATE_DOMAIN_NAME}" ] && [ "${EXTERNAL_DNS_PROVIDER}" != "none" ]; then
+			echo_red_bold "Use DNS provider: ${EXTERNAL_DNS_PROVIDER} for private domain"
+			return
 		fi
 
-		if [ -n "${OS_PRIVATE_DNS_ZONEID}" ]; then
-			FILL_ETC_HOSTS=NO
+		if [ -n "$(openstack service show -f json dns 2>/dev/null | jq -r '.id // ""')" ]; then
+			OS_PRIVATE_DNS_ZONEID=$(openstack zone show -f json "${PRIVATE_DOMAIN_NAME}." 2>/dev/null | jq -r '.id // ""')
+
+			if [ -z "${OS_PRIVATE_DNS_ZONEID}" ]; then
+				echo_blue_bold "Register zone: ${PRIVATE_DOMAIN_NAME}. with email: ${CERT_EMAIL}"
+				OS_PRIVATE_DNS_ZONEID=$(openstack zone create -f json --email ${CERT_EMAIL} --ttl 60 "${PRIVATE_DOMAIN_NAME}." 2>/dev/null | jq -r '.id // ""')
+
+				echo_blue_dot_title "Wait zone ${PRIVATE_DOMAIN_NAME} to be ready"
+				while [ "$(openstack zone show ${PRIVATE_DOMAIN_NAME}. -f json | jq -r '.status//""')" != "ACTIVE" ];
+				do
+					echo_blue_dot
+					sleep 1
+				done
+				echo
+			else
+				echo_blue_bold "Zone: ${PRIVATE_DOMAIN_NAME}. already registered with ID: ${OS_PRIVATE_DNS_ZONEID}"
+			fi
+
+			if [ -n "${OS_PRIVATE_DNS_ZONEID}" ]; then
+				USE_ETC_HOSTS=false
+			fi
 		fi
 	fi
 }
@@ -786,6 +842,60 @@ function get_security_group() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function create_member_in_nlb() {
+	local NLB_NAME=$1
+	local NLB_PORTS=$2
+	local NAME=$3
+	local ADDR=$4
+	local NLB_SUBNET=$(openstack network show ${VC_NETWORK_PRIVATE} -f json | jq -r '.subnets[0]//""')
+
+	IFS=, read -a NLB_PORTS <<< "${NLB_PORTS}"
+
+	for NLB_PORT in ${NLB_PORTS[@]}
+	do
+		POOL_ID=$(openstack loadbalancer pool show -f json ${NLB_NAME}-pool-${NLB_PORT} | jq -r '.id//""')
+
+		eval openstack loadbalancer member create \
+			--name ${NAME}-${NLB_PORT} \
+			--subnet-id ${NLB_SUBNET} \
+			--address ${ADDR} \
+			--protocol-port ${NLB_PORT} ${POOL_ID} ${SILENT}
+	done
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function not_create_plateform_nlb_member() {
+	local NAME=$1
+	local ADDR=$2
+
+	create_member_in_nlb "nlb-internal-${MASTERKUBE}" "${LOAD_BALANCER_PORT}" ${NAME} ${ADDR}
+
+	if [ ${EXPOSE_PUBLIC_CLUSTER} = "true" ]; then
+		create_member_in_nlb "nlb-external-${MASTERKUBE}" "80,443" ${NAME} ${ADDR}
+	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function wait_nlb_active() {
+	local NLB_NAME=$1
+
+	while :
+	do
+		if [ $(openstack loadbalancer show -f json ${NLB_NAME} | jq -r '.provisioning_status') = "ACTIVE" ]; then
+			break
+		fi
+ 
+		sleep 5
+	done
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function create_nlb() {
 	local NLB_NAME=$1
 	local NLB_PUBLIC=$2
@@ -796,53 +906,62 @@ function create_nlb() {
 	local NLB_FLOATING_IP=$7
 	local NLB_PORT=
 	local NBL_TARGET=
+	local NLB_PROVIDER=
 	local NLB_SUBNET=$(openstack network show ${VC_NETWORK_PRIVATE} -f json | jq -r '.subnets[0]//""')
 
 	NLB_ID=$(openstack loadbalancer create --vip-address ${NLB_VIP_ADDRESS} --vip-network-id ${VC_NETWORK_PRIVATE} -f json --name ${NLB_NAME} | jq -r '.id//""')
 
-	IFS=,  read -a NLB_PORTS <<< "${NLB_PORTS}"
-	IFS=,  read -a NLB_TARGETS <<< "${NLB_TARGETS}"
+	if [ -n "${NLB_ID}" ]; then
+		IFS=,  read -a NLB_PORTS <<< "${NLB_PORTS}"
+		IFS=,  read -a NLB_TARGETS <<< "${NLB_TARGETS}"
 
-	if [ ${NLB_FLOATING_IP} = "YES" ]; then
-		FLOATIP_ID=$(openstack floating ip create  --tag ${NLB_NAME} ${VC_NETWORK_PUBLIC} -f json  | jq -r '.floating_ip_address // ""')
-		PORT_ID=$(openstack loadbalancer show -f json ${NLB_NAME} | jq -r '.vip_port_id')
+		wait_nlb_active ${NLB_NAME}
 
-		eval openstack floating ip set --port ${PORT_ID} ${FLOATIP_ID} ${SILENT}
-	fi
+		NLB_PROVIDER=$(openstack loadbalancer show -f json ${NLB_NAME} | jq -r '.provider')
 
-	if [ -n ${NLB_ID} ]; then
-		for NLB_PORT in ${NLB_PORTS[@]}
-		do
-			# Create load balancer listener
-			LISTENER_ID=$(openstack loadbalancer listener create -f json \
-				--name ${NLB_NAME}-listen-${NLB_PORT} \
-				--protocol TCP \
-				--protocol-port ${NLB_PORT} ${NLB_ID} | jq -r '.id')
+		if [ ${NLB_FLOATING_IP} = "YES" ]; then
+			FLOATIP_ID=$(openstack floating ip create  --tag ${NLB_NAME} ${VC_NETWORK_PUBLIC} -f json  | jq -r '.floating_ip_address // ""')
+			PORT_ID=$(openstack loadbalancer show -f json ${NLB_NAME} | jq -r '.vip_port_id')
 
-			# Create load balancer pool
-			POOL_ID=$(openstack loadbalancer pool create -f json \
-				--name ${NLB_NAME}-pool-${NLB_PORT} \
-				--protocol tcp \
-				--lb-algorithm SOURCE_IP_PORT \
-				--listener ${NLB_NAME}-listen-${NLB_PORT} | jq -r '.id')
+			eval openstack floating ip set --port ${PORT_ID} ${FLOATIP_ID} ${SILENT}
+		fi
 
-			eval openstack loadbalancer healthmonitor create \
-				--name ${NLB_NAME}-health-${NLB_PORT} \
-				--delay 15 \
-				--max-retries 5 \
-				--timeout 5 \
-				--type TCP ${POOL_ID} ${SILENT}
-
-			# Append member
-			for NLB_TARGET in ${NLB_TARGETS[@]}
+		if [ -n ${NLB_ID} ]; then
+			for NLB_PORT in ${NLB_PORTS[@]}
 			do
-				IFS=: read NAME IP <<< "${NLB_TARGET}"
-				eval openstack loadbalancer member create \
-					--subnet-id ${NLB_SUBNET} \
-					--address ${IP} \
-					--protocol-port ${NLB_PORT} ${POOL_ID} ${SILENT}
+				# Create load balancer listener
+				LISTENER_ID=$(openstack loadbalancer listener create -f json \
+					--name ${NLB_NAME}-listen-${NLB_PORT} \
+					--protocol TCP \
+					--protocol-port ${NLB_PORT} ${NLB_ID} | jq -r '.id')
+
+				# Create load balancer pool
+				POOL_ID=$(openstack loadbalancer pool create -f json \
+					--name ${NLB_NAME}-pool-${NLB_PORT} \
+					--protocol tcp \
+					--lb-algorithm SOURCE_IP_PORT \
+					--listener ${NLB_NAME}-listen-${NLB_PORT} | jq -r '.id')
+
+				HEALTH_ID=$(openstack loadbalancer healthmonitor create \
+					--name ${NLB_NAME}-health-${NLB_PORT} \
+					--delay 15 \
+					--max-retries 5 \
+					--timeout 5 \
+					--type TCP ${POOL_ID})
+
+				# Append member
+				for NLB_TARGET in ${NLB_TARGETS[@]}
+				do
+					IFS=: read NAME IP <<< "${NLB_TARGET}"
+					eval openstack loadbalancer member create \
+						--subnet-id ${NLB_SUBNET} \
+						--address ${IP} \
+						--protocol-port ${NLB_PORT} ${POOL_ID} ${SILENT}
+				done
 			done
-		done
+		fi
+	else
+		echo_red_bold "Unable to create loadbalancer: ${NLB_NAME}"
 	fi
 }
 
@@ -883,7 +1002,6 @@ function create_plateform_nlb() {
 	else
 		PUBLIC_NLB_DNS=${PRIVATE_NLB_DNS}
 	fi
-set -x
+
 	register_nlb_dns A ${PRIVATE_NLB_DNS} ${PUBLIC_NLB_DNS}
-set +x
 }

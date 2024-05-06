@@ -10,8 +10,8 @@ CONTROL_PLANE_ENDPOINT_ADDR=
 CONTROL_PLANE_ENDPOINT=
 ETCD_ENDPOINT=
 EXTERNAL_ETCD=NO
-FILL_ETC_HOSTS=YES
-HA_CLUSTER=false
+USE_ETC_HOSTS=true
+CONTROL_PLANE=false
 INSTANCEID=
 INSTANCENAME=${HOSTNAME}
 KUBEADM_CONFIG=/etc/kubernetes/kubeadm-config.yaml
@@ -29,8 +29,8 @@ REGION=home
 SERVICE_NETWORK_CIDR="10.96.0.0/12"
 TOKEN=$(cat ./cluster/token)
 ZONEID=office
-
-TEMP=$(getopt -o i:g:k:c:n:r:x --long kubernetes-version:,cni-plugin:,container-runtime:,trace,fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,region:,zone:,vm-uuid: -n "$0" -- "$@")
+USE_LOADBALANCER=NO
+TEMP=$(getopt -o i:g:k:c:n:r:x --long use-load-balancer:,kubernetes-version:,cni-plugin:,container-runtime:,trace,use-etc-hosts:,cloud-provider:,plateform:,tls-san:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,region:,zone:,vm-uuid: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -66,7 +66,7 @@ while true; do
 		shift 2
 		;;
 	--control-plane)
-		HA_CLUSTER=$2
+		CONTROL_PLANE=$2
 		shift 2
 		;;
 	--use-external-etcd)
@@ -93,8 +93,8 @@ while true; do
 		MASTER_NODE_ALLOW_DEPLOYMENT=$2 
 		shift 2
 		;;
-	--fill-etc-hosts)
-		FILL_ETC_HOSTS=$2
+	--use-etc-hosts)
+		USE_ETC_HOSTS=$2
 		shift 2
 		;;
 	-n|--cluster-nodes)
@@ -136,6 +136,10 @@ while true; do
 				;;
 		esac
 		shift 2;;
+	--use-load-balancer)
+		USE_LOADBALANCER="$2"
+		shift 2
+		;;
 # Plateform specific
 	-c|--control-plane-endpoint)
 		IFS=: read CONTROL_PLANE_ENDPOINT CONTROL_PLANE_ENDPOINT_ADDR <<< "$2"
@@ -169,6 +173,8 @@ while true; do
 		;;
 	esac
 done
+
+IFS=: read JOIN_MASTER_IP JOIN_MASTER_PORT <<< "${MASTER_IP}"
 
 function wait_node_ready() {
 	echo -n "Wait node ${NODENAME} to be ready"
@@ -206,9 +212,9 @@ else
 	fi
 fi
 
-if [ ${FILL_ETC_HOSTS} == "YES" ]; then
+if [ ${USE_ETC_HOSTS} == "true" ]; then
 	sed -i "/${CONTROL_PLANE_ENDPOINT}/d" /etc/hosts
-	echo "${CONTROL_PLANE_ENDPOINT_ADDR}   ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
+	echo "${CONTROL_PLANE_ENDPOINT_ADDR%%,*}   ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 
 	for CLUSTER_NODE in ${CLUSTER_NODES[@]}
 	do
@@ -248,24 +254,15 @@ if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
 	APISERVER_ADVERTISE_PORT=16443
 	ANNOTE_MASTER=true
 
-	if [ "${HA_CLUSTER}" == "true" ]; then
-		WORKER_NODE=
-		WORKER=false
-	else
-		WORKER_NODE=--worker
-		WORKER=true
-	fi
-
 	mkdir -p /var/snap/microk8s/common/
 
 	cat >  ${MICROK8S_CONFIG} <<EOF
 version: 0.1.0
 persistentClusterToken: ${TOKEN}
 join:
-  url: ${MASTER_IP%%:*}:25000/${TOKEN}
+  url: ${JOIN_MASTER_IP}:25000/${TOKEN}
   worker: ${WORKER}
-extraMicroK8sAPIServerProxyArgs:
-  --refresh-interval: "0"
+
 extraKubeletArgs:
   --max-pods: ${MAX_PODS}
   --node-ip: ${APISERVER_ADVERTISE_ADDRESS}
@@ -280,10 +277,14 @@ EOF
 		echo "  --image-credential-provider-bin-dir: /usr/local/bin" >> ${MICROK8S_CONFIG}
 	fi
 
-	if [ "${HA_CLUSTER}" = "true" ]; then
+	if [ "${CONTROL_PLANE}" = "true" ]; then
+		echo "join:" >> ${MICROK8S_CONFIG}
+		echo "  url: ${JOIN_MASTER_IP}:25000/${TOKEN}" >> ${MICROK8S_CONFIG}
+
 		echo "addons:" >> ${MICROK8S_CONFIG}
 		echo "  - name: dns" >> ${MICROK8S_CONFIG}
 		echo "  - name: rbac" >> ${MICROK8S_CONFIG}
+		echo "  - name: ha-cluster" >> ${MICROK8S_CONFIG}
 
 		echo "extraKubeAPIServerArgs:" >> ${MICROK8S_CONFIG}
 		echo "  --advertise-address: ${APISERVER_ADVERTISE_ADDRESS}" >> ${MICROK8S_CONFIG}
@@ -302,6 +303,46 @@ EOF
 		do
 			echo "  - ${CERT_SAN}" >>  ${MICROK8S_CONFIG}
 		done
+
+	else
+
+		if [ ${USE_LOADBALANCER} = "true" ]; then
+			echo 'extraMicroK8sAPIServerProxyArgs:' >> ${MICROK8S_CONFIG}
+			echo '  --refresh-interval: "0"' >> ${MICROK8S_CONFIG}
+			echo '  --traefik-config: /usr/local/etc/microk8s/traefik.yaml' >> ${MICROK8S_CONFIG}
+
+			mkdir -p /usr/local/etc/microk8s
+
+			cat > /usr/local/etc/microk8s/traefik.yaml <<EOF
+entryPoints:
+  apiserver:
+    address: ':${JOIN_MASTER_PORT}'
+providers:
+  file:
+    filename: /usr/local/etc/microk8s/provider.yaml
+    watch: true
+EOF
+
+			cat > /usr/local/etc/microk8s/provider.yaml <<EOF
+tcp:
+  routers:
+    Router-1:
+      rule: HostSNI(\`*\`)
+      service: kube-apiserver
+      tls:
+        passthrough: true
+  services:
+    kube-apiserver:
+      loadBalancer:
+        servers:
+        - address: ${CONTROL_PLANE_ENDPOINT}:${JOIN_MASTER_PORT}
+EOF
+		fi
+
+
+		echo "join:" >> ${MICROK8S_CONFIG}
+		echo "  url: ${CONTROL_PLANE_ENDPOINT}:25000/${TOKEN}" >> ${MICROK8S_CONFIG}
+		echo "  worker: true" >> ${MICROK8S_CONFIG}
 	fi
 
 	cat ${MICROK8S_CONFIG}
@@ -309,15 +350,20 @@ EOF
 	echo "Install microk8s ${MICROK8S_CHANNEL}"
 	snap install microk8s --classic --channel=${MICROK8S_CHANNEL}
 
-#	echo "Wait microk8s get ready"
-#	microk8s status --wait-ready -t 120
-
-#	echo "Join master node ${MASTER_IP%%:*}:25000 ${WORKER_NODE}"
-#	microk8s join ${MASTER_IP%%:*}:25000/${TOKEN} ${WORKER_NODE}
+	if [ "${CONTROL_PLANE}" = "true" ]; then
+		echo "Wait microk8s get ready"
+		microk8s status --wait-ready -t 120
+	fi
 
 elif [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 	ANNOTE_MASTER=true
 	RKE2_SERVICE=rke2-agent
+
+	if [ "${CONTROL_PLANE}" = "true" ]; then
+		RKE2_ENDPOINT=${JOIN_MASTER_IP}
+	else
+		RKE2_ENDPOINT=${CONTROL_PLANE_ENDPOINT}
+	fi
 
 	if [ $"{CLOUD_PROVIDER}" == "external" ]; then
 		cat > /etc/rancher/rke2/config.yaml <<EOF
@@ -327,7 +373,7 @@ kubelet-arg:
   - provider-id=${PROVIDERID}
   - max-pods=${MAX_PODS}
 node-name: ${NODENAME}
-server: https://${MASTER_IP%%:*}:9345
+server: https://${RKE2_ENDPOINT}:9345
 advertise-address: ${APISERVER_ADVERTISE_ADDRESS}
 token: ${TOKEN}
 EOF
@@ -337,13 +383,13 @@ kubelet-arg:
   - fail-swap-on=false
   - max-pods=${MAX_PODS}
 node-name: ${NODENAME}
-server: https://${MASTER_IP%%:*}:9345
+server: https://${RKE2_ENDPOINT}:9345
 advertise-address: ${APISERVER_ADVERTISE_ADDRESS}
 token: ${TOKEN}
 EOF
 	fi
 
-	if [ "${HA_CLUSTER}" = "true" ]; then
+	if [ "${CONTROL_PLANE}" = "true" ]; then
 		RKE2_SERVICE=rke2-server
 
 		if [ $"{CLOUD_PROVIDER}" == "external" ]; then   
@@ -372,14 +418,19 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 	ANNOTE_MASTER=true
 
 	K3S_MODE=agent
-	K3S_ARGS="--kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --server=https://${MASTER_IP} --token=${TOKEN}"
 	K3S_DISABLE_ARGS=""
+
+	if [ "${CONTROL_PLANE}" != "true" ]; then
+		K3S_ARGS="--kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --server=https://${JOIN_MASTER_IP}:${JOIN_MASTER_PORT} --token=${TOKEN}"
+	else
+		K3S_ARGS="--kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --server=https://${CONTROL_PLANE_ENDPOINT}:${JOIN_MASTER_PORT} --token=${TOKEN}"
+	fi
 
 	if [ -n "${PROVIDERID}" ]; then
 		K3S_ARGS="${K3S_ARGS} --kubelet-arg=provider-id=${PROVIDERID}"
 	fi
 
-	if [ "${HA_CLUSTER}" = "true" ]; then
+	if [ "${CONTROL_PLANE}" = "true" ]; then
         K3S_MODE=server
 		K3S_DISABLE_ARGS="--disable=servicelb --disable=traefik --disable=metrics-server"
 		K3S_SERVER_ARGS="--tls-san=${CERT_SANS}"
@@ -418,7 +469,7 @@ providerID: ${PROVIDERID}
 maxPods: ${MAX_PODS}
 EOF
 
-	if [ "${HA_CLUSTER}" = "true" ]; then
+	if [ "${CONTROL_PLANE}" = "true" ]; then
 		cp cluster/kubernetes/pki/ca.crt /etc/kubernetes/pki
 		cp cluster/kubernetes/pki/ca.key /etc/kubernetes/pki
 		cp cluster/kubernetes/pki/sa.key /etc/kubernetes/pki
@@ -443,7 +494,7 @@ EOF
 			chmod 600 /etc/kubernetes/pki/etcd/ca.key
 		fi
 
-		kubeadm join ${MASTER_IP} \
+		kubeadm join ${JOIN_MASTER_IP}:${JOIN_MASTER_PORT} \
 			--node-name "${NODENAME}" \
 			--token "${TOKEN}" \
 			--patches /etc/kubernetes/patches \
@@ -451,7 +502,7 @@ EOF
 			--apiserver-advertise-address ${APISERVER_ADVERTISE_ADDRESS} \
 			--control-plane
 	else
-		kubeadm join ${MASTER_IP} \
+		kubeadm join ${CONTROL_PLANE_ENDPOINT}:${JOIN_MASTER_PORT} \
 			--node-name "${NODENAME}" \
 			--token "${TOKEN}" \
 			--patches /etc/kubernetes/patches \
@@ -461,7 +512,7 @@ fi
 
 wait_node_ready
 
-if [ "${HA_CLUSTER}" = "true" ]; then
+if [ "${CONTROL_PLANE}" = "true" ]; then
 	kubectl label nodes ${NODENAME} \
 		"cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" \
 		"node-role.kubernetes.io/control-plane=${ANNOTE_MASTER}" \

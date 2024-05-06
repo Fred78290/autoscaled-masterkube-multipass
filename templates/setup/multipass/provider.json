@@ -9,6 +9,8 @@
 	"netplan-name": "10-custom.yaml",
 	"region": "${REGION}",
 	"zone": "${ZONEID}",
+	"use-bind9": ${USE_BIND9_SERVER},
+	"bind9-host": "${BIND9_HOST}",
 	"network": {
 		"domain": "${PRIVATE_DOMAIN_NAME}",
 		"dns": {

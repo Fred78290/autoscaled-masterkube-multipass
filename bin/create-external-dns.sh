@@ -71,4 +71,23 @@ elif [ "${EXTERNAL_DNS_PROVIDER}" == "designate" ]; then
 		${KUBERNETES_TEMPLATE}/deploy-designate.yaml \
 			| tee ${ETC_DIR}/deploy.yaml \
 			| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+
+elif [ "${EXTERNAL_DNS_PROVIDER}" == "rfc2136" ]; then
+
+	TSIG_KEYNAME=$(grep 'key' ${BIND9_RNDCKEY} | cut -d '"' -f 2)
+	TSIG_ALGO=$(grep 'algorithm' ${BIND9_RNDCKEY} | cut -d ' ' -f 2 | cut -d ';' -f 1)
+	TSIG_SECRET=$(grep 'secret' ${BIND9_RNDCKEY} | cut -d '"' -f 2)
+
+	sed -e "s/__DOMAIN_NAME__/${DOMAIN_NAME}/g" \
+		-e "s/__NODEGROUP_NAME__/${NODEGROUP_NAME}/g" \
+		-e "s/__PLATEFORM__/${PLATEFORM}/g" \
+		-e "s/__DNSHOST__/${PRIVATE_DNS}/g" \
+		-e "s/__DNSPORT__/${BIND9_PORT}/g" \
+		-e "s/__TSIG_SECRET__/${TSIG_SECRET}/g" \
+		-e "s/__TSIG_ALGO__/${TSIG_ALGO}/g" \
+		-e "s/__TSIG_KEYNAME__/${TSIG_KEYNAME}/g" \
+		${KUBERNETES_TEMPLATE}/deploy-rfc2136.yaml \
+			| tee ${ETC_DIR}/deploy.yaml \
+			| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+
 fi

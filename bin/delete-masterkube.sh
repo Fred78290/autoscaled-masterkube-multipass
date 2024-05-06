@@ -88,7 +88,7 @@ fi
 
 source "${CURDIR}/common.sh"
 
-if [ -n ${OVERRIDE_KUBERNETES_DISTRO} ]; then
+if [ -n "${OVERRIDE_KUBERNETES_DISTRO}" ]; then
 	KUBERNETES_DISTRO=${OVERRIDE_KUBERNETES_DISTRO}
 fi
 
@@ -117,7 +117,6 @@ fi
 prepare_environment
 
 echo_blue_bold "Delete masterkube ${MASTERKUBE} previous instance"
-
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
@@ -193,12 +192,6 @@ fi
 delete_host "${MASTERKUBE}"
 delete_host "masterkube-${PLATEFORM}"
 
-if [ -n "${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}" ]; then
-	rm -rf "${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}"
-fi
-
-if [ -n "${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}" ]; then
-	rm -rf "${CONFIGURATION_LOCATION}/cluster/${NODEGROUP_NAME}"
-fi
-
 popd &>/dev/null
+
+rm -rf "${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}"

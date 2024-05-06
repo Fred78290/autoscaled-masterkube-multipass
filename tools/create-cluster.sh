@@ -39,11 +39,11 @@ PRIVATE_DOMAIN_NAME=
 SERVICE_NETWORK_CIDR="10.96.0.0/12"
 TOKEN_TLL="0s"
 ZONEID=office
-FILL_ETC_HOSTS=YES
+USE_ETC_HOSTS=true
 
 export KUBECONFIG=
 
-TEMP=$(getopt -o xm:g:r:i:c:n:k:p: --long advertise-port:,fill-etc-hosts:,cloud-provider:,plateform:,tls-san:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,region:,zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
+TEMP=$(getopt -o xm:g:r:i:c:n:k:p: --long advertise-port:,use-etc-hosts:,cloud-provider:,plateform:,tls-san:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,region:,zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
@@ -78,8 +78,8 @@ while true; do
 		MASTER_NODE_ALLOW_DEPLOYMENT=$2
 		shift 2
 		;;
-	--fill-etc-hosts)
-		FILL_ETC_HOSTS=$2
+	--use-etc-hosts)
+		USE_ETC_HOSTS=$2
 		shift 2
 		;;
 	--k8s-distribution)
@@ -247,7 +247,7 @@ else
 	fi
 fi
 
-if [ ${FILL_ETC_HOSTS} == "YES" ]; then
+if [ ${USE_ETC_HOSTS} == "true" ]; then
 	for CLUSTER_NODE in ${CLUSTER_NODES[@]}
 	do
 		IFS=: read HOST IP <<< "${CLUSTER_NODE}"
@@ -298,8 +298,7 @@ persistentClusterToken: ${MICROK8S_CLUSTER_TOKEN}
 addons:
   - name: dns
   - name: rbac
-  - name: hostpath-storage
-    disable: ${HA_CLUSTER}
+  - name: ha-cluster
 extraKubeAPIServerArgs:
   --advertise-address: ${APISERVER_ADVERTISE_ADDRESS}
   --authorization-mode: RBAC,Node

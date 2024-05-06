@@ -23,6 +23,18 @@ kubectl create configmap kubernetes-pki -n kube-system --dry-run=client -o yaml 
 	| tee ${TARGET_DEPLOY_LOCATION}/configmap/kubernetes-pki.yaml \
 	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
+if [ ${USE_BIND9_SERVER} = "true" ]; then
+	cp ${BIND9_RNDCKEY} ${TARGET_CONFIG_LOCATION}/rndc.key
+else
+	touch ${TARGET_CONFIG_LOCATION}/rndc.key
+fi
+
+kubectl create secret generic rndc-key -n kube-system --dry-run=client -o yaml \
+	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+	--from-file ${TARGET_CONFIG_LOCATION}/rndc.key \
+	| tee ${TARGET_DEPLOY_LOCATION}/secrets/rndc-key.yaml \
+	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+
 if [ "${EXTERNAL_ETCD}" = "true" ]; then
 	kubectl create secret generic etcd-ssl -n kube-system --dry-run=client -o yaml \
 		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \

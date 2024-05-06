@@ -24,7 +24,7 @@ export AWS_ROUTE53_TOKEN=
 export AWS_SECRETKEY=
 export AWS_TOKEN=
 export CACHE=${HOME}/.local/masterkube/${PLATEFORM}/cache
-export CERT_EMAIL=${USER}@acme.com
+export CERT_EMAIL=
 export CERT_GODADDY_API_KEY=${GODADDY_API_KEY:=}
 export CERT_GODADDY_API_SECRET=${GODADDY_API_SECRET:=}
 export CERT_SELFSIGNED=YES
@@ -55,10 +55,10 @@ export DOMAIN_NAME=
 export ETCD_DST_DIR=
 export ETCD_ENDPOINT=
 export EXPOSE_PUBLIC_CLUSTER=false
-export EXTERNAL_DNS_PROVIDER=
+export EXTERNAL_DNS_PROVIDER=none
 export EXTERNAL_ETCD_ARGS=
 export EXTERNAL_ETCD=false
-export FILL_ETC_HOSTS=YES
+export USE_ETC_HOSTS=true
 export FIRST_WORKER_NODE_IP=
 export FIRSTNODE=0
 export GOVC_DATACENTER=${GOVC_DATACENTER:=}
@@ -177,6 +177,7 @@ export USE_CLOUDINIT_TO_CONFIGURE=false
 export USE_DHCP_ROUTES_PRIVATE=true
 export USE_DHCP_ROUTES_PUBLIC=true
 export USE_KEEPALIVED=NO
+export USE_LOADBALANCER=false
 export USE_NGINX_GATEWAY=NO
 export USE_NLB=NO
 export USE_ZEROSSL=YES
@@ -207,6 +208,12 @@ export WORKERNODE_USE_PUBLICIP=false
 export WORKERNODES=3
 export ZONEID=office
 
+export INSTALL_BIND9_SERVER=NO
+export USE_BIND9_SERVER=false
+export BIND9_HOST=
+export BIND9_PORT=53
+export BIND9_RNDCKEY=${CURDIR}/../etc/bind/rndc.key
+
 export SCP_OPTIONS="${SSH_OPTIONS} -p -r"
 
 export TARGET_CONFIG_LOCATION=
@@ -236,6 +243,7 @@ fi
 #===========================================================================================================================================
 
 source ${CURDIR}/echo.sh
+source ${CURDIR}/network.sh
 source ${CURDIR}/functions.sh
 
 #===========================================================================================================================================

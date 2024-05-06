@@ -150,6 +150,11 @@ function parse_arguments() {
 		"public-address:"
 		"metallb-ip-range:"
 		"use-keepalived"
+		"use-named-server"
+		"install-named-server"
+		"named-server-host:"
+		"named-server-port:"
+		"named-server-key:"
 	)
 
 	PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
@@ -437,6 +442,28 @@ function parse_arguments() {
 			UNREMOVABLENODERECHECKTIMEOUT="$2"
 			shift 2
 			;;
+	### Bind9 space
+		--use-named-server)
+			USE_BIND9_SERVER=true
+			shift 1
+			;;
+		--install-named-server)
+			INSTALL_BIND9_SERVER=YES
+			shift 1
+			;;
+		--named-server-host)
+			BIND9_HOST=$2
+			shift 2
+			;;
+		--named-server-port)
+			BIND9_PORT=$2
+			shift 2
+			;;
+		--named-server-key)
+			BIND9_RNDCKEY=$2
+			shift 2
+			;;
+
 	### Plateform specific
 		--nfs-server-adress)
 			NFS_SERVER_ADDRESS="$2"
@@ -569,44 +596,6 @@ function wait_ssh_ready() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-function valid_ip()
-{
-    local  ip=$1
-    local  stat=1
-
-    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        OIFS=$IFS
-        IFS='.'
-        ip=($ip)
-        IFS=$OIFS
-        [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
-        stat=$?
-    fi
-
-    return $stat
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function nextip()
-{
-	local IP=$1
-
-	if [ "${IP}" == "DHCP" ] || [ "${IP}" == "NONE" ]; then
-		echo "${IP}"
-	else
-		local IP_HEX=$(printf '%.2X%.2X%.2X%.2X\n' `echo ${IP} | tr '.' ' '`)
-		local NEXT_IP_HEX=$(printf %.8X `echo $(( 0x${IP_HEX} + 1 ))`)
-		local NEXT_IP=$(printf '%d.%d.%d.%d\n' `echo ${NEXT_IP_HEX} | sed -r 's/(..)/0x\1\ /g'`)
-
-		echo "${NEXT_IP}"
-	fi
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
 function build_routes() {
 	local ROUTES="[]"
 	local ROUTE=
@@ -698,30 +687,6 @@ function collect_cert_sans() {
 	done
 
 	echo -n "${TLS_SNA[@]}" | tr ' ' ','
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function cidr_to_netmask() {
-    value=$(( 0xffffffff ^ ((1 << (32 - $1)) - 1) ))
-    echo "$(( (value >> 24) & 0xff )).$(( (value >> 16) & 0xff )).$(( (value >> 8) & 0xff )).$(( value & 0xff ))"
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
-function ipv4() {
-	local INF=$1
-	local LOCAL_IPADDR=
-
-	if [ "${OSDISTRO}" == "Darwin" ]; then
-		read -a LOCAL_IPADDR <<< "$(ifconfig ${INF} | grep -m 1 "inet\s" | sed -n 1p)"
-	else
-		read -a LOCAL_IPADDR <<< "$(ip addr show ${INF} | grep -m 1 "inet\s" | tr '/' ' ')"
-	fi
-
-	echo -n "${LOCAL_IPADDR[1]}"
 }
 
 #===========================================================================================================================================
@@ -866,6 +831,7 @@ function register_dns() {
     local IPADDR=$2
     local NAME=$3
 	local SUFFIX=$(named_index_suffix ${INDEX})
+	local RECORDTYPE=A
 
 	delete_host ${NAME}
 	add_host ${IPADDR} ${NAME} ${NAME}.${PRIVATE_DOMAIN_NAME}
@@ -874,7 +840,7 @@ function register_dns() {
 		echo_blue_bold "Register ${NAME} address: ${IPADDR} into Route53 dns zone ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
 
 		# Record kubernetes node in Route53 DNS
-        cat > ${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json <<EOF
+        cat > ${TARGET_CONFIG_LOCATION}/route53-private-${SUFFIX}.json <<EOF
 {
 	"Comment": "${NAME} private DNS entry",
 	"Changes": [
@@ -882,7 +848,7 @@ function register_dns() {
 			"Action": "UPSERT",
 			"ResourceRecordSet": {
 				"Name": "${NAME}.${PRIVATE_DOMAIN_NAME}",
-				"Type": "A",
+				"Type": "${RECORDTYPE}",
 				"TTL": 60,
 				"ResourceRecords": [
 					{
@@ -898,11 +864,12 @@ EOF
         aws route53 change-resource-record-sets \
             --profile ${AWS_ROUTE53_PROFILE} \
             --hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
-            --change-batch file://${TARGET_CONFIG_LOCATION}/dns-private-${SUFFIX}.json > /dev/null
+            --change-batch file://${TARGET_CONFIG_LOCATION}/route53-private-${SUFFIX}.json > /dev/null
+
 	elif [ -n "${OS_PRIVATE_DNS_ZONEID}" ]; then
-		echo_blue_bold "Register ${NAME} address: ${IPADDR} into private dns zone ${PRIVATE_DOMAIN_NAME} id: ${OS_PRIVATE_DNS_ZONEID}"
+		echo_blue_bold "Register with designate ${NAME} address: ${IPADDR} into private dns zone ${PRIVATE_DOMAIN_NAME} id: ${OS_PRIVATE_DNS_ZONEID}"
 		
-		DNS_ENTRY=$(openstack recordset create -f json --record ${IPADDR} --type A "${PRIVATE_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
+		DNS_ENTRY=$(openstack recordset create -f json --ttl 60 --type ${RECORDTYPE} --record ${IPADDR} "${PRIVATE_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
 		
 		cat > ${TARGET_CONFIG_LOCATION}/designate-private-${SUFFIX}.json <<EOF
 		{
@@ -912,10 +879,21 @@ EOF
 			"record": "${IPADDR}"
 		}
 EOF
+	elif [ "${USE_BIND9_SERVER}" = "true" ]; then
+		echo_blue_bold "Register with bind9 ${NAME} address: ${IPADDR} into private dns zone ${PRIVATE_DOMAIN_NAME}"
+
+		cat > ${TARGET_CONFIG_LOCATION}/rfc2136-private-${SUFFIX}.cmd <<EOF
+server ${BIND9_HOST} ${BIND9_PORT}
+update add ${NAME}.${PRIVATE_DOMAIN_NAME} 60 ${RECORDTYPE} ${IPADDR}
+send
+EOF
+
+		cat ${TARGET_CONFIG_LOCATION}/rfc2136-private-${SUFFIX}.cmd | nsupdate -k ${BIND9_RNDCKEY}
+
     # Register node in public zone DNS if we don't use private DNS
     elif [ "${EXTERNAL_DNS_PROVIDER}" = "aws" ]; then
 		echo_blue_bold "Register ${NAME} address: ${IPADDR} into public Route33 dns zone ${PUBLIC_DOMAIN_NAME}"
-		cat > ${TARGET_CONFIG_LOCATION}/dns-public-${SUFFIX}.json <<EOF
+		cat > ${TARGET_CONFIG_LOCATION}/route53-public-${SUFFIX}.cmd <<EOF
 {
 	"Comment": "${NAME} private DNS entry",
 	"Changes": [
@@ -923,7 +901,7 @@ EOF
 			"Action": "UPSERT",
 			"ResourceRecordSet": {
 				"Name": "${NAME}.${PUBLIC_DOMAIN_NAME}",
-				"Type": "A",
+				"Type": "${RECORDTYPE}",
 				"TTL": 60,
 				"ResourceRecords": [
 					{
@@ -940,19 +918,19 @@ EOF
 		aws route53 change-resource-record-sets \
 			--profile ${AWS_ROUTE53_PROFILE} \
 			--hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
-			--change-batch file://${TARGET_CONFIG_LOCATION}/dns-public-${SUFFIX}.json > /dev/null
+			--change-batch file://${TARGET_CONFIG_LOCATION}/route53-public-${SUFFIX}.json > /dev/null
 
 	elif [ "${EXTERNAL_DNS_PROVIDER}" = "godaddy" ]; then
 
 		# Register kubernetes nodes in godaddy if we don't use route53
-		curl -s -X PUT "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/A/${NAME}" \
+		curl -s -X PUT "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/${RECORDTYPE}/${NAME}" \
 			-H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
 			-H "Content-Type: application/json" -d "[{\"data\": \"${IPADDR}\"}]"
 
 		cat > ${TARGET_CONFIG_LOCATION}/godaddy-public-${SUFFIX}.json <<EOF
 		{
 			"zone": "${PUBLIC_DOMAIN_NAME}",
-			"type": "A",
+			"type": "${RECORDTYPE}",
 			"name": "${NAME}",
 			"record": [ "${IPADDR}" ]
 		}
@@ -961,7 +939,7 @@ EOF
 	elif [ "${EXTERNAL_DNS_PROVIDER}" = "designate" ]; then
 
 		# Register in designate IP addresses point in public IP
-		DNS_ENTRY=$(openstack recordset create -f json --record ${IPADDR} --type A "${PUBLIC_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
+		DNS_ENTRY=$(openstack recordset create -f json --ttl 60 --type ${RECORDTYPE} --record ${IPADDR} "${PUBLIC_DOMAIN_NAME}." ${NAME} 2>/dev/null | jq -r '.id // ""')
 
 		cat > ${TARGET_CONFIG_LOCATION}/designate-public-${SUFFIX}.json <<EOF
 		{
@@ -971,7 +949,38 @@ EOF
 			"record": "${IPADDR}"
 		}
 EOF
+	elif [ "${EXTERNAL_DNS_PROVIDER}" = "rfc2136" ]; then
+		cat > ${TARGET_CONFIG_LOCATION}/rfc2136-public-${SUFFIX}.cmd <<EOF
+server ${BIND9_HOST} ${BIND9_PORT}
+update add ${NAME}.${PUBLIC_DOMAIN_NAME} 60 ${RECORDTYPE} ${IPADDR}"
+send
+EOF
+
+		cat ${TARGET_CONFIG_LOCATION}/rfc2136-public-${SUFFIX}.cmd | nsupdate -k ${BIND9_RNDCKEY}
 	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function create_named_server() {
+	local INDEX=$1
+	local IPADDR=$2
+	local NAME=$3
+	local ZONES=("--zone-name=${PRIVATE_DOMAIN_NAME}")
+
+	if [ ${EXTERNAL_DNS_PROVIDER} = "rfc2136" ]; then
+		ZONES+=("--zone-name=${PUBLIC_DOMAIN_NAME}")
+	fi
+
+	echo_blue_bold "Install named server on ${NAME}, ${IPADDR}"
+	
+	eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo /usr/local/bin/install-bind9.sh --user ${KUBERNETES_USER} --master-dns ${PRIVATE_DNS} ${ZONES[@]} ${SILENT}
+	eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/home/${KUBERNETES_USER}/rndc.key ${TARGET_CLUSTER_LOCATION} ${SILENT}
+
+	PRIVATE_DNS=${IPADDR}
+	BIND9_HOST=${IPADDR}
+	BIND9_RNDCKEY=${TARGET_CLUSTER_LOCATION}/rndc.key
 }
 
 #===========================================================================================================================================
@@ -983,6 +992,10 @@ function create_vm() {
 
 	plateform_create_vm $@
 	plateform_info_vm ${INDEX}
+
+	if [ "${INSTALL_BIND9_SERVER}" == "YES" ] && [ ${INDEX} -eq ${FIRSTNODE} ]; then
+		create_named_server ${INDEX} ${PRIVATE_ADDR_IPS[${INDEX}]} ${NAME}
+	fi
 
 	register_dns ${INDEX} ${PRIVATE_ADDR_IPS[${INDEX}]} ${NAME}
 }
@@ -1055,6 +1068,7 @@ function prepare_node_indexes() {
 #
 #===========================================================================================================================================
 function prepare_environment() {
+	
 	if [ -z "${NODEGROUP_NAME}" ]; then
 		NODEGROUP_NAME=${PLATEFORM}-${DEPLOY_MODE}-${KUBERNETES_DISTRO}
 	fi
@@ -1150,11 +1164,11 @@ function prepare_environment() {
 		APISERVER_ADVERTISE_PORT=16443
 
 		# microk8s can't join thru tcp load balancer
-		if [ "${HA_CLUSTER}" = "true" ]; then
-			USE_KEEPALIVED=YES
-			USE_NLB=NO
-			USE_NGINX_GATEWAY=NO
-		fi
+#		if [ "${HA_CLUSTER}" = "true" ]; then
+#			USE_KEEPALIVED=YES
+#			USE_NLB=NO
+#			USE_NGINX_GATEWAY=NO
+#		fi
 	fi
 
 	if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
@@ -1164,6 +1178,10 @@ function prepare_environment() {
 		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},25000"
 	else
 		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT}"
+	fi
+
+	if [ "${USE_NLB}" = "YES" ] || [ "${USE_KEEPALIVED}" = "YES" ]; then
+		USE_LOADBALANCER=true
 	fi
 
 	SSH_KEY_FNAME="$(basename ${SSH_PRIVATE_KEY})"
@@ -1224,6 +1242,28 @@ function prepare_environment() {
 		MASTER_NODE_ALLOW_DEPLOYMENT=YES
 	else
 		MASTER_NODE_ALLOW_DEPLOYMENT=NO
+	fi
+
+	if [ ${INSTALL_BIND9_SERVER} = "YES" ]; then
+		USE_BIND9_SERVER=true
+	elif [ ${USE_BIND9_SERVER} = "true" ]; then
+		if [ -z "${BIND9_HOST}" ]; then
+			echo_red_bold "BIND9_HOST is not defined"
+			exit 1
+		fi
+
+		if [ -z "${BIND9_RNDCKEY}" ] || [ ! -f ${BIND9_RNDCKEY} ]; then
+			echo_red_bold "BIND9_RNDCKEY is not defined or not exists"
+			exit 1
+		fi
+	fi
+
+	if [ -z "${CERT_EMAIL}" ]; then
+		if [ -n ${PUBLIC_DOMAIN_NAME} ]; then
+			CERT_EMAIL=${USER}@${PUBLIC_DOMAIN_NAME}
+		else
+			CERT_EMAIL=${USER}@${PRIVATE_DOMAIN_NAME}
+		fi
 	fi
 
 	prepare_node_indexes
@@ -1336,9 +1376,11 @@ function delete_previous_masterkube() {
 #
 #===========================================================================================================================================
 function zoneid_by_name() {
+	local DOMAINNAME=$1
+
 	if [ -n "${AWS_ROUTE53_PROFILE}" ]; then
-		aws route53 list-hosted-zones-by-name --profile ${AWS_ROUTE53_PROFILE} --dns-name $1 \
-			| jq --arg DNSNAME "${PUBLIC_DOMAIN_NAME}." -r '.HostedZones[]|select(.Name == $DNSNAME)|.Id//""' \
+		aws route53 list-hosted-zones-by-name --profile ${AWS_ROUTE53_PROFILE} --dns-name ${DOMAINNAME} \
+			| jq --arg DNSNAME "${DOMAINNAME}." -r '.HostedZones[]|select(.Name == $DNSNAME)|.Id//""' \
 			| sed -E 's/\/hostedzone\/(\w+)/\1/'
 	fi
 }
@@ -1348,6 +1390,7 @@ function zoneid_by_name() {
 #===========================================================================================================================================
 function find_public_dns_provider() {
 	if [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
+		# Check if aws is candidate
 		AWS_ROUTE53_PUBLIC_ZONE_ID=$(zoneid_by_name ${PUBLIC_DOMAIN_NAME})
 
 		if [ -n "${AWS_ROUTE53_PUBLIC_ZONE_ID}" ]; then
@@ -1355,7 +1398,12 @@ function find_public_dns_provider() {
 			echo_red_bold "Route53 will be used to register public domain hosts"
             EXTERNAL_DNS_PROVIDER=aws
 			CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
-		elif [ -n "${CERT_GODADDY_API_KEY}" ]; then
+
+			return
+		fi
+
+		# Check if godaddy is candidate
+		if [ -n "${CERT_GODADDY_API_KEY}" ]; then
             local REGISTERED=$(curl -s "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}" \
 				-H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
 				-H "Content-Type: application/json" | jq -r '.status//""')
@@ -1365,10 +1413,27 @@ function find_public_dns_provider() {
     			echo_red_bold "Godaddy will be used to register public domain hosts"
                 EXTERNAL_DNS_PROVIDER=godaddy
 				CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
+
+				return
             fi
-        else
-			echo_red_bold "No DNS provider found for PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}"
-			CERT_SELFSIGNED=YES
+		fi
+        
+		CERT_SELFSIGNED=YES
+
+		if [ ${USE_BIND9_SERVER} = "true" ]; then
+			echo_red_bold "Use Bind9 DNS provider for PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}"
+
+			if [ -z "$(rndc -s ${BIND9_HOST} -k ${BIND9_RNDCKEY} showzone ${PUBLIC_DOMAIN_NAME} 2>/dev/null)" ] && [ ${INSTALL_BIND9_SERVER} != "YES" ]; then
+				echo_red_bold "Zone ${PUBLIC_DOMAIN_NAME} is not found on bind9 server: ${BIND9_HOST}"
+				exit 1
+			fi
+
+			EXTERNAL_DNS_PROVIDER=rfc2136
+			USE_ETC_HOSTS=false
+		else
+			echo_red_bold "PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} not found, use self signed cert and /etc/hosts"
+
+			EXTERNAL_DNS_PROVIDER=none
 		fi
 	else
 		CERT_SELFSIGNED=YES
@@ -1378,7 +1443,37 @@ function find_public_dns_provider() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function find_private_dns_provider() {
+	if [ "${PUBLIC_DOMAIN_NAME}" != "${PRIVATE_DOMAIN_NAME}" ]; then
+		if [ "${USE_BIND9_SERVER}" == "true" ]; then
+			if [ -z "$(dig @${PRIVATE_DNS} ${PRIVATE_DOMAIN_NAME} NS +short)" ]; then
+				echo_red_bold "Create Bind9 server for PRIVATE_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}"
+				INSTALL_BIND9_SERVER=YES
+			else
+				echo_blue_bold "Found PRIVATE_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME} on Bind9 server"
+				echo_red_bold "Use Bind9 server: ${BIND9_HOST} for PRIVATE_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}"
+			fi
+		# Create DNS server if needed
+		elif [ -z "$(dig ${PRIVATE_DOMAIN_NAME} NS +short)" ]; then
+			echo_red_bold "Create Bind9 server for PRIVATE_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}"
+			USE_BIND9_SERVER=true
+			INSTALL_BIND9_SERVER=YES
+		fi
+	elif [ "${EXTERNAL_DNS_PROVIDER}" = "none" ]; then
+		if [ -z "$(dig ${PRIVATE_DOMAIN_NAME} NS +short)" ]; then
+			echo_red_bold "Create Bind9 server for PRIVATE_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}"
+			USE_BIND9_SERVER=true
+			INSTALL_BIND9_SERVER=YES
+			EXTERNAL_DNS_PROVIDER=rfc2136
+		fi
+	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function prepare_plateform() {
+	find_private_dns_provider
 	find_public_dns_provider
 	prepare_node_indexes
 }
@@ -1838,7 +1933,9 @@ function create_all_vms() {
 		PRIVATE_DNS_NAMES[${INDEX}]=""
 		PUBLIC_ADDR_IPS[${INDEX}]=${PUBLIC_NODE_IP}
 	
-		if [ "${LAUNCH_IN_BACKGROUND}" = "YES" ]; then
+		if [ "${INSTALL_BIND9_SERVER}" == "YES" ] && [ ${INDEX} -eq ${FIRSTNODE} ]; then
+			create_vm ${INDEX} ${PUBLIC_NODE_IP} ${NODE_IP}
+		elif [ "${LAUNCH_IN_BACKGROUND}" = "YES" ]; then
 			create_vm ${INDEX} ${PUBLIC_NODE_IP} ${NODE_IP} &
 		else
 			create_vm ${INDEX} ${PUBLIC_NODE_IP} ${NODE_IP}
@@ -1934,6 +2031,25 @@ function create_keepalived() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function create_nameserver() {
+	if [ "${EXTERNAL_DNS_PROVIDER}" == "rfc2036" ]; then
+		IPADDR=${PRIVATE_ADDR_IPS[${INDEX}]}
+
+		echo_blue_bold "Start bind server with IP: ${IPADDR}"
+
+		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-load-bind9.sh \
+			--cluster-nodes="${CLUSTER_NODES}" \
+			--master-dns=${PRIVATE_DNS} \
+			--public-zone-name=${PUBLIC_DOMAIN_NAME} \
+			--private-zone-name=${PRIVATE_DOMAIN_NAME} ${SILENT}
+		
+		eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/masterkube-key.key ${SILENT}
+	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function create_nginx_gateway() {
 	for INDEX in $(seq ${FIRSTNODE} $((CONTROLNODE_INDEX - 1)) )
 	do
@@ -1957,7 +2073,7 @@ function create_nginx_gateway() {
 		echo ${MASTERKUBE_NODE} > ${TARGET_CONFIG_LOCATION}/node-0${INDEX}-prepared
 	done
 
-echo LOAD_BALANCER_IP=$LOAD_BALANCER_IP
+	echo_red_bold LOAD_BALANCER_IP=$LOAD_BALANCER_IP
 }
 
 #===========================================================================================================================================
@@ -1972,9 +2088,9 @@ function register_nlb_dns() {
 		CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 
 		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
-			echo_title "Register dns ${MASTERKUBE} in route53: ${AWS_ROUTE53_PRIVATE_ZONE_ID}, record: ${PRIVATE_NLB_DNS}"
+			echo_title "Register dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} in route53: ${AWS_ROUTE53_PRIVATE_ZONE_ID}, record: ${PRIVATE_NLB_DNS}"
 
-			cat > ${TARGET_CONFIG_LOCATION}/dns-nlb.json <<EOF
+			cat > ${TARGET_CONFIG_LOCATION}/route53-nlb.json <<EOF
 			{
 				"Comment": "${MASTERKUBE} private DNS entry",
 				"Changes": [
@@ -1998,13 +2114,13 @@ EOF
 			aws route53 change-resource-record-sets --profile ${AWS_ROUTE53_PROFILE} \
 				--region ${AWS_REGION} \
 				--hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
-				--change-batch file://${TARGET_CONFIG_LOCATION}/dns-nlb.json > /dev/null
+				--change-batch file://${TARGET_CONFIG_LOCATION}/route53-nlb.json > /dev/null
 
 			add_host "${PRIVATE_NLB_DNS} ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}"
 		elif [ -n "${OS_PRIVATE_DNS_ZONEID}" ]; then
-			echo_title "Register dns ${MASTERKUBE} designate, id: ${OS_PRIVATE_DNS_ZONEID}, record: ${PRIVATE_NLB_DNS}"
+			echo_title "Register dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} designate, id: ${OS_PRIVATE_DNS_ZONEID}, record: ${PRIVATE_NLB_DNS}"
 			
-			DNS_ENTRY=$(openstack recordset create -f json --record ${PRIVATE_NLB_DNS} --type ${RECORDTYPE} "${PRIVATE_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
+			DNS_ENTRY=$(openstack recordset create -f json --ttl 60 --type ${RECORDTYPE} --record ${PRIVATE_NLB_DNS} "${PRIVATE_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
 			CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 
 			cat > ${TARGET_CONFIG_LOCATION}/designate-nlb.json <<EOF
@@ -2016,14 +2132,24 @@ EOF
 				"record": "${PRIVATE_NLB_DNS}"
 			}
 EOF
+		elif [ ${USE_BIND9_SERVER} = "true" ]; then
+			echo_title "Register bind9 dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} designate, record: ${PRIVATE_NLB_DNS}"
+
+			cat > ${TARGET_CONFIG_LOCATION}/rfc2136-nlb.cmd <<EOF
+server ${BIND9_HOST} ${BIND9_PORT}
+update add ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} 60 ${RECORDTYPE} ${PRIVATE_NLB_DNS}
+send
+EOF
+
+			cat ${TARGET_CONFIG_LOCATION}/rfc2136-nlb.cmd | nsupdate -k ${BIND9_RNDCKEY}
 		fi
 	fi
 
 	if [ -n "${PUBLIC_NLB_DNS}" ]; then
 		if [ "${EXTERNAL_DNS_PROVIDER}" = "aws" ]; then
-			echo_title "Register public dns ${MASTERKUBE} in route53: ${AWS_ROUTE53_PUBLIC_ZONE_ID}"
+			echo_title "Register public dns ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} in route53: ${AWS_ROUTE53_PUBLIC_ZONE_ID}"
 
-			cat > ${TARGET_CONFIG_LOCATION}/dns-public.json <<EOF
+			cat > ${TARGET_CONFIG_LOCATION}/route53-public.json <<EOF
 {
 	"Comment": "${MASTERKUBE} public DNS entry",
 	"Changes": [
@@ -2045,10 +2171,10 @@ EOF
 EOF
 
 			aws route53 change-resource-record-sets --profile ${AWS_ROUTE53_PROFILE} --hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
-				--change-batch file://${TARGET_CONFIG_LOCATION}/dns-public.json > /dev/null
+				--change-batch file://${TARGET_CONFIG_LOCATION}/route53-public.json > /dev/null
 
 		elif [ "${EXTERNAL_DNS_PROVIDER}" = "godaddy" ]; then
-			echo_title "Register public dns ${MASTERKUBE} in godaddy"
+			echo_title "Register public dns ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} in godaddy"
 
 			curl -s -X PUT "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/${RECORDTYPE}/${MASTERKUBE}" \
 				-H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
@@ -2065,9 +2191,9 @@ EOF
 EOF
 
 		elif [ "${EXTERNAL_DNS_PROVIDER}" = "designate" ]; then
-			echo_title "Register public dns ${MASTERKUBE} in designate"
+			echo_title "Register public dns ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} with designate"
 
-			DNS_ENTRY=$(openstack recordset create -f json --record ${PUBLIC_NLB_DNS} --type ${RECORDTYPE} "${PUBLIC_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
+			DNS_ENTRY=$(openstack recordset create -f json --ttl 60 --type ${RECORDTYPE} --record ${PUBLIC_NLB_DNS} "${PUBLIC_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
 
 			cat > ${TARGET_CONFIG_LOCATION}/designate-public.json <<EOF
 			{
@@ -2077,6 +2203,16 @@ EOF
 				"record": "${PUBLIC_NLB_DNS}"
 			}
 EOF
+		elif [ "${EXTERNAL_DNS_PROVIDER}" = "rfc2136" ]; then
+			echo_title "Register public dns ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} with bind9"
+
+			cat > ${TARGET_CONFIG_LOCATION}/rfc2136-public.cmd <<EOF
+server ${BIND9_HOST} ${BIND9_PORT}
+update add ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} 60 ${RECORDTYPE} ${PUBLIC_NLB_DNS}
+send
+EOF
+
+			cat ${TARGET_CONFIG_LOCATION}/rfc2136-public.cmd | nsupdate -k ${BIND9_RNDCKEY}
 		fi
 	fi
 
@@ -2091,6 +2227,29 @@ function create_plateform_nlb() {
 	create_nginx_gateway
 }
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function create_plateform_nlb_member() {
+	local NAME=$1
+	local ADDR=$2
+
+	echo -n
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function create_nlb_member() {
+	local NODEINDEX=$1
+
+	if [ "${HA_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "YES" ]; then
+		local NAME=$(get_vm_name ${NODEINDEX})
+		local ADDR=${PRIVATE_ADDR_IPS[${INDEX}]}
+
+		create_plateform_nlb_member ${NAME} ${ADDR}
+	fi
+}
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
@@ -2153,65 +2312,76 @@ EOF
 EOF
 )
 
-    for INDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
-    do
-        local SUFFIX=$(named_index_suffix ${INDEX})
-        local LAUNCHED_INSTANCES[${INDEX}]=$(cat ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
-        local PRIVATEIPADDR=$(echo ${LAUNCHED_INSTANCES[${INDEX}]} | jq -r '.PrivateIpAddress // ""')
-        local PUBLICIPADDR=$(echo ${LAUNCHED_INSTANCES[${INDEX}]} | jq --arg IPADDR ${PRIVATEIPADDR} -r '.PublicIpAddress // $IPADDR')
-        local REGISTER_IPADDR=NO
+	if [ "${USE_KEEPALIVED}" == "YES" ]; then
+		local PRIVATEIPADDR=${PRIVATE_ADDR_IPS[0]}
 
-        PRIVATE_ADDR_IPS[${INDEX}]=${PRIVATEIPADDR}
-        PUBLIC_ADDR_IPS[${INDEX}]=${PUBLICIPADDR}
+		for PRIVATEIPADDR in $(echo ${LOAD_BALANCER_IP} | tr ',' ' ')
+		do
+			DESIGNATE_REGISTER+=(${PRIVATEIPADDR})
+			GODADDY_REGISTER=$(echo ${GODADDY_REGISTER} | jq --arg IPADDR "${PRIVATEIPADDR}" '. += [ { "data": $IPADDR, "ttl": 600 } ]')
+			RECORDS+=("--record ${PRIVATEIPADDR}")
+			PUBLIC_ROUTE53_REGISTER=$(echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg IPADDR "${PRIVATEIPADDR}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
+		done
+	fi
 
-        if [ ${INDEX} -lt ${WORKERNODE_INDEX} ] && [ ${INDEX} -ge ${CONTROLNODE_INDEX} ] && [ ${EXPOSE_PUBLIC_CLUSTER} = "true" ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ] && [ "${USE_NLB}" = "NO" ] && [ "${USE_NGINX_GATEWAY}" = "NO" ]; then
-            REGISTER_IPADDR=YES
-        elif [ ${INDEX} -eq 0 ] || [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
-            REGISTER_IPADDR=YES
-        fi
+	for INDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
+	do
+		local SUFFIX=$(named_index_suffix ${INDEX})
+		local LAUNCHED_INSTANCE=$(cat ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
+		local PRIVATEIPADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateIpAddress // ""')
+		local PUBLICIPADDR=$(echo ${LAUNCHED_INSTANCE} | jq --arg IPADDR ${PRIVATEIPADDR} -r '.PublicIpAddress // $IPADDR')
 
-        if [ ${REGISTER_IPADDR} = "YES" ]; then
-            PRIVATE_ROUTE53_REGISTER=$(echo ${PRIVATE_ROUTE53_REGISTER} | jq --arg IPADDR "${PRIVATEIPADDR}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
+		PRIVATE_ADDR_IPS[${INDEX}]=${PRIVATEIPADDR}
+		PUBLIC_ADDR_IPS[${INDEX}]=${PUBLICIPADDR}
 
-            if [ -z "${PUBLICIPADDR}" ]; then
-				DESIGNATE_REGISTER+=(${PRIVATEIPADDR})
-                GODADDY_REGISTER=$(echo ${GODADDY_REGISTER} | jq --arg IPADDR "${PRIVATEIPADDR}" '. += [ { "data": $IPADDR } ]')
-                RECORDS+=("--record ${PRIVATEIPADDR}")
-                PUBLIC_ROUTE53_REGISTER=$(echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg IPADDR "${PRIVATEIPADDR}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
-            else
-				DESIGNATE_REGISTER+=(${PUBLICIPADDR})
-                GODADDY_REGISTER=$(echo ${GODADDY_REGISTER} | jq --arg IPADDR "${PUBLICIPADDR}" '. += [ { "data": $IPADDR } ]')
-                RECORDS+=("--record ${PUBLICIPADDR}")
-                PUBLIC_ROUTE53_REGISTER=$(echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg IPADDR "${PUBLICIPADDR}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
-            fi
-        fi
-    done
+		if [[ ${USE_KEEPALIVED} == "NO" ]] && [[ "${USE_NLB}" = "NO" || "${HA_CLUSTER}" = "false" ]]; then
+			local REGISTER_IP=
 
-    if [ "${USE_NLB}" = "NO" ] || [ "${HA_CLUSTER}" = "false" ]; then
-        # Register in Route53 IP addresses point in private IP
-        if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
-            echo ${PRIVATE_ROUTE53_REGISTER} | jq . > ${TARGET_CONFIG_LOCATION}/dns-nlb.json
-            aws route53 change-resource-record-sets --profile ${AWS_ROUTE53_PROFILE} \
-                --hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
-                --change-batch file://${TARGET_CONFIG_LOCATION}/dns-nlb.json > /dev/null
+#			if [ ${INDEX} -lt ${WORKERNODE_INDEX} ] && [ ${INDEX} -ge ${CONTROLNODE_INDEX} ] && [ ${EXPOSE_PUBLIC_CLUSTER} = "true" ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ] && [ "${USE_NLB}" = "NO" ] && [ "${USE_NGINX_GATEWAY}" = "NO" ]; then
 
-            for IPADDR in $(echo ${LOAD_BALANCER_IP} | tr ',' ' ')
-            do
-                add_host "${IPADDR} ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}"
-            done
-        fi
+			if [ ${HA_CLUSTER} = "true" ] && [ ${INDEX} -lt ${WORKERNODE_INDEX} ] && [ ${INDEX} -ge ${CONTROLNODE_INDEX} ] && [ "${USE_NLB}" = "NO" ] && [ "${USE_NGINX_GATEWAY}" = "NO" ]; then
+				REGISTER_IP=${PRIVATEIPADDR}
+			elif [ ${INDEX} -eq 0 ] || [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
+				REGISTER_IP=${PRIVATEIPADDR}
+			fi
+
+			if [ -n "${REGISTER_IP}" ]; then
+				PRIVATE_ROUTE53_REGISTER=$(echo ${PRIVATE_ROUTE53_REGISTER} | jq --arg IPADDR "${REGISTER_IP}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
+
+				if [ -n "${PUBLICIPADDR}" ]; then
+					REGISTER_IP=${PUBLICIPADDR}
+				fi
+
+				DESIGNATE_REGISTER+=(${REGISTER_IP})
+				GODADDY_REGISTER=$(echo ${GODADDY_REGISTER} | jq --arg IPADDR "${REGISTER_IP}" '. += [ { "data": $IPADDR, "ttl": 600 } ]')
+				RECORDS+=("--record ${REGISTER_IP}")
+				PUBLIC_ROUTE53_REGISTER=$(echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg IPADDR "${REGISTER_IP}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
+			fi
+		fi
+	done
+
+	if [ ${#DESIGNATE_REGISTER[@]} -gt 0 ]; then
+		local RECORDTYPE=A
+
+		# Register in Route53 IP addresses point in private IP
+		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+			echo ${PRIVATE_ROUTE53_REGISTER} | jq . > ${TARGET_CONFIG_LOCATION}/route53-nlb.json
+			aws route53 change-resource-record-sets --profile ${AWS_ROUTE53_PROFILE} \
+				--hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
+				--change-batch file://${TARGET_CONFIG_LOCATION}/route53-nlb.json > /dev/null
+		fi
 
 		if [ "${EXTERNAL_DNS_PROVIDER}" = "aws" ]; then
-			echo_title "Register public dns ${MASTERKUBE} in route53"
+			echo_title "Register public dns ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} in route53"
 		
 			# Register in Route53 IP addresses point in public IP
-			echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg HOSTNAME "${MASTERKUBE}.${PUBLIC_DOMAIN_NAME}" '.Changes[0].ResourceRecordSet.Name = $HOSTNAME' > ${TARGET_CONFIG_LOCATION}/dns-public.json
+			echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg HOSTNAME "${MASTERKUBE}.${PUBLIC_DOMAIN_NAME}" '.Changes[0].ResourceRecordSet.Name = $HOSTNAME' > ${TARGET_CONFIG_LOCATION}/route53-public.json
 			aws route53 change-resource-record-sets --profile ${AWS_ROUTE53_PROFILE} \
 				--hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
-				--change-batch file://${TARGET_CONFIG_LOCATION}/dns-public.json > /dev/null
+				--change-batch file://${TARGET_CONFIG_LOCATION}/route53-public.json > /dev/null
 
 		elif [ "${EXTERNAL_DNS_PROVIDER}" = "godaddy" ]; then
-			echo_title "Register public dns ${MASTERKUBE} in godaddy"
+			echo_title "Register public dns ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} in godaddy: ${GODADDY_REGISTER}"
 
 			# Register in godaddy IP addresses point in public IP
 			curl -s -X PUT "https://api.godaddy.com/v1/domains/${PUBLIC_DOMAIN_NAME}/records/A/${MASTERKUBE}" \
@@ -2222,17 +2392,17 @@ EOF
 			cat > ${TARGET_CONFIG_LOCATION}/godaddy-public.json <<EOF
 			{
 				"zone": "${PUBLIC_DOMAIN_NAME}",
-				"type": "A",
+				"type": "${RECORDTYPE}",
 				"name": "${MASTERKUBE}",
 				"record": ${GODADDY_REGISTER}
 			}
 EOF
 
 		elif [ "${EXTERNAL_DNS_PROVIDER}" = "designate" ]; then
-			echo_title "Register public dns ${MASTERKUBE} in designate"
+			echo_title "Register public dns ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} in designate"
 
 			# Register in designate IP addresses point in public IP
-			DNS_ENTRY=$(openstack recordset create -f json ${RECORDS[@]} --type A "${PUBLIC_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
+			DNS_ENTRY=$(openstack recordset create -f json --ttl 60 --type ${RECORDTYPE} ${RECORDS[@]} "${PUBLIC_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
 
 			cat > ${TARGET_CONFIG_LOCATION}/designate-public.json <<EOF
 			{
@@ -2242,6 +2412,15 @@ EOF
 				"record": "${DESIGNATE_REGISTER[@]}"
 			}
 EOF
+		elif [ "${EXTERNAL_DNS_PROVIDER}" = "rfc2136" ]; then
+			echo_title "Register public dns ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} in bind9"
+			cat > ${TARGET_CONFIG_LOCATION}/rfc2136-public.cmd <<EOF
+server ${BIND9_HOST} ${BIND9_PORT}
+update add ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} 60 ${RECORDTYPE} ${DESIGNATE_REGISTER[@]}
+send
+EOF
+
+			cat ${TARGET_CONFIG_LOCATION}/rfc2136-public.cmd | nsupdate -k ${BIND9_RNDCKEY}
 		fi
     fi
 }
@@ -2327,16 +2506,18 @@ function create_cluster() {
 					--use-external-etcd=${EXTERNAL_ETCD} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${INDEX} \
-					--load-balancer-ip=${LOAD_BALANCER_IP} \
 					--cluster-nodes="${CLUSTER_NODES}" \
+					--load-balancer-ip=${LOAD_BALANCER_IP} \
 					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
-					--fill-etc-hosts=${FILL_ETC_HOSTS} \
+					--use-etc-hosts=${USE_ETC_HOSTS} \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--tls-san="${CERT_SANS}" \
 					--ha-cluster=${HA_CLUSTER} \
 					--cni-plugin=${CNI_PLUGIN} \
 					--net-if=${PRIVATE_NET_INF} \
 					--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
+
+				create_nlb_member ${INDEX}
 
 				eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/ ${SILENT}
 
@@ -2365,7 +2546,8 @@ function create_cluster() {
 					--use-external-etcd=${EXTERNAL_ETCD} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${MASTER_IP}" \
+					--use-load-balancer=${USE_LOADBALANCER} \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--tls-san="${CERT_SANS}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
@@ -2373,6 +2555,8 @@ function create_cluster() {
 					--net-if=${PRIVATE_NET_INF} \
 					--join-master="${MASTER_IP}" \
 					--control-plane=true ${SILENT}
+
+					create_nlb_member ${INDEX}
 			else
 				# Start join worker node
 				echo_blue_bold "Join node ${MASTERKUBE_NODE} instance worker node, kubernetes version=${KUBERNETES_VERSION}"
@@ -2394,7 +2578,8 @@ function create_cluster() {
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
 					--join-master="${MASTER_IP}" \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${MASTER_IP}" \
+					--use-load-balancer=${USE_LOADBALANCER} \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--tls-san="${CERT_SANS}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
@@ -2423,7 +2608,7 @@ function unregister_dns() {
 	local FILE=
 
     # Delete DNS entries
-    for FILE in ${TARGET_CONFIG_LOCATION}/dns-*.json
+    for FILE in ${TARGET_CONFIG_LOCATION}/route53-*.json
     do
         if [ -f ${FILE} ]; then
 			local DNS=$(cat ${FILE} | jq '.Changes[0].Action = "DELETE"')
@@ -2459,7 +2644,8 @@ function unregister_dns() {
 
 			if [ -n "${DNS_ENTRY_ID}" ]; then
 				echo_blue_bold "Delete DNS entry: ${DNSNAME} in designate"
-				openstack recordset delete ${ZONEID} ${DNS_ENTRY_ID} &>/dev/null
+				openstack recordset delete ${ZONEID} ${DNS_ENTRY_ID} &>/dev/null || true
+				rm -f ${FILE}
 			fi
 		fi
 	done
@@ -2477,6 +2663,14 @@ function unregister_dns() {
 				curl -s -X DELETE -H "Authorization: sso-key ${CERT_GODADDY_API_KEY}:${CERT_GODADDY_API_SECRET}" \
 					"https://api.godaddy.com/v1/domains/${ZONE}/records/${TYPE}/${NAME}" &> /dev/null
 			fi
+		fi
+	done
+
+    # Delete DNS entries
+    for FILE in ${TARGET_CONFIG_LOCATION}/rfc2136-*.cmd
+	do
+        if [ -f ${FILE} ]; then
+			cat ${FILE} | sed 's/add/delete/g' | nsupdate -k ${BIND9_RNDCKEY} 2> /dev/null || true
 		fi
 	done
 }

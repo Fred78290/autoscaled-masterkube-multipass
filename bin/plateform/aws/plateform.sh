@@ -544,13 +544,13 @@ function prepare_ssh() {
     KEYEXISTS=$(aws ec2 describe-key-pairs --profile ${AWS_PROFILE} --key-names "${SSH_KEYNAME}" 2> /dev/null | jq -r '.KeyPairs[].KeyName // ""')
 
     if [ -z ${KEYEXISTS} ]; then
-        echo_grey "SSH Public key doesn't exist"
+        echo_blue_bold "SSH Public key doesn't exist"
         aws ec2 import-key-pair \
             --profile ${AWS_PROFILE} \
             --key-name ${SSH_KEYNAME} \
             --public-key-material "$(cat ${SSH_PUBLIC_KEY} | base64 -w 0)"
     else
-        echo_grey "SSH Public key already exists"
+        echo_blue_bold "SSH Public key already exists"
     fi
 }
 
@@ -596,51 +596,6 @@ function prepare_plateform() {
     fi
 
     # Grab domain name from route53
-    if [ -z "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
-        if [ -n "${PRIVATE_DOMAIN_NAME}" ]; then
-            AWS_ROUTE53_PRIVATE_ZONE_ID=$(zoneid_by_name ${PRIVATE_DOMAIN_NAME})
-
-            if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
-                echo_blue_bold "AWS_ROUTE53_PRIVATE_ZONE_ID will be set to ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
-            elif [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
-                echo_blue_bold "AWS_ROUTE53_PRIVATE_ZONE_ID try to be set to ${PUBLIC_DOMAIN_NAME}"
-                AWS_ROUTE53_PRIVATE_ZONE_ID=$(zoneid_by_name ${PUBLIC_DOMAIN_NAME})
-                PRIVATE_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
-            fi
-
-            if [ -z "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
-                echo_red_bold "AWS_ROUTE53_PRIVATE_ZONE_ID is not defined, exit"
-                exit 1
-            fi
-        fi
-    else
-        ROUTE53_ZONE_NAME=$(aws route53 get-hosted-zone --id  ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
-            --profile ${AWS_ROUTE53_PROFILE} 2>/dev/null| jq -r '.HostedZone.Name // ""')
-
-        if [ -z "${ROUTE53_ZONE_NAME}" ]; then
-            echo_red_bold "The zone: ${AWS_ROUTE53_PRIVATE_ZONE_ID} does not exist, exit"
-            exit 1
-        fi
-
-        ROUTE53_ZONE_NAME=${ROUTE53_ZONE_NAME%?}
-        FILL_ETC_HOSTS=NO
-
-        # Grab private domain name
-        if [ -z "${PRIVATE_DOMAIN_NAME}" ]; then
-            if [ -z "${ROUTE53_ZONE_NAME}" ] && [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
-                echo_red_bold "PRIVATE_DOMAIN_NAME is not defined, exit"
-                exit 1
-            fi
-
-            if [ -n "${ROUTE53_ZONE_NAME}" ]; then
-                echo_blue_bold "PRIVATE_DOMAIN_NAME will be set to ${ROUTE53_ZONE_NAME}"
-                PRIVATE_DOMAIN_NAME=${ROUTE53_ZONE_NAME}
-            else
-                echo_blue_bold "PRIVATE_DOMAIN_NAME will be set to ${PUBLIC_DOMAIN_NAME}"
-                PRIVATE_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
-            fi
-        fi
-    fi
 
     # Tag VPC & Subnet
     for SUBNET in ${VPC_PUBLIC_SUBNET_IDS[@]}
@@ -802,6 +757,57 @@ function create_plateform_nlb() {
 
 	# Record Masterkube in Route53 DNS
 	register_nlb_dns CNAME ${PRIVATE_NLB_DNS} ${PUBLIC_NLB_DNS}
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function find_private_dns_provider() {
+    if [ -z "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+        if [ -n "${PRIVATE_DOMAIN_NAME}" ]; then
+            AWS_ROUTE53_PRIVATE_ZONE_ID=$(zoneid_by_name ${PRIVATE_DOMAIN_NAME})
+
+            if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+                echo_blue_bold "AWS_ROUTE53_PRIVATE_ZONE_ID will be set to ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
+            elif [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
+                echo_blue_bold "AWS_ROUTE53_PRIVATE_ZONE_ID try to be set to ${PUBLIC_DOMAIN_NAME}"
+                AWS_ROUTE53_PRIVATE_ZONE_ID=$(zoneid_by_name ${PUBLIC_DOMAIN_NAME})
+                PRIVATE_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
+            fi
+
+            if [ -z "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+                echo_red_bold "AWS_ROUTE53_PRIVATE_ZONE_ID is not defined, exit"
+                exit 1
+            fi
+        fi
+    else
+        ROUTE53_ZONE_NAME=$(aws route53 get-hosted-zone --id  ${AWS_ROUTE53_PRIVATE_ZONE_ID} \
+            --profile ${AWS_ROUTE53_PROFILE} 2>/dev/null| jq -r '.HostedZone.Name // ""')
+
+        if [ -z "${ROUTE53_ZONE_NAME}" ]; then
+            echo_red_bold "The zone: ${AWS_ROUTE53_PRIVATE_ZONE_ID} does not exist, exit"
+            exit 1
+        fi
+
+        ROUTE53_ZONE_NAME=${ROUTE53_ZONE_NAME%?}
+        USE_ETC_HOSTS=false
+
+        # Grab private domain name
+        if [ -z "${PRIVATE_DOMAIN_NAME}" ]; then
+            if [ -z "${ROUTE53_ZONE_NAME}" ] && [ -z "${PUBLIC_DOMAIN_NAME}" ]; then
+                echo_red_bold "PRIVATE_DOMAIN_NAME is not defined, exit"
+                exit 1
+            fi
+
+            if [ -n "${ROUTE53_ZONE_NAME}" ]; then
+                echo_blue_bold "PRIVATE_DOMAIN_NAME will be set to ${ROUTE53_ZONE_NAME}"
+                PRIVATE_DOMAIN_NAME=${ROUTE53_ZONE_NAME}
+            else
+                echo_blue_bold "PRIVATE_DOMAIN_NAME will be set to ${PUBLIC_DOMAIN_NAME}"
+                PRIVATE_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
+            fi
+        fi
+    fi
 }
 
 #===========================================================================================================================================

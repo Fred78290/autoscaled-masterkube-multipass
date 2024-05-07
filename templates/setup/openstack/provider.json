@@ -6,7 +6,8 @@
 	"keyName": "${SSH_KEYNAME}",
 	"timeout": 300,
 	"use-bind9": ${USE_BIND9_SERVER},
-	"bind9-host": "${BIND9_HOST}",
+	"bind9-host": "${BIND9_HOST}:${BIND9_PORT}",
+	"rndc-key-file": "/etc/cluster/rndc.key",
 	"clouds": {
 		"openstack": {
 			"auth": {

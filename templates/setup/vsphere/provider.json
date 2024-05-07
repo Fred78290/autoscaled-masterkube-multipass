@@ -14,6 +14,9 @@
 	"customization": "${GOVC_CUSTOMIZATION}",
 	"region": "${REGION}",
 	"zone": "${ZONEID}",
+	"use-bind9": ${USE_BIND9_SERVER},
+	"bind9-host": "${BIND9_HOST}:${BIND9_PORT}",
+	"rndc-key-file": "/etc/cluster/rndc.key",
 	"network": {
 		"domain": "${PRIVATE_DOMAIN_NAME}",
 		"dns": {

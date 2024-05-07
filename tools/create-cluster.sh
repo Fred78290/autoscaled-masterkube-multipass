@@ -256,6 +256,8 @@ if [ ${USE_ETC_HOSTS} == "true" ]; then
 			echo "${IP}   ${HOST} ${HOST%%.*}" >> /etc/hosts
 		fi
 	done
+
+	echo "${APISERVER_ADVERTISE_ADDRESS} $(hostname) ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 fi
 
 if [ -z "${LOAD_BALANCER_IP}" ]; then
@@ -273,8 +275,6 @@ fi
 
 mkdir -p /etc/kubernetes
 mkdir -p ${CLUSTER_DIR}/etcd
-
-echo "${APISERVER_ADVERTISE_ADDRESS} $(hostname) ${CONTROL_PLANE_ENDPOINT}" >> /etc/hosts
 
 if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
 	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"

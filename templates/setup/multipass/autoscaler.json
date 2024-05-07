@@ -25,9 +25,6 @@
 	"cloudinit-file-owner": "root:adm",
 	"cloudinit-file-mode": 420,
 	"allow-upgrade": ${UPDATE_PACKAGE},
-	"use-bind9": ${USE_BIND9_SERVER},
-	"bind9-host": "${BIND9_HOST}",
-	"rndc-key-file": "/etc/kubernetes/rndc.key",
 	"optionals": {
 		"pricing": false,
 		"getAvailableMachineTypes": false,

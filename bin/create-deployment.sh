@@ -8,12 +8,19 @@ if [ "${KUBERNETES_DISTRO}" == "microk8s" ] || [ "${KUBERNETES_DISTRO}" == "k3s"
   ANNOTE_MASTER=true
 fi
 
+if [ "${USE_BIND9_SERVER}" = "true" ] && [ "${BIND9_RNDCKEY}" != "${TARGET_CLUSTER_LOCATION}/rndc.key" ]; then
+	cp ${BIND9_RNDCKEY} ${TARGET_CLUSTER_LOCATION}/rndc.key
+else
+	touch ${TARGET_CLUSTER_LOCATION}/rndc.key
+fi
+
 kubectl create configmap config-cluster-autoscaler -n kube-system --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	--from-file ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} \
 	--from-file ${TARGET_CONFIG_LOCATION}/provider.json \
 	--from-file ${TARGET_CONFIG_LOCATION}/machines.json \
 	--from-file ${TARGET_CONFIG_LOCATION}/autoscaler.json \
+	--from-file ${TARGET_CLUSTER_LOCATION}/rndc.key \
 	| tee ${TARGET_DEPLOY_LOCATION}/configmap/config-cluster-autoscaler.yaml \
 	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
@@ -21,18 +28,6 @@ kubectl create configmap kubernetes-pki -n kube-system --dry-run=client -o yaml 
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	--from-file ${TARGET_CLUSTER_LOCATION}/kubernetes/pki \
 	| tee ${TARGET_DEPLOY_LOCATION}/configmap/kubernetes-pki.yaml \
-	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
-
-if [ ${USE_BIND9_SERVER} = "true" ]; then
-	cp ${BIND9_RNDCKEY} ${TARGET_CONFIG_LOCATION}/rndc.key
-else
-	touch ${TARGET_CONFIG_LOCATION}/rndc.key
-fi
-
-kubectl create secret generic rndc-key -n kube-system --dry-run=client -o yaml \
-	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--from-file ${TARGET_CONFIG_LOCATION}/rndc.key \
-	| tee ${TARGET_DEPLOY_LOCATION}/secrets/rndc-key.yaml \
 	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 if [ "${EXTERNAL_ETCD}" = "true" ]; then
@@ -98,7 +93,7 @@ elif [ ${PLATEFORM} == "aws" ]; then
 	echo_title "Create EFS provisionner"
 	create-efs-provisionner.sh
 fi
-
+exit
 if [ ${LAUNCH_CA} != "NO" ]; then
 	echo_title "Create autoscaler"
 	create-autoscaler.sh ${LAUNCH_CA}

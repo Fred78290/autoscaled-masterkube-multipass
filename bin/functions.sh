@@ -833,8 +833,10 @@ function register_dns() {
 	local SUFFIX=$(named_index_suffix ${INDEX})
 	local RECORDTYPE=A
 
-	delete_host ${NAME}
-	add_host ${IPADDR} ${NAME} ${NAME}.${PRIVATE_DOMAIN_NAME}
+	if [ "${USE_ETC_HOSTS}" = "true" ] || [ ${INSTALL_BIND9_SERVER} = "YES" ]; then
+		delete_host ${NAME}
+		add_host ${IPADDR} ${NAME} ${NAME}.${PRIVATE_DOMAIN_NAME}
+	fi
 
     if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 		echo_blue_bold "Register ${NAME} address: ${IPADDR} into Route53 dns zone ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
@@ -1467,6 +1469,10 @@ function find_private_dns_provider() {
 			EXTERNAL_DNS_PROVIDER=rfc2136
 		fi
 	fi
+
+	if [ "${USE_BIND9_SERVER}" = "true" ]; then
+		USE_ETC_HOSTS=false
+	fi
 }
 
 #===========================================================================================================================================
@@ -1706,6 +1712,7 @@ export UNREMOVABLENODERECHECKTIMEOUT=${UNREMOVABLENODERECHECKTIMEOUT}
 export UPGRADE_CLUSTER=${UPGRADE_CLUSTER}
 export USE_DHCP_ROUTES_PRIVATE=${USE_DHCP_ROUTES_PRIVATE}
 export USE_DHCP_ROUTES_PUBLIC=${USE_DHCP_ROUTES_PUBLIC}
+export USE_ETC_HOSTS=${USE_ETC_HOSTS}
 export USE_KEEPALIVED=${USE_KEEPALIVED}
 export USE_NGINX_GATEWAY=${USE_NGINX_GATEWAY}
 export USE_NLB=${USE_NLB}
@@ -2469,7 +2476,7 @@ EOF
 #===========================================================================================================================================
 function create_cluster() {
     local MASTER_IP=
-
+echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
 	CERT_SANS=$(collect_cert_sans "${LOAD_BALANCER_IP}" "${CLUSTER_NODES}" "${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}")
 
 	for INDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
@@ -2543,6 +2550,7 @@ function create_cluster() {
 					--max-pods=${MAX_PODS} \
 					--vm-uuid=${VMUUID} \
 					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
+					--use-etc-hosts=${USE_ETC_HOSTS} \
 					--use-external-etcd=${EXTERNAL_ETCD} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
@@ -2574,6 +2582,7 @@ function create_cluster() {
 					--zone=${ZONEID} \
 					--max-pods=${MAX_PODS} \
 					--vm-uuid=${VMUUID} \
+					--use-etc-hosts=${USE_ETC_HOSTS} \
 					--use-external-etcd=${EXTERNAL_ETCD} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
@@ -2720,7 +2729,7 @@ EOF
 		echo_title "Create ${TARGET_CONFIG_LOCATION}/image-credential-provider-config.json"
 		echo $(eval "cat <<EOF
 	$(<${PWD}/templates/setup/image-credential-provider-config.json)
-EOF") | tee /dev/stderr | jq . > ${TARGET_CONFIG_LOCATION}/image-credential-provider-config.json
+EOF") | jq . | tee /dev/stderr > ${TARGET_CONFIG_LOCATION}/image-credential-provider-config.json
 
 		IMAGE_CREDENTIALS=$(cat "${TARGET_CONFIG_LOCATION}/image-credential-provider-config.json")
 	else
@@ -2731,12 +2740,12 @@ EOF") | tee /dev/stderr | jq . > ${TARGET_CONFIG_LOCATION}/image-credential-prov
 
 	echo $(eval "cat <<EOF
 	$(<${PWD}/templates/setup/${PLATEFORM}/provider.json)
-EOF") | tee /dev/stderr | jq . > ${TARGET_CONFIG_LOCATION}/provider.json
+EOF") | jq . | tee /dev/stderr > ${TARGET_CONFIG_LOCATION}/provider.json
 
 	echo_title "Create ${TARGET_CONFIG_LOCATION}/autoscaler.json"
 
 	echo $(eval "cat <<EOF
 	$(<${PWD}/templates/setup/${PLATEFORM}/autoscaler.json)
-EOF") | tee /dev/stderr | jq --argjson IMAGE_CREDENTIALS "${IMAGE_CREDENTIALS}" '. += $IMAGE_CREDENTIALS' | tee /dev/stderr > ${TARGET_CONFIG_LOCATION}/autoscaler.json
+EOF") | jq --argjson IMAGE_CREDENTIALS "${IMAGE_CREDENTIALS}" '. += $IMAGE_CREDENTIALS' | tee /dev/stderr > ${TARGET_CONFIG_LOCATION}/autoscaler.json
 }
 

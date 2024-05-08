@@ -93,7 +93,7 @@ elif [ ${PLATEFORM} == "aws" ]; then
 	echo_title "Create EFS provisionner"
 	create-efs-provisionner.sh
 fi
-exit
+
 if [ ${LAUNCH_CA} != "NO" ]; then
 	echo_title "Create autoscaler"
 	create-autoscaler.sh ${LAUNCH_CA}

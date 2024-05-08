@@ -1,1 +1,1 @@
-# Deployed selef signed certificates location
+# Deployed self signed certificates location

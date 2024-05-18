@@ -67,7 +67,6 @@ kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 helm repo add jetstack https://charts.jetstack.io
-helm repo add godaddy-webhook https://fred78290.github.io/cert-manager-webhook-godaddy/
 helm repo update
 
 helm upgrade -i ${NAMESPACE} jetstack/cert-manager \
@@ -103,6 +102,8 @@ else
 		fi
 	elif [ "${EXTERNAL_DNS_PROVIDER}" == "godaddy" ]; then
 		echo_blue_bold "Register godaddy issuer"
+		helm repo add godaddy-webhook https://fred78290.github.io/cert-manager-webhook-godaddy/
+		helm repo update
 		helm upgrade -i godaddy-webhook godaddy-webhook/godaddy-webhook \
 			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 			--version ${GODADDY_WEBHOOK_VERSION} \

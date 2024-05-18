@@ -259,10 +259,6 @@ if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
 	cat >  ${MICROK8S_CONFIG} <<EOF
 version: 0.1.0
 persistentClusterToken: ${TOKEN}
-join:
-  url: ${JOIN_MASTER_IP}:25000/${TOKEN}
-  worker: ${WORKER}
-
 extraKubeletArgs:
   --max-pods: ${MAX_PODS}
   --node-ip: ${APISERVER_ADVERTISE_ADDRESS}
@@ -305,7 +301,6 @@ EOF
 		done
 
 	else
-
 		if [ ${USE_LOADBALANCER} = "true" ]; then
 			echo 'extraMicroK8sAPIServerProxyArgs:' >> ${MICROK8S_CONFIG}
 			echo '  --refresh-interval: "0"' >> ${MICROK8S_CONFIG}

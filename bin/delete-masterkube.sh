@@ -194,4 +194,6 @@ delete_host "masterkube-${PLATEFORM}"
 
 popd &>/dev/null
 
+echo_blue_bold "Delete ${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}"
+
 rm -rf "${CONFIGURATION_LOCATION}/config/${NODEGROUP_NAME}"

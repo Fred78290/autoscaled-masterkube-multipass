@@ -2092,10 +2092,12 @@ function register_nlb_dns() {
 	local PUBLIC_NLB_DNS=$3
 
 	if [ -n "${PRIVATE_NLB_DNS}" ]; then
-		CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
-
 		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 			echo_title "Register dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} in route53: ${AWS_ROUTE53_PRIVATE_ZONE_ID}, record: ${PRIVATE_NLB_DNS}"
+
+			if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
+				CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
+			fi
 
 			cat > ${TARGET_CONFIG_LOCATION}/route53-nlb.json <<EOF
 			{
@@ -2128,7 +2130,10 @@ EOF
 			echo_title "Register dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} designate, id: ${OS_PRIVATE_DNS_ZONEID}, record: ${PRIVATE_NLB_DNS}"
 			
 			DNS_ENTRY=$(openstack recordset create -f json --ttl 60 --type ${RECORDTYPE} --record ${PRIVATE_NLB_DNS} "${PRIVATE_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
-			CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
+
+			if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
+				CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
+			fi
 
 			cat > ${TARGET_CONFIG_LOCATION}/designate-nlb.json <<EOF
 			{
@@ -2142,13 +2147,15 @@ EOF
 		elif [ ${USE_BIND9_SERVER} = "true" ]; then
 			echo_title "Register bind9 dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} designate, record: ${PRIVATE_NLB_DNS}"
 
+			if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
+				CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
+			fi
+
 			cat > ${TARGET_CONFIG_LOCATION}/rfc2136-nlb.cmd <<EOF
 server ${BIND9_HOST} ${BIND9_PORT}
 update add ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} 60 ${RECORDTYPE} ${PRIVATE_NLB_DNS}
 send
 EOF
-
-			CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 
 			cat ${TARGET_CONFIG_LOCATION}/rfc2136-nlb.cmd | nsupdate -k ${BIND9_RNDCKEY}
 		fi
@@ -2478,8 +2485,10 @@ EOF
 #===========================================================================================================================================
 function create_cluster() {
     local MASTER_IP=
-echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
-	CERT_SANS=$(collect_cert_sans "${LOAD_BALANCER_IP}" "${CLUSTER_NODES}" "${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}")
+
+	echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
+
+	CERT_SANS=$(collect_cert_sans "${LOAD_BALANCER_IP}" "${CLUSTER_NODES}" "${MASTERKUBE}.${PRIVATE_DOMAIN_NAME},${MASTERKUBE}")
 
 	for INDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
 	do

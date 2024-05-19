@@ -126,6 +126,9 @@ if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
 	echo_title "Create Rancher"
 	create-rancher.sh
 
+	echo_title "Create Kubeapps"
+	create-kubeapps.sh
+
 	echo_title "Create Sample hello"
 	create-helloworld.sh
 

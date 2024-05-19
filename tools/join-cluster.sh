@@ -247,6 +247,11 @@ mkdir -p ${SUDO_HOME}/.kube
 cp ${KUBECONFIG} ${SUDO_HOME}/.kube/config
 chown ${SUDO_UID}:${SUDO_GID} ${SUDO_HOME}/.kube/config
 
+# AWS NLB....
+if [ -z "${CONTROL_PLANE_ENDPOINT_ADDR}" ]; then
+	CONTROL_PLANE_ENDPOINT_ADDR=${JOIN_MASTER_IP}
+fi
+
 if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
 	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
 	MICROK8S_CHANNEL="${VERSION:1}.${MAJOR}/stable"
@@ -330,13 +335,12 @@ tcp:
     kube-apiserver:
       loadBalancer:
         servers:
-        - address: ${CONTROL_PLANE_ENDPOINT}:${JOIN_MASTER_PORT}
+        - address: ${CONTROL_PLANE_ENDPOINT_ADDR}:${JOIN_MASTER_PORT}
 EOF
 		fi
 
-
 		echo "join:" >> ${MICROK8S_CONFIG}
-		echo "  url: ${CONTROL_PLANE_ENDPOINT}:25000/${TOKEN}" >> ${MICROK8S_CONFIG}
+		echo "  url: ${CONTROL_PLANE_ENDPOINT_ADDR}:25000/${TOKEN}" >> ${MICROK8S_CONFIG}
 		echo "  worker: true" >> ${MICROK8S_CONFIG}
 	fi
 

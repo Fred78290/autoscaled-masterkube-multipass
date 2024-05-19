@@ -2499,7 +2499,7 @@ echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
 				# Start create first master node
 				echo_blue_bold "Start control plane ${MASTERKUBE_NODE} index=${INDEX}, kubernetes version=${KUBERNETES_VERSION}"
 
-				MASTER_IP=${IPADDR}:6443
+				MASTER_IP=${IPADDR}:${APISERVER_ADVERTISE_PORT}
 
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
 					--plateform=${PLATEFORM} \

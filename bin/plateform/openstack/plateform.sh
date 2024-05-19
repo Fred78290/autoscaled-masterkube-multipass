@@ -626,7 +626,7 @@ function delete_load_balancer() {
 
 		echo_blue_bold "Delete port: ${PORTID}"
 
-		openstack port delete ${PORTID} &>/dev/null
+		openstack port delete ${PORTID} &>/dev/null || :
 	fi
 }
 
@@ -989,8 +989,8 @@ function create_plateform_nlb() {
 
 	LOAD_BALANCER=$(openstack loadbalancer show -f json nlb-internal-${MASTERKUBE} 2>/dev/null)
 	CONTROL_PLANE_ENDPOINT=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address')
-	LOAD_BALANCER_IP=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address' | tr '[:space:]' ',')
-	PRIVATE_NLB_DNS=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address')
+	LOAD_BALANCER_IP=${CONTROL_PLANE_ENDPOINT}
+	PRIVATE_NLB_DNS=${CONTROL_PLANE_ENDPOINT}
 
 	if [ ${EXPOSE_PUBLIC_CLUSTER} = "true" ]; then
 		echo_title "Create external NLB ${MASTERKUBE} with target: ${NLB_TARGETS} at: ${PUBLIC_VIP_ADDRESS}"

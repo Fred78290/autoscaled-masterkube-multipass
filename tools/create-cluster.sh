@@ -284,7 +284,7 @@ if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
 	APISERVER_ADVERTISE_PORT=16443
 	ANNOTE_MASTER=true
 
-	mkdir -p /var/snap/microk8s/common/
+	mkdir -p "$(dirname ${MICROK8S_CONFIG})"
 
 	if [ "${HA_CLUSTER}" == "true" ]; then
 		DISABLE_HA_CLUSTER=false

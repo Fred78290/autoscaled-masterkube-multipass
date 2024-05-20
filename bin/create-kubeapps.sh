@@ -1,5 +1,8 @@
 #!/bin/bash
+CURDIR=$(dirname $0)
 export ETC_DIR=${TARGET_DEPLOY_LOCATION}/kubeapps
+
+source "${CURDIR}/echo.sh"
 
 ### Clear AppRepository after delete ns
 # kubectl patch AppRepository/bitnami -p '{"metadata":{"finalizers":[]}}' --type=merge

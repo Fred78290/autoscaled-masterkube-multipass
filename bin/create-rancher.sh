@@ -64,8 +64,10 @@ done
 
 echo
 
+echo "https://rancher-${NODEGROUP_NAME}.${DOMAIN_NAME}/dashboard/?setup=${BOOTSTRAP_SECRET}" > ${TARGET_DEPLOY_LOCATION}/rancher/rancher.log
+
 echo_title "Rancher setup URL"
-echo_blue_bold "https://rancher-${PLATEFORM}.${DOMAIN_NAME}/dashboard/?setup=${BOOTSTRAP_SECRET}" | tee ${TARGET_DEPLOY_LOCATION}/rancher/rancher.log
+echo_blue_bold "https://rancher-${NODEGROUP_NAME}.${DOMAIN_NAME}/dashboard/?setup=${BOOTSTRAP_SECRET}"
 echo_line
 echo
 

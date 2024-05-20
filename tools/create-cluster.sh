@@ -43,7 +43,37 @@ USE_ETC_HOSTS=true
 
 export KUBECONFIG=
 
-TEMP=$(getopt -o xm:g:r:i:c:n:k:p: --long advertise-port:,use-etc-hosts:,cloud-provider:,plateform:,tls-san:,etcd-endpoint:,k8s-distribution:,allow-deployment:,max-pods:,trace,container-runtime:,node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,cni-plugin:,kubernetes-version:,region:,zone:,vm-uuid:,net-if:,ecr-password:,private-zone-id:,private-zone-name: -n "$0" -- "$@")
+OPTIONS=(
+	"advertise-port:"
+	"allow-deployment:"
+	"cloud-provider:"
+	"cluster-nodes:"
+	"cni-plugin:"
+	"container-runtime:"
+	"control-plane-endpoint:"
+	"ecr-password:"
+	"etcd-endpoint:"
+	"ha-cluster:"
+	"kube-engine:"
+	"kube-version:"
+	"load-balancer-ip:"
+	"max-pods:"
+	"net-if:"
+	"node-group:"
+	"node-index:"
+	"plateform:"
+	"private-zone-id:"
+	"private-zone-name:"
+	"region:"
+	"tls-san:"
+	"trace"
+	"use-etc-hosts:"
+	"use-external-etcd:"
+	"vm-uuid:"
+	"zone:"
+)
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
+TEMP=$(getopt -o xm:g:r:i:c:n:k:p: --long "${PARAMS}" -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 

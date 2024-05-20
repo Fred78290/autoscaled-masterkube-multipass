@@ -11,7 +11,13 @@ if [ "$(uname -p)" == "aarch64" ];  then
 	ARCH="arm64"
 fi
 
-TEMP=$(getopt -o u:c:n: --long user:,node-index:,cluster-nodes: -n "$0" -- "$@")
+OPTIONS=(
+	"cluster-nodes:"
+	"node-index:"
+	"user:"
+)
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
+TEMP=$(getopt -o u:c:n: --long "${PARAMS}" -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 

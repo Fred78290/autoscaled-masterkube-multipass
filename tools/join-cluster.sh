@@ -30,7 +30,35 @@ SERVICE_NETWORK_CIDR="10.96.0.0/12"
 TOKEN=$(cat ./cluster/token)
 ZONEID=office
 USE_LOADBALANCER=NO
-TEMP=$(getopt -o i:g:k:c:n:r:x --long use-load-balancer:,kubernetes-version:,cni-plugin:,container-runtime:,trace,use-etc-hosts:,cloud-provider:,plateform:,tls-san:,max-pods:,etcd-endpoint:,k8s-distribution:,allow-deployment:,join-master:,node-index:,use-external-etcd:,control-plane:,node-group:,control-plane-endpoint:,cluster-nodes:,net-if:,region:,zone:,vm-uuid: -n "$0" -- "$@")
+
+OPTIONS=(
+	"allow-deployment:"
+	"cloud-provider:"
+	"cluster-nodes:"
+	"cni-plugin:"
+	"container-runtime:"
+	"control-plane-endpoint:"
+	"control-plane:"
+	"etcd-endpoint:"
+	"join-master:"
+	"kube-engine:"
+	"kube-version:"
+	"max-pods:"
+	"net-if:"
+	"node-group:"
+	"node-index:"
+	"plateform:"
+	"region:"
+	"tls-san:"
+	"trace use-etc-hosts:"
+	"use-external-etcd:"
+	"use-load-balancer:"
+	"vm-uuid:"
+	"zone:"
+)
+
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
+TEMP=$(getopt -o i:g:k:c:n:r:x --long "${PARAMS}" -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 

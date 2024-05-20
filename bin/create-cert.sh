@@ -12,7 +12,14 @@ Options are:
 EOF
 }
 
-TEMP=$(getopt -o hl:d:m: --long help,ssl-location:,domain:,cert-email: -n "$0" -- "$@")
+OPTIONS=(
+	"help"
+	"ssl-location:"
+	"domain:"
+	"cert-email:"
+)
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
+TEMP=$(getopt -o hl:d:m: --long "${PARAMS}" -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 

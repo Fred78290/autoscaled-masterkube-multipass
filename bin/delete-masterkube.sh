@@ -13,7 +13,19 @@ OVERRIDE_KUBERNETES_DISTRO=
 
 pushd ${CURDIR}/../ &>/dev/null
 
-TEMP=$(getopt -o ftg:p:r: --long k8s-distribution:,trace,configuration-location:,defs:,force,node-group:,profile:,region:,plateform: -n "$0" -- "$@")
+OPTIONS=(
+	"configuration-location:"
+	"defs:"
+	"force"
+	"kube-engine:"
+	"node-group:"
+	"plateform:"
+	"profile:"
+	"region:"
+	"trace"
+)
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
+TEMP=$(getopt -o ftg:p:r: --long "${PARAMS}" -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 

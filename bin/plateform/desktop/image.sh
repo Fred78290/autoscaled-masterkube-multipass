@@ -16,20 +16,20 @@ SECOND_NETWORK_NAME= #vmnet8
 TARGET_IMAGE=
 
 OPTIONS=(
-	"distribution:"
-	"custom-image:"
-	"ssh-key:"
-	"ssh-priv-key:"
-	"cni-version:"
-	"password:"
-	"seed:"
 	"arch:"
-	"user:"
-	"kubernetes-version:"
+	"cni-version:"
+	"container-runtime:"
+	"custom-image:"
+	"distribution:"
+	"kube-engine:"
+	"kube-version:"
+	"password:"
 	"primary-network:"
 	"second-network:"
-	"k8s-distribution:"
-	"container-runtime:"
+	"seed:"
+	"ssh-key:"
+	"ssh-priv-key:"
+	"user:"
 )
 
 PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')

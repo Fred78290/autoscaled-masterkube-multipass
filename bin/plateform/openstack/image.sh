@@ -12,23 +12,23 @@ FLAVOR_IMAGE=ds2G
 SECURITY_GROUP=default
 
 OPTIONS=(
-	"distribution:"
-	"custom-image:"
-	"ssh-key:"
-	"ssh-priv-key:"
-	"cni-version:"
-	"password:"
-	"seed:"
 	"arch:"
-	"user:"
-	"kubernetes-version:"
+	"cni-version:"
+	"container-runtime:"
+	"custom-image:"
+	"distribution:"
+	"flavor:"
+	"kube-engine:"
+	"kube-version:"
+	"password:"
+	"primary-adapter:"
 	"primary-network:"
 	"second-network:"
-	"k8s-distribution:"
-	"container-runtime:"
-	"primary-adapter:"
-	"flavor:"
 	"security-group:"
+	"seed:"
+	"ssh-key:"
+	"ssh-priv-key:"
+	"user:"
 )
 
 PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')

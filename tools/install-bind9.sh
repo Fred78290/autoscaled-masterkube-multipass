@@ -5,7 +5,13 @@ ADVERTISE_ADDRESS=$(ip addr show ${NET_INF} | grep "inet\s" | tr '/' ' ' | awk '
 MASTER_DNS=$(resolvectl dns ${NET_INF} | cut -d ' ' -f 4)
 USER=ubuntu
 
-TEMP=$(getopt -o m:u:z: --long user:,master-dns:,zone-name: -n "$0" -- "$@")
+OPTIONS=(
+	"user:"
+	"master-dns:"
+	"zone-name:"
+)
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
+TEMP=$(getopt -o m:u:z: --long "${PARAMS}" -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 

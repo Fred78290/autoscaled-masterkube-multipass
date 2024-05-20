@@ -25,7 +25,7 @@ else
 fi
 
 cat > ${TARGET_DEPLOY_LOCATION}/rancher/rancher.yaml <<EOF
-hostname: rancher-${PLATEFORM}.${DOMAIN_NAME}
+hostname: rancher-${NODEGROUP_NAME}.${DOMAIN_NAME}
 tls: ingress
 replicas: 1
 global:
@@ -42,7 +42,7 @@ ingress:
     "external-dns.alpha.kubernetes.io/register": 'true'
     "external-dns.alpha.kubernetes.io/ttl": '600'
     "external-dns.alpha.kubernetes.io/target": "${EXTERNAL_DNS_TARGET}"
-    "external-dns.alpha.kubernetes.io/hostname": "rancher-${PLATEFORM}.${DOMAIN_NAME}"
+    "external-dns.alpha.kubernetes.io/hostname": "rancher-${NODEGROUP_NAME}.${DOMAIN_NAME}"
 EOF
 
 helm upgrade -i rancher "${REPO}" \

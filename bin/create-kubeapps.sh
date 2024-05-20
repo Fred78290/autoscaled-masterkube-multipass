@@ -37,7 +37,7 @@ cat > ${ETC_DIR}/values.yaml <<EOF
 ingress:
   ingressClassName: nginx
   enabled: true
-  hostname: ${NODEGROUP_NAME}-kubeapps.${DOMAIN_NAME}
+  hostname: kubeapps-${NODEGROUP_NAME}.${DOMAIN_NAME}
   tls: true
   certManager: true
   annotations:
@@ -45,7 +45,7 @@ ingress:
     external-dns.alpha.kubernetes.io/register: 'true'
     external-dns.alpha.kubernetes.io/ttl: '600'
     external-dns.alpha.kubernetes.io/target: ${MASTERKUBE}.${DOMAIN_NAME}
-    external-dns.alpha.kubernetes.io/hostname: ${NODEGROUP_NAME}-kubeapps.${DOMAIN_NAME}
+    external-dns.alpha.kubernetes.io/hostname: kubeapps-${NODEGROUP_NAME}.${DOMAIN_NAME}
 EOF
 
 helm install kubeapps \

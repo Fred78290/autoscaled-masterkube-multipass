@@ -22,20 +22,20 @@ TARGET_IMAGE=
 FOLDER_OPTIONS=
 
 OPTIONS=(
-	"distribution:"
-	"custom-image:"
-	"ssh-key:"
-	"ssh-priv-key:"
-	"cni-version:"
-	"password:"
-	"seed:"
 	"arch:"
-	"user:"
-	"kubernetes-version:"
+	"cni-version:"
+	"container-runtime:"
+	"custom-image:"
+	"distribution:"
+	"kube-engine:"
+	"kube-version:"
+	"password:"
 	"primary-network:"
 	"second-network:"
-	"k8s-distribution:"
-	"container-runtime:"
+	"seed:"
+	"ssh-key:"
+	"ssh-priv-key:"
+	"user:"
 )
 
 PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
@@ -60,10 +60,10 @@ while true ; do
 		-s|--seed) SEED_IMAGE=$2 ; shift 2;;
 		-a|--arch) SEED_ARCH=$2 ; shift 2;;
 		-u|--user) KUBERNETES_USER=$2 ; shift 2;;
-		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
+		-v|--kube-version) KUBERNETES_VERSION=$2 ; shift 2;;
 		--primary-network) PRIMARY_NETWORK_NAME=$2 ; shift 2;;
 		--second-network) SECOND_NETWORK_NAME=$2 ; shift 2;;
-		--k8s-distribution) 
+		--kube-engine) 
 			case "$2" in
 				kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
@@ -340,8 +340,8 @@ ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo /usr/local/bin/prepare
 						--container-runtime ${CONTAINER_ENGINE} \
 						--cni-version ${CNI_VERSION} \
 						--cni-plugin ${CNI_PLUGIN} \
-						--kubernetes-version ${KUBERNETES_VERSION} \
-						--k8s-distribution ${KUBERNETES_DISTRO}
+						--kube-version ${KUBERNETES_VERSION} \
+						--kube-engine ${KUBERNETES_DISTRO}
 
 govc vm.power -persist-session=false -s=true "${TARGET_IMAGE}"
 

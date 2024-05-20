@@ -7,7 +7,14 @@ CLUSTER_NODES=()
 PRIVATE_IP=0.0.0.0
 LOAD_BALANCER_PORT=80,443,6443
 
-TEMP=$(getopt -o l:c:p:n: --long listen-port:,listen-ip:,cluster-nodes:,control-plane-endpoint: -n "$0" -- "$@")
+OPTIONS=(
+	"cluster-nodes:"
+	"control-plane-endpoint:"
+	"listen-ip:"
+	"listen-port:"
+)
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
+TEMP=$(getopt -o l:c:p:n: --long "${PARAMS}" -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 

@@ -4,7 +4,13 @@ set -eu
 CURDIR=$(dirname $0)
 CLUSTER_NODES=()
 
-TEMP=$(getopt -o c:g:l: --long target-location:,node-group:,cluster-nodes: -n "$0" -- "$@")
+OPTIONS=(
+	"target-location:"
+	"node-group:"
+	"cluster-nodes:"
+)
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
+TEMP=$(getopt -o c:g:l: --long "${PARAMS}" -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 

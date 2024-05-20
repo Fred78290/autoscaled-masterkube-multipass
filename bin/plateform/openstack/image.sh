@@ -12,23 +12,23 @@ FLAVOR_IMAGE=ds2G
 SECURITY_GROUP=default
 
 OPTIONS=(
-	"distribution:"
-	"custom-image:"
-	"ssh-key:"
-	"ssh-priv-key:"
-	"cni-version:"
-	"password:"
-	"seed:"
 	"arch:"
-	"user:"
-	"kubernetes-version:"
+	"cni-version:"
+	"container-runtime:"
+	"custom-image:"
+	"distribution:"
+	"flavor:"
+	"kube-engine:"
+	"kube-version:"
+	"password:"
+	"primary-adapter:"
 	"primary-network:"
 	"second-network:"
-	"k8s-distribution:"
-	"container-runtime:"
-	"primary-adapter:"
-	"flavor:"
 	"security-group:"
+	"seed:"
+	"ssh-key:"
+	"ssh-priv-key:"
+	"user:"
 )
 
 PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
@@ -53,11 +53,11 @@ while true ; do
 		-s|--seed) SEED_IMAGE=$2 ; shift 2;;
 		-a|--arch) SEED_ARCH=$2 ; shift 2;;
 		-u|--user) KUBERNETES_USER=$2 ; shift 2;;
-		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
+		-v|--kube-version) KUBERNETES_VERSION=$2 ; shift 2;;
 		--primary-network) PRIMARY_NETWORK_NAME=$2 ; shift 2;;
 		--flavor) FLAVOR_IMAGE=$2 ; shift 2;;
 		--security-group) SECURITY_GROUP=$2 ; shift 2;;
-		--k8s-distribution) 
+		--kube-engine) 
 			case "$2" in
 				kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
@@ -202,7 +202,7 @@ CRIO_VERSION=$(echo -n ${KUBERNETES_VERSION} | tr -d 'v' | tr '.' ' ' | awk '{ p
 
 echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: ${CRIO_VERSION} and kubernetes: ${KUBERNETES_VERSION}"
 
-INIT_SCRIPT="/usr/local/bin/prepare-image.sh --container-runtime ${CONTAINER_ENGINE} --cni-version ${CNI_VERSION} --cni-plugin ${CNI_PLUGIN} --kubernetes-version ${KUBERNETES_VERSION} --k8s-distribution ${KUBERNETES_DISTRO}"
+INIT_SCRIPT="/usr/local/bin/prepare-image.sh --container-runtime ${CONTAINER_ENGINE} --cni-version ${CNI_VERSION} --cni-plugin ${CNI_PLUGIN} --kube-version ${KUBERNETES_VERSION} --kube-engine ${KUBERNETES_DISTRO}"
 
 pushd ${CACHE}/packer/
 export PACKER_LOG=1

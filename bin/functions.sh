@@ -29,8 +29,8 @@ Options are:
 --container-runtime=<docker|containerd|cri-o>    # Specify which OCI runtime to use, default ${CONTAINER_ENGINE}
 --control-plane-machine=<value>                  # Override machine type used for control plane, default ${CONTROL_PLANE_MACHINE}
 --ha-cluster | -c                                # Allow to create an HA cluster, default ${HA_CLUSTER}
---k8s-distribution=<kubeadm|k3s|rke2>            # Which kubernetes distribution to use: kubeadm, k3s, rke2, default ${KUBERNETES_DISTRO}
---kubernetes-version | -k=<value>                # Override the kubernetes version, default ${KUBERNETES_VERSION}
+--kube-engine=<kubeadm|k3s|rke2|microk8s>        # Which kubernetes distribution to use: kubeadm, k3s, rke2, default ${KUBERNETES_DISTRO}
+--kube-version | -k=<value>                      # Override the kubernetes version, default ${KUBERNETES_VERSION}
 --max-pods=<value>                               # Specify the max pods per created VM, default ${MAX_PODS}
 --nginx-machine=<value>                          # Override machine type used for nginx as ELB, default ${NGINX_MACHINE}
 --node-group=<value>                             # Override the node group name, default ${NODEGROUP_NAME}
@@ -101,8 +101,8 @@ function usage() {
 
   # Flags to set the template vm
 --seed-image=<value>                           # Override the seed image name used to create template, default ${SEED_IMAGE}
---kubernetes-user=<value>                      # Override the seed user in template, default ${KUBERNETES_USER}
---kubernetes-password | -p=<value>             # Override the password to ssh the cluster VM, default random word
+--kube-user=<value>                            # Override the seed user in template, default ${KUBERNETES_USER}
+--kube-password | -p=<value>                   # Override the password to ssh the cluster VM, default random word
 
   # Flags in ha mode only
 --use-keepalived | -u                          # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
@@ -286,7 +286,7 @@ function parse_arguments() {
 			MAX_PODS=$2
 			shift 2
 			;;
-		--k8s-distribution)
+		--kube-engine)
 			case "$2" in
 				kubeadm|k3s|rke2|microk8s)
 					KUBERNETES_DISTRO=$2
@@ -362,18 +362,18 @@ function parse_arguments() {
 			TRANSPORT="$2"
 			shift 2
 			;;
-		-k|--kubernetes-version)
+		-k|--kube-version)
 			KUBERNETES_VERSION="$2"
 			if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
 				KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
 			fi
 			shift 2
 			;;
-		-u|--kubernetes-user)
+		-u|--kube-user)
 			KUBERNETES_USER="$2"
 			shift 2
 			;;
-		-p|--kubernetes-password)
+		-p|--kube-password)
 			KUBERNETES_PASSWORD="$2"
 			shift 2
 			;;
@@ -1506,15 +1506,15 @@ function prepare_image() {
 			--container-runtime=${CONTAINER_ENGINE} \
 			--custom-image="${TARGET_IMAGE}" \
 			--distribution="${DISTRO}" \
-			--k8s-distribution=${KUBERNETES_DISTRO} \
-			--kubernetes-version="${KUBERNETES_VERSION}" \
+			--kube-engine=${KUBERNETES_DISTRO} \
+			--kube-version="${KUBERNETES_VERSION}" \
 			--password="${KUBERNETES_PASSWORD}" \
 			--plateform=${PLATEFORM} \
+			--primary-network="${VC_NETWORK_PRIVATE}" \
 			--seed="${SEED_IMAGE}-${SEED_ARCH}" \
 			--ssh-key="${SSH_KEY}" \
 			--ssh-priv-key="${SSH_PRIVATE_KEY}" \
-			--user="${KUBERNETES_USER}" \
-			--primary-network="${VC_NETWORK_PRIVATE}"
+			--user="${KUBERNETES_USER}"
 
 		TARGET_IMAGE_UUID=$(get_vmuuid ${PRIMARY_NETWORK})
 	fi
@@ -2511,29 +2511,30 @@ function create_cluster() {
 				MASTER_IP=${IPADDR}:${APISERVER_ADVERTISE_PORT}
 
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
-					--plateform=${PLATEFORM} \
-					--cloud-provider=${CLOUD_PROVIDER} \
 					--advertise-port=${APISERVER_ADVERTISE_PORT} \
-					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--vm-uuid=${VMUUID} \
-					--region=${REGION} \
-					--zone=${ZONEID} \
-					--max-pods=${MAX_PODS} \
 					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
+					--cloud-provider=${CLOUD_PROVIDER} \
+					--cluster-nodes="${CLUSTER_NODES}" \
+					--cni-plugin=${CNI_PLUGIN} \
 					--container-runtime=${CONTAINER_ENGINE} \
-					--use-external-etcd=${EXTERNAL_ETCD} \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
+					--etcd-endpoint="${ETCD_ENDPOINT}" \
+					--ha-cluster=${HA_CLUSTER} \
+					--kube-engine=${KUBERNETES_DISTRO} \
+					--kube-version="${KUBERNETES_VERSION}" \
+					--load-balancer-ip=${LOAD_BALANCER_IP} \
+					--max-pods=${MAX_PODS} \
+					--net-if=${PRIVATE_NET_INF} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${INDEX} \
-					--cluster-nodes="${CLUSTER_NODES}" \
-					--load-balancer-ip=${LOAD_BALANCER_IP} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
-					--use-etc-hosts=${USE_ETC_HOSTS} \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
+					--plateform=${PLATEFORM} \
+					--region=${REGION} \
 					--tls-san="${CERT_SANS}" \
-					--ha-cluster=${HA_CLUSTER} \
-					--cni-plugin=${CNI_PLUGIN} \
-					--net-if=${PRIVATE_NET_INF} \
-					--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
+					--use-etc-hosts=${USE_ETC_HOSTS} \
+					--use-external-etcd=${EXTERNAL_ETCD} \
+					--vm-uuid=${VMUUID} \
+					--zone=${ZONEID} \
+					${SILENT}
 
 				create_nlb_member ${INDEX}
 
@@ -2550,30 +2551,30 @@ function create_cluster() {
 				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
-					--plateform=${PLATEFORM} \
-					--cloud-provider=${CLOUD_PROVIDER} \
-					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--kubernetes-version="${KUBERNETES_VERSION}" \
-					--container-runtime=${CONTAINER_ENGINE} \
-					--cni-plugin=${CNI_PLUGIN} \
-					--region=${REGION} \
-					--zone=${ZONEID} \
-					--max-pods=${MAX_PODS} \
-					--vm-uuid=${VMUUID} \
 					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
-					--use-etc-hosts=${USE_ETC_HOSTS} \
-					--use-external-etcd=${EXTERNAL_ETCD} \
+					--cloud-provider=${CLOUD_PROVIDER} \
+					--cluster-nodes="${CLUSTER_NODES}" \
+					--cni-plugin=${CNI_PLUGIN} \
+					--container-runtime=${CONTAINER_ENGINE} \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
+					--control-plane=true \
+					--etcd-endpoint="${ETCD_ENDPOINT}" \
+					--join-master="${MASTER_IP}" \
+					--kube-engine=${KUBERNETES_DISTRO} \
+					--kube-version="${KUBERNETES_VERSION}" \
+					--max-pods=${MAX_PODS} \
+					--net-if=${PRIVATE_NET_INF} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
-					--use-load-balancer=${USE_LOADBALANCER} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
+					--plateform=${PLATEFORM} \
+					--region=${REGION} \
 					--tls-san="${CERT_SANS}" \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
-					--cluster-nodes="${CLUSTER_NODES}" \
-					--net-if=${PRIVATE_NET_INF} \
-					--join-master="${MASTER_IP}" \
-					--control-plane=true ${SILENT}
+					--use-etc-hosts=${USE_ETC_HOSTS} \
+					--use-external-etcd=${EXTERNAL_ETCD} \
+					--use-load-balancer=${USE_LOADBALANCER} \
+					--vm-uuid=${VMUUID} \
+					--zone=${ZONEID} \
+					${SILENT}
 
 					create_nlb_member ${INDEX}
 			else
@@ -2583,28 +2584,28 @@ function create_cluster() {
 				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
-					--plateform=${PLATEFORM} \
 					--cloud-provider=${CLOUD_PROVIDER} \
-					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--kubernetes-version="${KUBERNETES_VERSION}" \
-					--container-runtime=${CONTAINER_ENGINE} \
+					--cluster-nodes="${CLUSTER_NODES}" \
 					--cni-plugin=${CNI_PLUGIN} \
-					--region=${REGION} \
-					--zone=${ZONEID} \
-					--max-pods=${MAX_PODS} \
-					--vm-uuid=${VMUUID} \
-					--use-etc-hosts=${USE_ETC_HOSTS} \
-					--use-external-etcd=${EXTERNAL_ETCD} \
-					--node-group=${NODEGROUP_NAME} \
-					--node-index=${NODEINDEX} \
-					--join-master="${MASTER_IP}" \
-					--use-load-balancer=${USE_LOADBALANCER} \
+					--container-runtime=${CONTAINER_ENGINE} \
 					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
-					--tls-san="${CERT_SANS}" \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
+					--join-master="${MASTER_IP}" \
+					--kube-engine=${KUBERNETES_DISTRO} \
+					--kube-version="${KUBERNETES_VERSION}" \
+					--max-pods=${MAX_PODS} \
 					--net-if=${PRIVATE_NET_INF} \
-					--cluster-nodes="${CLUSTER_NODES}" ${SILENT}
+					--node-group=${NODEGROUP_NAME} \
+					--node-index=${NODEINDEX} \
+					--plateform=${PLATEFORM} \
+					--region=${REGION} \
+					--tls-san="${CERT_SANS}" \
+					--use-etc-hosts=${USE_ETC_HOSTS} \
+					--use-external-etcd=${EXTERNAL_ETCD} \
+					--use-load-balancer=${USE_LOADBALANCER} \
+					--vm-uuid=${VMUUID} \
+					--zone=${ZONEID} \
+					${SILENT}
 			fi
 
 			echo ${MASTERKUBE_NODE} > ${TARGET_CONFIG_LOCATION}/node-0${INDEX}-prepared

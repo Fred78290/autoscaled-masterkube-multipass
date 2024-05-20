@@ -18,7 +18,24 @@ AWS_USE_PUBLICIP=false
 PUBLIC_INSTANCES_ID=
 CONTROLPLANE_INSTANCES_ID=
 
-TEMP=`getopt -o n:p:r:s:x --long cert-arn:,trace,expose-public:,name:,profile:,region:,target-vpc-id:,private-subnet-id:,public-subnet-id:,target-port:,security-group:,public-instances-id:,controlplane-instances-id: -n "$0" -- "$@"`
+OPTIONS=(
+	"cert-arn:"
+	"controlplane-instances-id:"
+	"expose-public:"
+	"name:"
+	"private-subnet-id:"
+	"profile:"
+	"public-instances-id:"
+	"public-subnet-id:"
+	"region:"
+	"security-group:"
+	"target-port:"
+	"target-vpc-id:"
+	"trace"
+)
+PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
+TEMP=`getopt -o n:p:r:s:x --long "${PARAMS}" -n "$0" -- "$@"`
+
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.

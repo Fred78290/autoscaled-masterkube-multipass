@@ -60,4 +60,4 @@ helm install kubeapps \
 
 echo_blue_dot_title "KubeApps token: "
 
-kubectl get --namespace kubeapps secret kubeapps-operator-token --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o go-template='{{.data.token | base64decode}}'
+kubectl get --namespace kubeapps secret kubeapps-operator-token --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o go-template='{{.data.token | base64decode}}' | tee ${TARGET_CLUSTER_LOCATION}/kubeapps-token

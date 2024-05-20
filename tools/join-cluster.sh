@@ -392,34 +392,25 @@ elif [ ${KUBERNETES_DISTRO} == "rke2" ]; then
 		RKE2_ENDPOINT=${CONTROL_PLANE_ENDPOINT}
 	fi
 
-	if [ $"{CLOUD_PROVIDER}" == "external" ]; then
-		cat > /etc/rancher/rke2/config.yaml <<EOF
-kubelet-arg:
-  - cloud-provider=external
-  - fail-swap-on=false
-  - provider-id=${PROVIDERID}
-  - max-pods=${MAX_PODS}
+	cat > /etc/rancher/rke2/config.yaml <<EOF
 node-name: ${NODENAME}
 server: https://${RKE2_ENDPOINT}:9345
 advertise-address: ${APISERVER_ADVERTISE_ADDRESS}
 token: ${TOKEN}
-EOF
-   else   
-		cat > /etc/rancher/rke2/config.yaml <<EOF
 kubelet-arg:
   - fail-swap-on=false
   - max-pods=${MAX_PODS}
-node-name: ${NODENAME}
-server: https://${RKE2_ENDPOINT}:9345
-advertise-address: ${APISERVER_ADVERTISE_ADDRESS}
-token: ${TOKEN}
 EOF
+
+	if [ "${CLOUD_PROVIDER}" == "external" ]; then
+		echo "  - provider-id=${PROVIDERID}" >> /etc/rancher/rke2/config.yaml
+		echo "  - cloud-provider=external" >> /etc/rancher/rke2/config.yaml
 	fi
 
 	if [ "${CONTROL_PLANE}" = "true" ]; then
 		RKE2_SERVICE=rke2-server
 
-		if [ $"{CLOUD_PROVIDER}" == "external" ]; then   
+		if [ "${CLOUD_PROVIDER}" == "external" ]; then   
 			echo "disable-cloud-controller: true" >> /etc/rancher/rke2/config.yaml
 			echo "cloud-provider-name: external" >> /etc/rancher/rke2/config.yaml
 		fi
@@ -440,7 +431,6 @@ EOF
 
 	systemctl enable ${RKE2_SERVICE}.service
 	systemctl start ${RKE2_SERVICE}.service --no-block
-
 elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 	ANNOTE_MASTER=true
 

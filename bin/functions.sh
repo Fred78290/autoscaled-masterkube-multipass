@@ -1510,11 +1510,11 @@ function prepare_image() {
 			--kube-version="${KUBERNETES_VERSION}" \
 			--password="${KUBERNETES_PASSWORD}" \
 			--plateform=${PLATEFORM} \
+			--primary-network="${VC_NETWORK_PRIVATE}" \
 			--seed="${SEED_IMAGE}-${SEED_ARCH}" \
 			--ssh-key="${SSH_KEY}" \
 			--ssh-priv-key="${SSH_PRIVATE_KEY}" \
-			--user="${KUBERNETES_USER}" \
-			--primary-network="${VC_NETWORK_PRIVATE}"
+			--user="${KUBERNETES_USER}"
 
 		TARGET_IMAGE_UUID=$(get_vmuuid ${PRIMARY_NETWORK})
 	fi
@@ -2502,30 +2502,30 @@ echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
 				MASTER_IP=${IPADDR}:6443
 
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh ${TRACE_ARGS} \
-					--plateform=${PLATEFORM} \
-					--cloud-provider=${CLOUD_PROVIDER} \
 					--advertise-port=${APISERVER_ADVERTISE_PORT} \
-					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--vm-uuid=${VMUUID} \
-					--region=${REGION} \
-					--zone=${ZONEID} \
-					--max-pods=${MAX_PODS} \
 					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
-					--container-runtime=${CONTAINER_ENGINE} \
-					--use-external-etcd=${EXTERNAL_ETCD} \
-					--node-group=${NODEGROUP_NAME} \
-					--node-index=${INDEX} \
+					--cloud-provider=${CLOUD_PROVIDER} \
 					--cluster-nodes="${CLUSTER_NODES}" \
-					--load-balancer-ip=${LOAD_BALANCER_IP} \
+					--cni-plugin=${CNI_PLUGIN} \
+					--container-runtime=${CONTAINER_ENGINE} \
 					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
-					--use-etc-hosts=${USE_ETC_HOSTS} \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
-					--tls-san="${CERT_SANS}" \
 					--ha-cluster=${HA_CLUSTER} \
 					--kube-engine=${KUBERNETES_DISTRO} \
 					--kube-version="${KUBERNETES_VERSION}" \
+					--load-balancer-ip=${LOAD_BALANCER_IP} \
+					--max-pods=${MAX_PODS} \
 					--net-if=${PRIVATE_NET_INF} \
-					--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
+					--node-group=${NODEGROUP_NAME} \
+					--node-index=${INDEX} \
+					--plateform=${PLATEFORM} \
+					--region=${REGION} \
+					--tls-san="${CERT_SANS}" \
+					--use-etc-hosts=${USE_ETC_HOSTS} \
+					--use-external-etcd=${EXTERNAL_ETCD} \
+					--vm-uuid=${VMUUID} \
+					--zone=${ZONEID} \
+					${SILENT}
 
 				create_nlb_member ${INDEX}
 
@@ -2542,30 +2542,30 @@ echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
 				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
-					--plateform=${PLATEFORM} \
+					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
 					--cloud-provider=${CLOUD_PROVIDER} \
-					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--kubernetes-version="${KUBERNETES_VERSION}" \
-					--container-runtime=${CONTAINER_ENGINE} \
+					--cluster-nodes="${CLUSTER_NODES}" \
 					--cni-plugin=${CNI_PLUGIN} \
+					--container-runtime=${CONTAINER_ENGINE} \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
+					--control-plane=true \
+					--etcd-endpoint="${ETCD_ENDPOINT}" \
+					--join-master="${MASTER_IP}" \
 					--kube-engine=${KUBERNETES_DISTRO} \
 					--kube-version="${KUBERNETES_VERSION}" \
 					--max-pods=${MAX_PODS} \
-					--vm-uuid=${VMUUID} \
-					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
-					--use-etc-hosts=${USE_ETC_HOSTS} \
-					--use-external-etcd=${EXTERNAL_ETCD} \
+					--net-if=${PRIVATE_NET_INF} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
-					--use-load-balancer=${USE_LOADBALANCER} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
+					--plateform=${PLATEFORM} \
+					--region=${REGION} \
 					--tls-san="${CERT_SANS}" \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
-					--cluster-nodes="${CLUSTER_NODES}" \
-					--net-if=${PRIVATE_NET_INF} \
-					--join-master="${MASTER_IP}" \
-					--control-plane=true ${SILENT}
+					--use-etc-hosts=${USE_ETC_HOSTS} \
+					--use-external-etcd=${EXTERNAL_ETCD} \
+					--use-load-balancer=${USE_LOADBALANCER} \
+					--vm-uuid=${VMUUID} \
+					--zone=${ZONEID} \
+					${SILENT}
 
 					create_nlb_member ${INDEX}
 			else
@@ -2575,28 +2575,28 @@ echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
 				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/* ${KUBERNETES_USER}@${IPADDR}:~/cluster ${SILENT}
 
 				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh ${TRACE_ARGS} \
-					--plateform=${PLATEFORM} \
 					--cloud-provider=${CLOUD_PROVIDER} \
-					--k8s-distribution=${KUBERNETES_DISTRO} \
-					--kubernetes-version="${KUBERNETES_VERSION}" \
-					--container-runtime=${CONTAINER_ENGINE} \
+					--cluster-nodes="${CLUSTER_NODES}" \
 					--cni-plugin=${CNI_PLUGIN} \
+					--container-runtime=${CONTAINER_ENGINE} \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
+					--etcd-endpoint="${ETCD_ENDPOINT}" \
+					--join-master="${MASTER_IP}" \
 					--kube-engine=${KUBERNETES_DISTRO} \
 					--kube-version="${KUBERNETES_VERSION}" \
 					--max-pods=${MAX_PODS} \
-					--vm-uuid=${VMUUID} \
-					--use-etc-hosts=${USE_ETC_HOSTS} \
-					--use-external-etcd=${EXTERNAL_ETCD} \
+					--net-if=${PRIVATE_NET_INF} \
 					--node-group=${NODEGROUP_NAME} \
 					--node-index=${NODEINDEX} \
-					--join-master="${MASTER_IP}" \
-					--use-load-balancer=${USE_LOADBALANCER} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
+					--plateform=${PLATEFORM} \
+					--region=${REGION} \
 					--tls-san="${CERT_SANS}" \
-					--etcd-endpoint="${ETCD_ENDPOINT}" \
-					--net-if=${PRIVATE_NET_INF} \
-					--cluster-nodes="${CLUSTER_NODES}" ${SILENT}
+					--use-etc-hosts=${USE_ETC_HOSTS} \
+					--use-external-etcd=${EXTERNAL_ETCD} \
+					--use-load-balancer=${USE_LOADBALANCER} \
+					--vm-uuid=${VMUUID} \
+					--zone=${ZONEID} \
+					${SILENT}
 			fi
 
 			echo ${MASTERKUBE_NODE} > ${TARGET_CONFIG_LOCATION}/node-0${INDEX}-prepared

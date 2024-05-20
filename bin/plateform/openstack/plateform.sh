@@ -28,8 +28,8 @@ function usage() {
 
   # Flags to set the template vm
 --seed-image=<value>                           # Override the seed image name used to create template, default ${SEED_IMAGE}
---kubernetes-user=<value>                      # Override the seed user in template, default ${KUBERNETES_USER}
---kubernetes-password | -p=<value>             # Override the password to ssh the cluster VM, default random word
+--kube-user=<value>                            # Override the seed user in template, default ${KUBERNETES_USER}
+--kube-password | -p=<value>                   # Override the password to ssh the cluster VM, default random word
 
   # Flags in ha mode only
 --use-keepalived | -u                          # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
@@ -212,7 +212,7 @@ function parse_arguments() {
 			MAX_PODS=$2
 			shift 2
 			;;
-		--k8s-distribution)
+		--kube-engine)
 			case "$2" in
 				kubeadm|k3s|rke2|microk8s)
 					KUBERNETES_DISTRO=$2
@@ -288,18 +288,18 @@ function parse_arguments() {
 			TRANSPORT="$2"
 			shift 2
 			;;
-		-k|--kubernetes-version)
+		-k|--kube-version)
 			KUBERNETES_VERSION="$2"
 			if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
 				KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
 			fi
 			shift 2
 			;;
-		-u|--kubernetes-user)
+		-u|--kube-user)
 			KUBERNETES_USER="$2"
 			shift 2
 			;;
-		-p|--kubernetes-password)
+		-p|--kube-password)
 			KUBERNETES_PASSWORD="$2"
 			shift 2
 			;;

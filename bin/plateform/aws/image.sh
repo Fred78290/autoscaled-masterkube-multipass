@@ -48,7 +48,7 @@ while true ; do
 		-n|--cni-version) CNI_VERSION=$2 ; shift 2;;
 		-c|--cni-plugin) CNI_PLUGIN=$2 ; shift 2;;
 		-u|--user) KUBERNETES_USER=$2 ; shift 2;;
-		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
+		-v|--kube-version) KUBERNETES_VERSION=$2 ; shift 2;;
 
 		--ami) SEED_IMAGE=$2 ; shift 2;;
 		--arch) SEED_ARCH=$2 ; shift 2;;
@@ -58,7 +58,7 @@ while true ; do
 		--subnet-id) SUBNET_ID="${2}" ; shift 2;;
 		--sg-id) SECURITY_GROUPID="${2}" ; shift 2;;
 		--use-public-ip) MASTER_USE_PUBLICIP="${2}" ; shift 2;;
-		--k8s-distribution) 
+		--kube-engine) 
 			case "$2" in
 				kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
@@ -277,8 +277,8 @@ ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo /usr/local/bin/prepare
 						--cni-version ${CNI_VERSION} \
 						--cni-plugin ${CNI_PLUGIN} \
 						--ecr-password ${ECR_PASSWORD} \
-						--kubernetes-version ${KUBERNETES_VERSION} \
-						--k8s-distribution ${KUBERNETES_DISTRO}
+						--kube-version ${KUBERNETES_VERSION} \
+						--kube-engine ${KUBERNETES_DISTRO}
 
 aws ec2 stop-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${LAUNCHED_ID}" &> /dev/null
 

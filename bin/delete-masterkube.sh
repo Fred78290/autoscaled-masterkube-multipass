@@ -43,7 +43,7 @@ while true; do
 			PLATEFORM="$2"
 			shift 2
 			;;
-		--k8s-distribution)
+		--kube-engine)
 			case "$2" in
 				kubeadm|k3s|rke2|microk8s)
 					OVERRIDE_KUBERNETES_DISTRO=$2

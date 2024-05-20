@@ -15,8 +15,8 @@ OPTIONS=(
 	"cni-version:"
 	"cni-plugin:"
 	"ecr-password:"
-	"kubernetes-version:"
-	"k8s-distribution:"
+	"kube-version:"
+	"kube-engine:"
 )
 
 PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
@@ -56,11 +56,11 @@ while true ; do
 			ECR_PASSWORD=$2
 			shift 2
 			;;
-		-v|--kubernetes-version)
+		-v|--kube-version)
 			KUBERNETES_VERSION=$2
 			shift 2
 			;;
-		-d|--k8s-distribution)
+		-d|--kube-engine)
 			case "$2" in
 				kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2

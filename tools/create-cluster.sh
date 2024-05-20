@@ -112,7 +112,7 @@ while true; do
 		USE_ETC_HOSTS=$2
 		shift 2
 		;;
-	--k8s-distribution)
+	--kube-engine)
 		case "$2" in
 			kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
@@ -171,7 +171,7 @@ while true; do
 		IFS=, read -a CLUSTER_NODES <<< "$2"
 		shift 2
 		;;
-	-k|--kubernetes-version)
+	-k|--kube-version)
 		KUBERNETES_VERSION="$2"
 		shift 2
 		;;

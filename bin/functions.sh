@@ -29,8 +29,8 @@ Options are:
 --container-runtime=<docker|containerd|cri-o>    # Specify which OCI runtime to use, default ${CONTAINER_ENGINE}
 --control-plane-machine=<value>                  # Override machine type used for control plane, default ${CONTROL_PLANE_MACHINE}
 --ha-cluster | -c                                # Allow to create an HA cluster, default ${HA_CLUSTER}
---k8s-distribution=<kubeadm|k3s|rke2>            # Which kubernetes distribution to use: kubeadm, k3s, rke2, default ${KUBERNETES_DISTRO}
---kubernetes-version | -k=<value>                # Override the kubernetes version, default ${KUBERNETES_VERSION}
+--kube-engine=<kubeadm|k3s|rke2|microk8s>        # Which kubernetes distribution to use: kubeadm, k3s, rke2, default ${KUBERNETES_DISTRO}
+--kube-version | -k=<value>                      # Override the kubernetes version, default ${KUBERNETES_VERSION}
 --max-pods=<value>                               # Specify the max pods per created VM, default ${MAX_PODS}
 --nginx-machine=<value>                          # Override machine type used for nginx as ELB, default ${NGINX_MACHINE}
 --node-group=<value>                             # Override the node group name, default ${NODEGROUP_NAME}
@@ -101,8 +101,8 @@ function usage() {
 
   # Flags to set the template vm
 --seed-image=<value>                           # Override the seed image name used to create template, default ${SEED_IMAGE}
---kubernetes-user=<value>                      # Override the seed user in template, default ${KUBERNETES_USER}
---kubernetes-password | -p=<value>             # Override the password to ssh the cluster VM, default random word
+--kube-user=<value>                            # Override the seed user in template, default ${KUBERNETES_USER}
+--kube-password | -p=<value>                   # Override the password to ssh the cluster VM, default random word
 
   # Flags in ha mode only
 --use-keepalived | -u                          # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
@@ -286,7 +286,7 @@ function parse_arguments() {
 			MAX_PODS=$2
 			shift 2
 			;;
-		--k8s-distribution)
+		--kube-engine)
 			case "$2" in
 				kubeadm|k3s|rke2|microk8s)
 					KUBERNETES_DISTRO=$2
@@ -362,18 +362,18 @@ function parse_arguments() {
 			TRANSPORT="$2"
 			shift 2
 			;;
-		-k|--kubernetes-version)
+		-k|--kube-version)
 			KUBERNETES_VERSION="$2"
 			if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
 				KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
 			fi
 			shift 2
 			;;
-		-u|--kubernetes-user)
+		-u|--kube-user)
 			KUBERNETES_USER="$2"
 			shift 2
 			;;
-		-p|--kubernetes-password)
+		-p|--kube-password)
 			KUBERNETES_PASSWORD="$2"
 			shift 2
 			;;
@@ -1506,8 +1506,8 @@ function prepare_image() {
 			--container-runtime=${CONTAINER_ENGINE} \
 			--custom-image="${TARGET_IMAGE}" \
 			--distribution="${DISTRO}" \
-			--k8s-distribution=${KUBERNETES_DISTRO} \
-			--kubernetes-version="${KUBERNETES_VERSION}" \
+			--kube-engine=${KUBERNETES_DISTRO} \
+			--kube-version="${KUBERNETES_VERSION}" \
 			--password="${KUBERNETES_PASSWORD}" \
 			--plateform=${PLATEFORM} \
 			--seed="${SEED_IMAGE}-${SEED_ARCH}" \
@@ -2522,7 +2522,8 @@ echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--tls-san="${CERT_SANS}" \
 					--ha-cluster=${HA_CLUSTER} \
-					--cni-plugin=${CNI_PLUGIN} \
+					--kube-engine=${KUBERNETES_DISTRO} \
+					--kube-version="${KUBERNETES_VERSION}" \
 					--net-if=${PRIVATE_NET_INF} \
 					--kubernetes-version="${KUBERNETES_VERSION}" ${SILENT}
 
@@ -2547,8 +2548,8 @@ echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
 					--kubernetes-version="${KUBERNETES_VERSION}" \
 					--container-runtime=${CONTAINER_ENGINE} \
 					--cni-plugin=${CNI_PLUGIN} \
-					--region=${REGION} \
-					--zone=${ZONEID} \
+					--kube-engine=${KUBERNETES_DISTRO} \
+					--kube-version="${KUBERNETES_VERSION}" \
 					--max-pods=${MAX_PODS} \
 					--vm-uuid=${VMUUID} \
 					--allow-deployment=${MASTER_NODE_ALLOW_DEPLOYMENT} \
@@ -2580,8 +2581,8 @@ echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
 					--kubernetes-version="${KUBERNETES_VERSION}" \
 					--container-runtime=${CONTAINER_ENGINE} \
 					--cni-plugin=${CNI_PLUGIN} \
-					--region=${REGION} \
-					--zone=${ZONEID} \
+					--kube-engine=${KUBERNETES_DISTRO} \
+					--kube-version="${KUBERNETES_VERSION}" \
 					--max-pods=${MAX_PODS} \
 					--vm-uuid=${VMUUID} \
 					--use-etc-hosts=${USE_ETC_HOSTS} \

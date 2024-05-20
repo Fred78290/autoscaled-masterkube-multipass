@@ -51,10 +51,10 @@ while true ; do
 		-s|--seed) SEED_IMAGE=$2 ; shift 2;;
 		-a|--arch) SEED_ARCH=$2 ; shift 2;;
 		-u|--user) KUBERNETES_USER=$2 ; shift 2;;
-		-v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
+		-v|--kube-version) KUBERNETES_VERSION=$2 ; shift 2;;
 		--primary-network) PRIMARY_NETWORK_NAME=$2 ; shift 2;;
 		--second-network) SECOND_NETWORK_NAME=$2 ; shift 2;;
-		--k8s-distribution) 
+		--kube-engine) 
 			case "$2" in
 				kubeadm|k3s|rke2|microk8s)
 				KUBERNETES_DISTRO=$2
@@ -175,7 +175,7 @@ fi
 
 popd
 
-INIT_SCRIPT="/usr/local/bin/prepare-image.sh --container-runtime ${CONTAINER_ENGINE} --cni-version ${CNI_VERSION} --cni-plugin ${CNI_PLUGIN} --kubernetes-version ${KUBERNETES_VERSION} --k8s-distribution ${KUBERNETES_DISTRO}"
+INIT_SCRIPT="/usr/local/bin/prepare-image.sh --container-runtime ${CONTAINER_ENGINE} --cni-version ${CNI_VERSION} --cni-plugin ${CNI_PLUGIN} --kube-version ${KUBERNETES_VERSION} --kube-engine ${KUBERNETES_DISTRO}"
 
 pushd ${CACHE}/packer
 

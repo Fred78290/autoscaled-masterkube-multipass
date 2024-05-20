@@ -50,7 +50,7 @@ function usage() {
 
   # Flags to set the template vm
 --seed-image=<value>                             # Override the seed image name used to create template, default ${SEED_IMAGE}
---kubernetes-user=<value>                        # Override the seed user in template, default ${KUBERNETES_USER}
+--kube-user=<value>                              # Override the seed user in template, default ${KUBERNETES_USER}
 --arch=<value>                                   # Specify the architecture of VM (amd64|arm64), default ${SEED_ARCH}
 --volume-type=<value>                            # Override the root EBS volume type, default ${VOLUME_TYPE}
 --volume-size=<value>                            # Override the root EBS volume size in Gb, default ${VOLUME_SIZE}
@@ -224,7 +224,7 @@ function parse_arguments() {
             MAX_PODS=$2
             shift 2
             ;;
-        --k8s-distribution)
+        --kube-engine)
             case "$2" in
                 kubeadm|k3s|rke2|microk8s)
                     KUBERNETES_DISTRO=$2
@@ -304,18 +304,18 @@ function parse_arguments() {
             TRANSPORT="$2"
             shift 2
             ;;
-        -k|--kubernetes-version)
+        -k|--kube-version)
             KUBERNETES_VERSION="$2"
 			if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
 				KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
 			fi
             shift 2
             ;;
-        -u|--kubernetes-user)
+        -u|--kube-user)
             KUBERNETES_USER="$2"
             shift 2
             ;;
-        -p|--kubernetes-password)
+        -p|--kube-password)
             KUBERNETES_PASSWORD="$2"
             shift 2
             ;;
@@ -509,8 +509,8 @@ function prepare_image() {
             --container-runtime=${CONTAINER_ENGINE} \
             --custom-image="${TARGET_IMAGE}" \
             --ecr-password="${ECR_PASSWORD}" \
-            --k8s-distribution=${KUBERNETES_DISTRO} \
-            --kubernetes-version="${KUBERNETES_VERSION}" \
+            --kube-engine=${KUBERNETES_DISTRO} \
+            --kube-version="${KUBERNETES_VERSION}" \
             --plateform=${PLATEFORM} \
             --profile="${AWS_PROFILE}" \
             --region="${AWS_REGION}" \

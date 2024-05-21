@@ -742,21 +742,23 @@ function create_plateform_nlb() {
 		--public-instances-id="${PUBLIC_INSTANCEID_NLB_TARGET}" \
 		${SILENT}
     
-	PRIVATE_NLB_DNS=$(aws elbv2 describe-load-balancers \
-        --profile=${AWS_PROFILE} \
-        --region=${AWS_REGION} \
-        | jq -r --arg NLB_NAME "c-${MASTERKUBE}" '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)|.DNSName')
+    PRIVATE_NLB_DEF=$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} \
+        | jq -r --arg NLB_NAME c-${MASTERKUBE} '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)')
 
 	LOAD_BALANCER_IP="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}"
 
 	if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
-		PUBLIC_NLB_DNS=$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} | jq -r --arg NLB_NAME "p-${MASTERKUBE}" '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)|.DNSName')
+        PUBLIC_NLB_DEF="$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} | jq -r --arg NLB_NAME p-${MASTERKUBE} '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)')"
 	else
-		PUBLIC_NLB_DNS=${PRIVATE_NLB_DNS}
+		PUBLIC_NLB_DEF="${PRIVATE_NLB_DEF}"
 	fi
 
+	PRIVATE_NLB_DNS=$(echo "${PRIVATE_NLB_DEF}" | jq -r '.DNSName')
+	PUBLIC_NLB_DNS=$(echo ${PUBLIC_NLB_DEF} | jq -r '.DNSName')
+	PUBLIC_NLB_HOSTED_ZONEID=$(echo ${PUBLIC_NLB_DEF} | jq -r '.CanonicalHostedZoneId//""')
+
 	# Record Masterkube in Route53 DNS
-	register_nlb_dns CNAME ${PRIVATE_NLB_DNS} ${PUBLIC_NLB_DNS}
+	register_nlb_dns CNAME "${PRIVATE_NLB_DNS}" "${PUBLIC_NLB_DNS}" "${PUBLIC_NLB_HOSTED_ZONEID}"
 }
 
 #===========================================================================================================================================

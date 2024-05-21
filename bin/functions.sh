@@ -2120,6 +2120,7 @@ function register_nlb_dns() {
 	local RECORDTYPE=$1
 	local PRIVATE_NLB_DNS=$2
 	local PUBLIC_NLB_DNS=$3
+	local PUBLIC_NLB_HOSTED_ZONEID=$4
 
 	if [ -n "${PRIVATE_NLB_DNS}" ]; then
 		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
@@ -2195,7 +2196,29 @@ EOF
 		if [ "${EXTERNAL_DNS_PROVIDER}" = "aws" ]; then
 			echo_title "Register public dns ${MASTERKUBE}.${PUBLIC_DOMAIN_NAME} in route53: ${AWS_ROUTE53_PUBLIC_ZONE_ID}"
 
-			cat > ${TARGET_CONFIG_LOCATION}/route53-public.json <<EOF
+			if [ -n "${PUBLIC_NLB_HOSTED_ZONEID}" ]; then
+				cat > ${TARGET_CONFIG_LOCATION}/route53-public.json <<EOF
+{
+	"Comment": "${MASTERKUBE} public DNS entry",
+	"Changes": [
+		{
+			"Action": "UPSERT",
+			"ResourceRecordSet": {
+				"Name": "${MASTERKUBE}.${PUBLIC_DOMAIN_NAME}",
+				"Type": "A",
+				"TTL": 60,
+				"AliasTarget": {
+          			"HostedZoneId": "${PUBLIC_NLB_HOSTED_ZONEID}",
+		  			"DNSName": "${PUBLIC_NLB_DNS}",
+					"EvaluateTargetHealth": false
+				}
+			}
+		}
+	]
+}
+EOF
+			else
+				cat > ${TARGET_CONFIG_LOCATION}/route53-public.json <<EOF
 {
 	"Comment": "${MASTERKUBE} public DNS entry",
 	"Changes": [
@@ -2215,6 +2238,7 @@ EOF
 	]
 }
 EOF
+			fi
 
 			aws route53 change-resource-record-sets --profile ${AWS_ROUTE53_PROFILE} --hosted-zone-id ${AWS_ROUTE53_PUBLIC_ZONE_ID} \
 				--change-batch file://${TARGET_CONFIG_LOCATION}/route53-public.json > /dev/null

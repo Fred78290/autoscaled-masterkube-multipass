@@ -1003,5 +1003,5 @@ function create_plateform_nlb() {
 		PUBLIC_NLB_DNS=${PRIVATE_NLB_DNS}
 	fi
 
-	register_nlb_dns A ${PRIVATE_NLB_DNS} ${PUBLIC_NLB_DNS}
+	register_nlb_dns A "${PRIVATE_NLB_DNS}" "${PUBLIC_NLB_DNS}" ""
 }

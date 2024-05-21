@@ -1584,8 +1584,8 @@ function prepare_cert() {
 						-nodes \
 						-newkey rsa:2048 \
 						-subj "/CN=${CERT_EMAIL}/C=US/L=San Fransisco" \
-						-keyout ${CA_LOCATION}/masterkube.key \
-						-out ${CA_LOCATION}/masterkube.pem
+						-keyout "${CA_LOCATION}/masterkube.key" \
+						-out "${CA_LOCATION}/masterkube.pem"
 
 			if [ ${OSDISTRO} == "Darwin" ]; then
 				sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${CA_LOCATION}/masterkube.pem
@@ -1597,8 +1597,9 @@ function prepare_cert() {
 
 		echo_blue_bold "Create autosigned certificat for domain: ${DOMAIN_NAME}, email: ${CERT_EMAIL}"
 
-		${CURDIR}/create-cert.sh --ca="${PWD}/etc/certs/ca.pem" \
-			--ca-key="${PWD}/etc/certs/ca.key" \
+		${CURDIR}/create-cert.sh \
+			--ca="${CA_LOCATION}/masterkube.pem" \
+			--ca-key="${CA_LOCATION}/masterkube.key" \
 			--domain ${DOMAIN_NAME} \
 			--ssl-location ${SSL_LOCATION} \
 			--cert-email ${CERT_EMAIL}

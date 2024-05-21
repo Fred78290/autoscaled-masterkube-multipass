@@ -1553,25 +1553,55 @@ function prepare_cert() {
 		exit 1
 	fi
 
-	if [ -z ${SSL_LOCATION} ]; then
+	if [ -z "${CA_LOCATION}" ]; then
+		if [ -f ${HOME}/etc/ssl/certs/ca.pem ]; then
+			CA_LOCATION=${HOME}/etc/ssl/certs
+		elif [ -f ${HOME}/Library/etc/ssl/certs/ca.pem ]; then
+			CA_LOCATION=${HOME}/Library/etc/ssl/certs
+		else
+			CA_LOCATION=${PWD}/etc/ssl/certs
+		fi
+	fi
+
+	if [ -z "${SSL_LOCATION}" ]; then
 		if [ -f ${HOME}/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
 			SSL_LOCATION=${HOME}/etc/ssl/${DOMAIN_NAME}
 		elif [ -f ${HOME}/Library/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
 			SSL_LOCATION=${HOME}/Library/etc/ssl/${DOMAIN_NAME}
 		elif [ -f $HOME/.acme.sh/${DOMAIN_NAME}/cert.pem ]; then
 			SSL_LOCATION=$HOME/.acme.sh/${DOMAIN_NAME}
-		elif [ -f ${HOME}/Library/etc/ssl/${DOMAIN_NAME}/cert.pem ]; then
-			SSL_LOCATION=${HOME}/Library/etc/ssl/${DOMAIN_NAME}
-		elif [ -f $HOME/.acme.sh/${DOMAIN_NAME}/cert.pem ]; then
-			SSL_LOCATION=${HOME}/.acme.sh/${DOMAIN_NAME}
 		else
 			SSL_LOCATION=${PWD}/etc/ssl/${DOMAIN_NAME}
 		fi
 	fi
 
 	if [ ! -f ${SSL_LOCATION}/privkey.pem ]; then
+		if [ ! -f ${CA_LOCATION}/masterkube.key ] &&  [ ! -f ${CA_LOCATION}/masterkube.pem ]; then
+			echo_blue_bold "Create certificat authority, email: ${CERT_EMAIL}"
+			mkdir -p ${CA_LOCATION}
+			openssl req -x509 \
+						-sha256 -days 3560 \
+						-nodes \
+						-newkey rsa:2048 \
+						-subj "/CN=${CERT_EMAIL}/C=US/L=San Fransisco" \
+						-keyout ${CA_LOCATION}/masterkube.key \
+						-out ${CA_LOCATION}/masterkube.pem
+
+			if [ ${OSDISTRO} == "Darwin" ]; then
+				sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${CA_LOCATION}/masterkube.pem
+			else
+				sudo cp ${CA_LOCATION}/masterkube.pem /usr/local/share/ca-certificates/masterkube.crt
+				sudo update-ca-certificates
+			fi
+		fi
+
 		echo_blue_bold "Create autosigned certificat for domain: ${DOMAIN_NAME}, email: ${CERT_EMAIL}"
-		${CURDIR}/create-cert.sh --domain ${DOMAIN_NAME} --ssl-location ${SSL_LOCATION} --cert-email ${CERT_EMAIL}
+
+		${CURDIR}/create-cert.sh --ca="${PWD}/etc/certs/ca.pem" \
+			--ca-key="${PWD}/etc/certs/ca.key" \
+			--domain ${DOMAIN_NAME} \
+			--ssl-location ${SSL_LOCATION} \
+			--cert-email ${CERT_EMAIL}
 	else
 		if [ ! -f ${SSL_LOCATION}/cert.pem ]; then
 			echo_red "${SSL_LOCATION}/cert.pem not found, exit"

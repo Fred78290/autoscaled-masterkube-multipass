@@ -23,6 +23,7 @@ export AWS_ROUTE53_SECRETKEY=
 export AWS_ROUTE53_TOKEN=
 export AWS_SECRETKEY=
 export AWS_TOKEN=
+export CA_LOCATION=
 export CACHE=${HOME}/.local/masterkube/${PLATEFORM}/cache
 export CERT_EMAIL=
 export CERT_GODADDY_API_KEY=${GODADDY_API_KEY:=}

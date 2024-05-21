@@ -80,8 +80,8 @@ if [ -z "${PUBLIC_DOMAIN_NAME}" ] || [ "${CERT_SELFSIGNED}" == "YES" ]; then
 	kubectl create secret generic ca-key-pair --dry-run=client -o yaml \
 		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 		--namespace ${NAMESPACE} \
-		--from-file=tls.crt=${SSL_LOCATION}/ca.pem \
-		--from-file=tls.key=${SSL_LOCATION}/ca.key | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+		--from-file=tls.crt=${CA_LOCATION}/masterkube.pem \
+		--from-file=tls.key=${CA_LOCATION}/masterkube.key | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 	deploy cluster-issuer-selfsigned
 else

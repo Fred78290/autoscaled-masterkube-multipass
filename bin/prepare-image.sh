@@ -419,7 +419,7 @@ EOF
 
 		mkdir -p /etc/eks
 		mkdir -p /etc/sysconfig
-		wget https://raw.githubusercontent.com/awslabs/amazon-eks-ami/master/files/eni-max-pods.txt -O /etc/eks/eni-max-pods.txt
+		curl -s https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/misc/eni-max-pods.txt  | grep -v '#' > /etc/eks/eni-max-pods.txt
 
 		/sbin/iptables-save > /etc/sysconfig/iptables
 

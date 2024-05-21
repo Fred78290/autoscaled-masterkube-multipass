@@ -15,7 +15,6 @@ export ACM_CERTIFICATE_FORCE=NO
 export ACM_CERTIFICATE_TAGGING=
 export CONTROLPLANE_INSTANCEID_NLB_TARGET=
 export LAUNCHED_INSTANCES=()
-export OVERRIDE_SEED_IMAGE=
 export PRIVATE_SUBNET_NLB_TARGET=
 export PUBLIC_ADDR_IPS=()
 export PUBLIC_SUBNET_NLB_TARGET=
@@ -23,17 +22,11 @@ export RESERVED_ADDR_IPS=()
 export RESERVED_ENI=()
 export TARGET_IMAGE_AMI=
 
-if [ ${SEED_ARCH} == "amd64" ]; then
-	AUTOSCALE_MACHINE="t3a.medium"
-	CONTROL_PLANE_MACHINE="t3a.medium"
-	WORKER_NODE_MACHINE="t3a.medium"
-	NGINX_MACHINE="t3a.small"
-else
-	AUTOSCALE_MACHINE="t4g.medium"
-	CONTROL_PLANE_MACHINE="t4g.medium"
-	WORKER_NODE_MACHINE="t4g.medium"
-	NGINX_MACHINE="t4g.small"
-fi
+export OVERRIDE_SEED_IMAGE=
+export OVERRIDE_AUTOSCALE_MACHINE=
+export OVERRIDE_CONTROL_PLANE_MACHINE=
+export OVERRIDE_WORKER_NODE_MACHINE=
+export OVERRIDE_NGINX_MACHINE=
 
 #===========================================================================================================================================
 #
@@ -273,19 +266,19 @@ function parse_arguments() {
             shift 2
             ;;
         --nginx-machine)
-            NGINX_MACHINE="$2"
+            OVERRIDE_NGINX_MACHINE="$2"
             shift 2
             ;;
         --control-plane-machine)
-            CONTROL_PLANE_MACHINE="$2"
+            OVERRIDE_CONTROL_PLANE_MACHINE="$2"
             shift 2
             ;;
         --worker-node-machine)
-            WORKER_NODE_MACHINE="$2"
+            OVERRIDE_WORKER_NODE_MACHINE="$2"
             shift 2
             ;;
         --autoscale-machine)
-            AUTOSCALE_MACHINE="$2"
+            OVERRIDE_AUTOSCALE_MACHINE="$2"
             shift 2
             ;;
         --ssh-private-key)
@@ -457,30 +450,29 @@ function parse_arguments() {
         esac
     done
 
+    if [ ${SEED_ARCH} == "amd64" ]; then
+        AUTOSCALE_MACHINE="${OVERRIDE_AUTOSCALE_MACHINE:=t3a.medium}"
+        CONTROL_PLANE_MACHINE="${OVERRIDE_CONTROL_PLANE_MACHINE:=t3a.medium}"
+        WORKER_NODE_MACHINE="${OVERRIDE_WORKER_NODE_MACHINE:=t3a.medium}"
+        NGINX_MACHINE="${OVERRIDE_NGINX_MACHINE:=t3a.small}"
+        SEED_IMAGE=${OVERRIDE_SEED_IMAGE:=${SEED_IMAGE_AMD64}}
+    elif [ ${SEED_ARCH} == "arm64" ]; then
+        AUTOSCALE_MACHINE="${OVERRIDE_AUTOSCALE_MACHINE:=t4g.medium}"
+        CONTROL_PLANE_MACHINE="${OVERRIDE_CONTROL_PLANE_MACHINE:=t4g.medium}"
+        WORKER_NODE_MACHINE="${OVERRIDE_WORKER_NODE_MACHINE:=t4g.medium}"
+        NGINX_MACHINE="${OVERRIDE_NGINX_MACHINE:=t4g.small}"
+        SEED_IMAGE=${OVERRIDE_SEED_IMAGE:=${SEED_IMAGE_ARM64}}
+    else
+        echo_red "Unsupported architecture: ${SEED_ARCH}"
+        exit -1
+    fi
+
     export REGION=${AWS_REGION}
     export AWS_DEFAULT_REGION=${AWS_REGION}
     export ECR_PASSWORD=$(aws ecr get-login-password  --profile ${AWS_PROFILE} --region us-west-2)
 
     IFS=, read -a VPC_PUBLIC_SUBNET_IDS <<< "${VPC_PUBLIC_SUBNET_ID}"
     IFS=, read -a VPC_PRIVATE_SUBNET_IDS <<< "${VPC_PRIVATE_SUBNET_ID}"
-
-    if [ "${SEED_ARCH}" = "amd64" ]; then
-        if [ -z "${OVERRIDE_SEED_IMAGE}" ]; then
-            SEED_IMAGE=${SEED_IMAGE_AMD64}
-        else
-            SEED_IMAGE="${OVERRIDE_SEED_IMAGE}"
-        fi
-    elif [ "${SEED_ARCH}" = "arm64" ]; then
-        if [ -z "${OVERRIDE_SEED_IMAGE}" ]; then
-            SEED_IMAGE=${SEED_IMAGE_ARM64}
-        else
-            SEED_IMAGE="${OVERRIDE_SEED_IMAGE}"
-        fi
-    else
-        echo_red "Unsupported architecture: ${SEED_ARCH}"
-        exit -1
-    fi
-
 }
 
 #===========================================================================================================================================
@@ -558,11 +550,9 @@ function prepare_ssh() {
 #
 #===========================================================================================================================================
 function prepare_plateform() {
-    find_public_dns_provider
-
     # If we use AWS CNI, install eni-max-pods.txt definition file
     if [ ${CNI_PLUGIN} = "aws" ]; then
-        MAX_PODS=$(curl -s "https://raw.githubusercontent.com/awslabs/amazon-eks-ami/master/files/eni-max-pods.txt" | grep ^${AUTOSCALE_MACHINE} | awk '{print $2}')
+        MAX_PODS=$(curl -s "https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/misc/eni-max-pods.txt" | grep -v '#' | grep ^${AUTOSCALE_MACHINE} | awk '{print $2}')
 
         if [ -z "${MAX_PODS}" ]; then
             echo_red "No entry for ${AUTOSCALE_MACHINE} in eni-max-pods.txt. Not setting ${MAX_PODS} max pods for kubelet"
@@ -595,19 +585,19 @@ function prepare_plateform() {
         fi
     fi
 
-    # Grab domain name from route53
-
     # Tag VPC & Subnet
     for SUBNET in ${VPC_PUBLIC_SUBNET_IDS[@]}
     do
         TAGGED=$(aws ec2 describe-subnets \
             --profile ${AWS_PROFILE} \
+            --region=${AWS_REGION} \
             --filters "Name=subnet-id,Values=${SUBNET}" \
             | jq -r ".Subnets[].Tags[]|select(.Key == \"kubernetes.io/cluster/${NODEGROUP_NAME}\")|.Value")
 
         if [ -z ${TAGGED} ]; then
             aws ec2 create-tags \
                 --profile ${AWS_PROFILE} \
+                --region=${AWS_REGION} \
                 --resources ${SUBNET} \
                 --tags "Key=kubernetes.io/cluster/${NODEGROUP_NAME},Value=owned" 2> /dev/null
         fi
@@ -628,13 +618,14 @@ function prepare_plateform() {
     # Tag VPC & Subnet
     for SUBNET in ${VPC_PRIVATE_SUBNET_IDS[@]}
     do
-        NETINFO=$(aws ec2 describe-subnets --profile ${AWS_PROFILE} --filters "Name=subnet-id,Values=${SUBNET}")
+        NETINFO=$(aws ec2 describe-subnets --profile ${AWS_PROFILE} --region=${AWS_REGION} --filters "Name=subnet-id,Values=${SUBNET}")
         TAGGED=$(echo "${NETINFO}" | jq -r ".Subnets[].Tags[]|select(.Key == \"kubernetes.io/cluster/${NODEGROUP_NAME}\")|.Value")
         BASE_IP=$(echo "${NETINFO}" | jq -r .Subnets[].CidrBlock | sed -E 's/(\w+\.\w+\.\w+).\w+\/\w+/\1/')
 
         if [ -z ${TAGGED} ]; then
             aws ec2 create-tags \
                 --profile ${AWS_PROFILE} \
+                --region=${AWS_REGION} \
                 --resources ${SUBNET} \
                 --tags "Key=kubernetes.io/cluster/${NODEGROUP_NAME},Value=owned" 2> /dev/null
         fi
@@ -651,6 +642,9 @@ function prepare_plateform() {
     elif [ ${#VPC_PRIVATE_SUBNET_IDS[@]} = 2 ]; then
         VPC_PRIVATE_SUBNET_IDS+=(${VPC_PRIVATE_SUBNET_IDS[1]})
     fi
+
+   	find_private_dns_provider
+    find_public_dns_provider
 }
 
 #===========================================================================================================================================
@@ -771,6 +765,19 @@ function find_private_dns_provider() {
 
             if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
                 echo_blue_bold "AWS_ROUTE53_PRIVATE_ZONE_ID will be set to ${AWS_ROUTE53_PRIVATE_ZONE_ID}"
+            elif [ -z "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ] && [ "${PRIVATE_DOMAIN_NAME}" != "${PUBLIC_DOMAIN_NAME}" ]; then
+                TARGET_VPC=$(aws ec2 describe-subnets \
+                    --profile ${AWS_PROFILE} \
+                    --region ${AWS_REGION} \
+                    --filters "Name=subnet-id,Values=${VPC_PRIVATE_SUBNET_IDS[0]}" \
+                    | jq -r ".Subnets[0].VpcId")
+
+                AWS_ROUTE53_PRIVATE_ZONE_ID=$(aws route53 create-hosted-zone --profile ${AWS_PROFILE} --region ${AWS_REGION} \
+                    --name ${PRIVATE_DOMAIN_NAME} \
+                    --caller-reference $(date +%Y-%m-%dT%H:%M:%S) \
+                    --vpc="VPCRegion=${AWS_REGION},VPCId=${TARGET_VPC}" \
+                    --hosted-zone-config="Comment=${PRIVATE_DOMAIN_NAME},PrivateZone=true" | jq -r '.HostedZone.id')
+
             elif [ -n "${PUBLIC_DOMAIN_NAME}" ]; then
                 echo_blue_bold "AWS_ROUTE53_PRIVATE_ZONE_ID try to be set to ${PUBLIC_DOMAIN_NAME}"
                 AWS_ROUTE53_PRIVATE_ZONE_ID=$(zoneid_by_name ${PUBLIC_DOMAIN_NAME})

@@ -1,6 +1,8 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
 
+source ${CURDIR}/echo.sh
+
 function usage() {
 cat <<EOF
 $0 create an autosigned certificat with own CA

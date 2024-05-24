@@ -42,6 +42,7 @@
 			"--ignore-preflight-errors=All"
 		],
 		"use-nlb": ${USE_LOADBALANCER},
+		"nlb-ip": ${NLB_IPS},
 		"channel": "${MICROK8S_CHANNEL}",
 		"extras-commands": [],
 		"join-command": "/usr/local/bin/join-cluster.sh",

@@ -1,0 +1,40 @@
+{
+  "LoadBalancerArn": "arn:aws:elasticloadbalancing:eu-west-1:390689217862:loadbalancer/net/test/45a91815b43c23ed",
+  "DNSName": "test-45a91815b43c23ed.elb.eu-west-1.amazonaws.com",
+  "CanonicalHostedZoneId": "Z2IFOLAFXWLO4F",
+  "CreatedTime": "2024-05-22T12:03:22.050000+00:00",
+  "LoadBalancerName": "test",
+  "Scheme": "internal",
+  "VpcId": "vpc-01bbc4bcb89795e89",
+  "State": {
+    "Code": "provisioning"
+  },
+  "Type": "network",
+  "AvailabilityZones": [
+    {
+      "ZoneName": "eu-west-1b",
+      "SubnetId": "subnet-00272f4f93f36a142",
+      "LoadBalancerAddresses": [
+        "192.168.2.10"
+      ]
+    },
+    {
+      "ZoneName": "eu-west-1a",
+      "SubnetId": "subnet-08978535f23892fc7",
+      "LoadBalancerAddresses": [
+        "192.168.3.10"
+      ]
+    },
+    {
+      "ZoneName": "eu-west-1c",
+      "SubnetId": "subnet-0cf90b3658eb4c96f",
+      "LoadBalancerAddresses": [
+        "192.168.4.10"
+      ]
+    }
+  ],
+  "SecurityGroups": [
+    "sg-0b53c559e9ae44086"
+  ],
+  "IpAddressType": "ipv4"
+}

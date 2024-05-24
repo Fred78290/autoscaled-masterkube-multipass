@@ -566,19 +566,10 @@ fi
 		if [ ${FLOATING_IP} == "true" ]; then
 			eval openstack server add floating ip ${MASTERKUBE_NODE} ${PUBLIC_IP} ${SILENT}
 		fi
-
-		echo_title "Wait ssh ready on ${KUBERNETES_USER}@${LOCALIP}"
-		wait_ssh_ready ${KUBERNETES_USER}@${LOCALIP}
-
-		echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${LOCALIP}"
-		eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${LOCALIP}:~ ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${LOCALIP} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${LOCALIP} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${LOCALIP} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
 
-		LOCALIP=$(openstack server show -f json ${MASTERKUBE_NODE} 2/dev/null | jq -r --arg NETWORK ${VC_NETWORK_PRIVATE}  '.addresses|.[$NETWORK][0]')
+		LOCALIP=$(openstack server show -f json ${MASTERKUBE_NODE} 2/dev/null | jq -r --arg NETWORK ${VC_NETWORK_PRIVATE} '.addresses|.[$NETWORK][0]')
 
 		if [ ${FLOATING_IP} == "true" ]; then
 			PUBLIC_IP=$(openstack floating ip list --fixed-ip-address ${LOCALIP} -f json | jq -r '.[0]."Floating IP Address"')

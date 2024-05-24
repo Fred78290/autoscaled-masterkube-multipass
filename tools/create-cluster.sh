@@ -835,6 +835,10 @@ fi
 
 #sed -i -e "/${CONTROL_PLANE_ENDPOINT%%.}/d" /etc/hosts
 
-echo -n "${LOAD_BALANCER_IP[0]}:${APISERVER_ADVERTISE_PORT}" > ${CLUSTER_DIR}/manager-ip
+if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	echo -n "${APISERVER_ADVERTISE_ADDRESS}:${APISERVER_ADVERTISE_PORT}" > ${CLUSTER_DIR}/manager-ip
+else
+	echo -n "${LOAD_BALANCER_IP[0]}:${APISERVER_ADVERTISE_PORT}" > ${CLUSTER_DIR}/manager-ip
+fi
 
 echo "Done k8s master node"

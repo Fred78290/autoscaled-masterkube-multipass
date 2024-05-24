@@ -636,55 +636,42 @@ function build_routes() {
 #
 #===========================================================================================================================================
 function collect_cert_sans() {
-	local NLB_IP=$1
-	local CLUSTER_NODES=$2
-	local CERT_EXTRA_SANS=$3
+	local CERT_EXTRA_SANS=$1
 
-	local LB_IP=
 	local CERT_EXTRA=
-	local CLUSTER_NODE=
-	local CLUSTER_IP=
-	local CLUSTER_HOST=
-	local TLS_SNA=(
-		"${NLB_IP}"
-	)
+	local IP=
+	local HOST=
 
-	IFS=, read -a CLUSTER_NODES <<< "${CLUSTER_NODES}"
+	local TLS_SNA=()
+
 	IFS=, read -a CERT_EXTRA_SANS <<< "${CERT_EXTRA_SANS}"
 
 	for CERT_EXTRA in ${CERT_EXTRA_SANS[@]}
 	do
-		if [[ ! ${TLS_SNA[@]} =~ "${CERT_EXTRA}" ]]; then
-			TLS_SNA+=("${CERT_EXTRA}")
-		fi
-	done
+		IFS=: read HOST IP <<< "${CERT_EXTRA}"
 
-	for CLUSTER_NODE in ${CLUSTER_NODES[@]}
-	do
-		IFS=: read CLUSTER_HOST CLUSTER_IP <<< "${CLUSTER_NODE}"
-
-		if [ -n ${CLUSTER_IP} ] && [[ ! ${TLS_SNA[@]} =~ "${CLUSTER_IP}" ]]; then
-			TLS_SNA+=("${CLUSTER_IP}")
-		fi
-
-		if [ -n "${CLUSTER_HOST}" ]; then
-			if [[ ! ${TLS_SNA[@]} =~ "${CLUSTER_HOST}" ]]; then
-				TLS_SNA+=("${CLUSTER_HOST}")
-				TLS_SNA+=("${CLUSTER_HOST%%.*}")
+		if [ "$(valid_ip $HOST)" == "YES" ]; then
+			TLS_SNA+=("${HOST}")
+		else
+			if [ -n ${IP} ]; then
+				TLS_SNA+=("${IP}")
 			fi
+
+			TLS_SNA+=("${HOST}")
+			TLS_SNA+=("${HOST%%.*}")
 		fi
 	done
 
-	for INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES})))
+	for INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES} - 1)))
 	do
 		local PRIVATEDNS=${PRIVATE_DNS_NAMES[${INDEX}]:-}
 
 		if [ -n "${PRIVATEDNS}" ]; then
-			if [[ ! ${TLS_SNA[@]} =~ "${PRIVATEDNS}" ]]; then
-				TLS_SNA+=("${CLUSTER_HOST}")
-			fi
+			TLS_SNA+=("${PRIVATEDNS}")
 		fi
 	done
+
+	TLS_SNA=($(printf '%s\n' "${TLS_SNA[@]}" | sort -u))
 
 	echo -n "${TLS_SNA[@]}" | tr ' ' ','
 }
@@ -988,18 +975,41 @@ function create_named_server() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function prepare_vm() {
+	local INDEX=$1
+	local NAME=$2
+	local SSHADDR=$(get_ssh_ip ${INDEX})
+	local IPADDR=${PRIVATE_ADDR_IPS[${INDEX}]}
+	local PUBADDR=${PUBLIC_ADDR_IPS[${INDEX}]}
+
+	echo_title "Wait ssh ready on ${NAME} -> ${KUBERNETES_USER}@${IPADDR}"
+	wait_ssh_ready ${KUBERNETES_USER}@${SSHADDR}
+
+	echo_blue_bold "SSH is ready on ${NAME}, private-ip=${IPADDR}, ssh-ip=${SSHADDR}, public-ip=${PUBADDR}"
+	echo_title "Prepare ${NAME} instance with IP:${SSHADDR}"
+
+	eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${SSHADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
+	eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${SSHADDR}:~ ${SILENT}
+	eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${SSHADDR} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools/* ${SILENT}
+	eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${SSHADDR} sudo mv /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
+
+	if [ "${INSTALL_BIND9_SERVER}" == "YES" ] && [ ${INDEX} -eq ${FIRSTNODE} ]; then
+		create_named_server ${INDEX} ${SSHADDR} ${NAME}
+	fi
+
+	register_dns ${INDEX} ${IPADDR} ${NAME}
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function create_vm() {
 	local INDEX=$1
 	local NAME=$(get_vm_name ${INDEX})
 
 	plateform_create_vm $@
 	plateform_info_vm ${INDEX}
-
-	if [ "${INSTALL_BIND9_SERVER}" == "YES" ] && [ ${INDEX} -eq ${FIRSTNODE} ]; then
-		create_named_server ${INDEX} ${PRIVATE_ADDR_IPS[${INDEX}]} ${NAME}
-	fi
-
-	register_dns ${INDEX} ${PRIVATE_ADDR_IPS[${INDEX}]} ${NAME}
+	prepare_vm ${INDEX} ${NAME}
 }
 
 #===========================================================================================================================================
@@ -1018,7 +1028,10 @@ function wait_nlb_ready() {
 
 	echo_line
 
-	echo -n ${CONTROL_PLANE_ENDPOINT}:${APISERVER_ADVERTISE_PORT} > ${TARGET_CLUSTER_LOCATION}/manager-ip
+	# Microk8s doesn't support fqdn
+	if [[ ${KUBERNETES_DISTRO} != "microk8s" || ${USE_KEEPALIVED} == "YES" ]] || [[ ${USE_NLB} == "YES" && ${PLATEFORM} == "openstack" ]];  then
+		echo -n ${CONTROL_PLANE_ENDPOINT}:${APISERVER_ADVERTISE_PORT} > ${TARGET_CLUSTER_LOCATION}/manager-ip
+	fi
 }
 
 #===========================================================================================================================================
@@ -1176,7 +1189,7 @@ function prepare_environment() {
 	if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},9345"
 		EXTERNAL_ETCD=false
-	elif [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
+	elif [ "${KUBERNETES_DISTRO}" == "microk8s" ] && [ "${KUBERNETES_DISTRO}" != "aws" ]; then
 		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},25000"
 	else
 		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT}"
@@ -2028,7 +2041,9 @@ function create_keepalived() {
 
 	for INDEX in $(seq 1 ${CONTROLNODES})
 	do
-		if [ ! -f ${TARGET_CONFIG_LOCATION}/keepalived-0${INDEX}-prepared ]; then
+		local SUFFIX=$(named_index_suffix ${INDEX})
+
+		if [ ! -f ${TARGET_CONFIG_LOCATION}/keepalived-${SUFFIX}-prepared ]; then
 			IPADDR="${PRIVATE_ADDR_IPS[${INDEX}]}"
 
 			echo_title "Start keepalived node: ${IPADDR}"
@@ -2061,7 +2076,7 @@ function create_keepalived() {
 				--keep-alive-peer2=${KEEPALIVED_PEER2} \
 				--keep-alive-status=${KEEPALIVED_STATUS} ${SILENT}
 
-			touch ${TARGET_CONFIG_LOCATION}/keepalived-0${INDEX}-prepared
+			touch ${TARGET_CONFIG_LOCATION}/keepalived-${SUFFIX}-prepared
 		fi
 	done
 }
@@ -2091,24 +2106,28 @@ function create_nameserver() {
 function create_nginx_gateway() {
 	for INDEX in $(seq ${FIRSTNODE} $((CONTROLNODE_INDEX - 1)) )
 	do
-		MASTERKUBE_NODE=$(get_vm_name ${INDEX})
-		IPADDR=${PRIVATE_ADDR_IPS[${INDEX}]}
+		local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
+		local IPADDR=${PRIVATE_ADDR_IPS[${INDEX}]}
+		local SUFFIX=$(named_index_suffix ${INDEX})
+		local SSHADDR=$(get_ssh_ip ${INDEX})
 
 		if [ ${INDEX} -eq ${FIRSTNODE} ]; then
-			LOAD_BALANCER_IP="${PRIVATE_ADDR_IPS[${INDEX}]}"
+			LOAD_BALANCER_IP="${IPADDR}"
 		else
-			LOAD_BALANCER_IP="${LOAD_BALANCER_IP},${PRIVATE_ADDR_IPS[${INDEX}]}"
+			LOAD_BALANCER_IP="${LOAD_BALANCER_IP},${IPADDR}"
 		fi
 
-		echo_blue_bold "Start load balancer ${MASTERKUBE_NODE} instance ${INDEX} with IP: ${IPADDR}"
+		if [ ! -f ${TARGET_CONFIG_LOCATION}/node-${SUFFIX}-prepared ]; then
+			echo_blue_bold "Start load balancer ${MASTERKUBE_NODE} instance ${INDEX} with IP: ${IPADDR}"
 
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-load-balancer.sh \
-			--listen-port=${LOAD_BALANCER_PORT} \
-			--cluster-nodes="${CLUSTER_NODES}" \
-			--control-plane-endpoint=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} \
-			--listen-ip=0.0.0.0 ${SILENT}
+			eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${SSHADDR} sudo install-load-balancer.sh \
+				--listen-port=${LOAD_BALANCER_PORT} \
+				--cluster-nodes="${CLUSTER_NODES}" \
+				--control-plane-endpoint=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} \
+				--listen-ip=0.0.0.0 ${SILENT}
 
-		echo ${MASTERKUBE_NODE} > ${TARGET_CONFIG_LOCATION}/node-0${INDEX}-prepared
+			touch ${TARGET_CONFIG_LOCATION}/node-${SUFFIX}-prepared
+		fi
 	done
 
 	echo_red_bold LOAD_BALANCER_IP=$LOAD_BALANCER_IP
@@ -2127,9 +2146,9 @@ function register_nlb_dns() {
 		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 			echo_title "Register dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} in route53: ${AWS_ROUTE53_PRIVATE_ZONE_ID}, record: ${PRIVATE_NLB_DNS}"
 
-			if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
+			#if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
 				CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
-			fi
+			#fi
 
 			cat > ${TARGET_CONFIG_LOCATION}/route53-nlb.json <<EOF
 			{
@@ -2163,9 +2182,9 @@ EOF
 			
 			DNS_ENTRY=$(openstack recordset create -f json --ttl 60 --type ${RECORDTYPE} --record ${PRIVATE_NLB_DNS} "${PRIVATE_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
 
-			if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
+			#if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
 				CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
-			fi
+			#fi
 
 			cat > ${TARGET_CONFIG_LOCATION}/designate-nlb.json <<EOF
 			{
@@ -2179,9 +2198,9 @@ EOF
 		elif [ ${USE_BIND9_SERVER} = "true" ]; then
 			echo_title "Register bind9 dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} designate, record: ${PRIVATE_NLB_DNS}"
 
-			if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
+			#if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
 				CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
-			fi
+			#fi
 
 			cat > ${TARGET_CONFIG_LOCATION}/rfc2136-nlb.cmd <<EOF
 server ${BIND9_HOST} ${BIND9_PORT}
@@ -2207,7 +2226,6 @@ EOF
 			"ResourceRecordSet": {
 				"Name": "${MASTERKUBE}.${PUBLIC_DOMAIN_NAME}",
 				"Type": "A",
-				"TTL": 60,
 				"AliasTarget": {
           			"HostedZoneId": "${PUBLIC_NLB_HOSTED_ZONEID}",
 		  			"DNSName": "${PUBLIC_NLB_DNS}",
@@ -2500,6 +2518,10 @@ EOF
 #
 #===========================================================================================================================================
 function create_etcd() {
+	local INDEX=
+	local IPADDR=
+	local SUFFIX=
+
 	if [ "${HA_CLUSTER}" = "true" ]; then
 		if [ "${EXTERNAL_ETCD}" = "true" ]; then
 			echo_title "Created etcd cluster: ${CLUSTER_NODES}"
@@ -2510,10 +2532,11 @@ function create_etcd() {
 
 			for INDEX in $(seq 1 ${CONTROLNODES})
 			do
-				if [ ! -f ${TARGET_CONFIG_LOCATION}/etdc-0${INDEX}-prepared ]; then
-	                INDEX=$((${INDEX} + ${CONTROLNODE_INDEX} - 1))
-					IPADDR="${PRIVATE_ADDR_IPS[${INDEX}]}"
+	            INDEX=$((${INDEX} + ${CONTROLNODE_INDEX} - 1))
+				SUFFIX=$(named_index_suffix ${INDEX})
+				IPADDR=$(get_ssh_ip ${INDEX})
 
+				if [ ! -f ${TARGET_CONFIG_LOCATION}/etdc-${SUFFIX}-prepared ]; then
 					echo_title "Start etcd node: ${IPADDR}"
 					eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/etcd ${KUBERNETES_USER}@${IPADDR}:~/etcd ${SILENT}
 					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh \
@@ -2521,7 +2544,7 @@ function create_etcd() {
 						--cluster-nodes="${CLUSTER_NODES}" \
 						--node-index="${INDEX}" ${SILENT}
 
-					touch ${TARGET_CONFIG_LOCATION}/etdc-0${INDEX}-prepared
+					touch ${TARGET_CONFIG_LOCATION}/etdc-${SUFFIX}-prepared
 				fi
 			done
 		fi
@@ -2541,18 +2564,17 @@ EOF
 function create_cluster() {
     local MASTER_IP=
 
-	echo_red_bold USE_ETC_HOSTS=${USE_ETC_HOSTS}
-
-	CERT_SANS=$(collect_cert_sans "${LOAD_BALANCER_IP}" "${CLUSTER_NODES}" "${MASTERKUBE}.${PRIVATE_DOMAIN_NAME},${MASTERKUBE}")
+	CERT_SANS=$(collect_cert_sans "${LOAD_BALANCER_IP},${CLUSTER_NODES},${MASTERKUBE}.${PRIVATE_DOMAIN_NAME},${MASTERKUBE}")
 
 	for INDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
 	do
-		MASTERKUBE_NODE=$(get_vm_name ${INDEX})
-        NODEINDEX=$((INDEX - ${CONTROLNODE_INDEX}))
-		VMUUID=$(get_vmuuid ${MASTERKUBE_NODE})
-		IPADDR=$(get_ssh_ip ${INDEX})
+		local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
+        local NODEINDEX=$((INDEX - ${CONTROLNODE_INDEX}))
+		local VMUUID=$(get_vmuuid ${MASTERKUBE_NODE})
+		local IPADDR=$(get_ssh_ip ${INDEX})
+		local SUFFIX=$(named_index_suffix ${INDEX})
 
-		if [ -f ${TARGET_CONFIG_LOCATION}/node-0${INDEX}-prepared ]; then
+		if [ -f ${TARGET_CONFIG_LOCATION}/node-${SUFFIX}-prepared ]; then
 			echo_title "Already prepared VM ${MASTERKUBE_NODE}"
 		else
 			echo_title "Prepare VM ${MASTERKUBE_NODE}, index=${INDEX}, UUID=${VMUUID} with IP:${IPADDR}"
@@ -2611,12 +2633,13 @@ function create_cluster() {
 					--cluster-nodes="${CLUSTER_NODES}" \
 					--cni-plugin=${CNI_PLUGIN} \
 					--container-runtime=${CONTAINER_ENGINE} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP%%,*}" \
 					--control-plane=true \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--join-master="${MASTER_IP}" \
 					--kube-engine=${KUBERNETES_DISTRO} \
 					--kube-version="${KUBERNETES_VERSION}" \
+					--load-balancer-ip=${LOAD_BALANCER_IP} \
 					--max-pods=${MAX_PODS} \
 					--net-if=${PRIVATE_NET_INF} \
 					--node-group=${NODEGROUP_NAME} \
@@ -2643,11 +2666,12 @@ function create_cluster() {
 					--cluster-nodes="${CLUSTER_NODES}" \
 					--cni-plugin=${CNI_PLUGIN} \
 					--container-runtime=${CONTAINER_ENGINE} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP%%,*}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--join-master="${MASTER_IP}" \
 					--kube-engine=${KUBERNETES_DISTRO} \
 					--kube-version="${KUBERNETES_VERSION}" \
+					--load-balancer-ip=${LOAD_BALANCER_IP} \
 					--max-pods=${MAX_PODS} \
 					--net-if=${PRIVATE_NET_INF} \
 					--node-group=${NODEGROUP_NAME} \
@@ -2663,7 +2687,7 @@ function create_cluster() {
 					${SILENT}
 			fi
 
-			echo ${MASTERKUBE_NODE} > ${TARGET_CONFIG_LOCATION}/node-0${INDEX}-prepared
+			echo ${MASTERKUBE_NODE} > ${TARGET_CONFIG_LOCATION}/node-${SUFFIX}-prepared
 		fi
 
 		echo_separator
@@ -2789,6 +2813,8 @@ EOF
 	else
 		SERVER_ADDRESS="${MASTER_IP}"
 	fi
+
+	export NLB_IPS=$(echo "[\"${LOAD_BALANCER_IP}\"]" | sed 's/,/","/g')
 
 	cp ${PWD}/templates/setup/${PLATEFORM}/machines.json ${TARGET_CONFIG_LOCATION}/machines.json
 

@@ -3,6 +3,8 @@ set -e
 
 CURDIR=$(dirname $0)
 
+source "${CURDIR}/echo.sh"
+
 AWS_NLB_NAME=${MASTERKUBE}
 AWS_PROFILE=
 AWS_REGION=
@@ -47,6 +49,7 @@ function delete_nlb() {
 	local NLB_ARN=$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} --names ${NLB_NAME} 2> /dev/null | jq -r '.LoadBalancers[0].LoadBalancerArn // ""')
 
 	if [ "x${NLB_ARN}" != "x" ]; then
+		echo_blue_bold "Delete load balancer: ${NLB_NAME}"
 		NLB_LISTENERS=$(aws elbv2 describe-listeners --profile=${AWS_PROFILE} --region=${AWS_REGION} --load-balancer-arn ${NLB_ARN} | jq -r '.Listeners[].ListenerArn // ""')
 
 		for NLB_LISTENER in ${NLB_LISTENERS}

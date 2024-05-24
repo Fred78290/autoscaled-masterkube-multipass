@@ -8,28 +8,29 @@ CLUSTER_NODES=()
 CNI_PLUGIN=flannel
 CONTROL_PLANE_ENDPOINT_ADDR=
 CONTROL_PLANE_ENDPOINT=
+CONTROL_PLANE=false
 ETCD_ENDPOINT=
 EXTERNAL_ETCD=NO
-USE_ETC_HOSTS=true
-CONTROL_PLANE=false
 INSTANCEID=
 INSTANCENAME=${HOSTNAME}
 KUBEADM_CONFIG=/etc/kubernetes/kubeadm-config.yaml
 KUBERNETES_DISTRO=kubeadm
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
+LOAD_BALANCER_IP=
 MASTER_IP=$(cat ./cluster/manager-ip)
 MASTER_NODE_ALLOW_DEPLOYMENT=NO
 MAX_PODS=110
-PRIVATE_NET_INF=$(ip route get 1|awk '{print $5;exit}')
 NODEGROUP_NAME=
 NODEINDEX=0
 NODENAME=${HOSTNAME}
 POD_NETWORK_CIDR="10.244.0.0/16"
+PRIVATE_NET_INF=$(ip route get 1|awk '{print $5;exit}')
 REGION=home
 SERVICE_NETWORK_CIDR="10.96.0.0/12"
 TOKEN=$(cat ./cluster/token)
+USE_ETC_HOSTS=true
+USE_LOADBALANCER=false
 ZONEID=office
-USE_LOADBALANCER=NO
 
 OPTIONS=(
 	"allow-deployment:"
@@ -43,6 +44,7 @@ OPTIONS=(
 	"join-master:"
 	"kube-engine:"
 	"kube-version:"
+	"load-balancer-ip:"
 	"max-pods:"
 	"net-if:"
 	"node-group:"
@@ -168,6 +170,10 @@ while true; do
 		USE_LOADBALANCER="$2"
 		shift 2
 		;;
+	--load-balancer-ip)
+		IFS=, read -a LOAD_BALANCER_IP <<< "$2"
+		shift 2
+		;;
 # Plateform specific
 	-c|--control-plane-endpoint)
 		IFS=: read CONTROL_PLANE_ENDPOINT CONTROL_PLANE_ENDPOINT_ADDR <<< "$2"
@@ -213,10 +219,17 @@ function wait_node_ready() {
 		sleep 1
 	done
 
+	echo
+
 	kubectl wait --for=condition=Ready nodes --field-selector metadata.name=${NODENAME} --timeout=120s
 
 	echo
 }
+
+# AWS NLB....
+if [ -z "${CONTROL_PLANE_ENDPOINT_ADDR}" ]; then
+	CONTROL_PLANE_ENDPOINT_ADDR=${JOIN_MASTER_IP}
+fi
 
 if [ ${PLATEFORM} == "aws" ]; then
 	LOCALHOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)
@@ -275,11 +288,6 @@ mkdir -p ${SUDO_HOME}/.kube
 cp ${KUBECONFIG} ${SUDO_HOME}/.kube/config
 chown ${SUDO_UID}:${SUDO_GID} ${SUDO_HOME}/.kube/config
 
-# AWS NLB....
-if [ -z "${CONTROL_PLANE_ENDPOINT_ADDR}" ]; then
-	CONTROL_PLANE_ENDPOINT_ADDR=${JOIN_MASTER_IP}
-fi
-
 if [ ${KUBERNETES_DISTRO} == "microk8s" ]; then
 	IFS=. read VERSION MAJOR MINOR <<< "${KUBERNETES_VERSION}"
 	MICROK8S_CHANNEL="${VERSION:1}.${MAJOR}/stable"
@@ -334,14 +342,22 @@ EOF
 		done
 
 	else
-		if [ ${USE_LOADBALANCER} = "true" ]; then
-			echo 'extraMicroK8sAPIServerProxyArgs:' >> ${MICROK8S_CONFIG}
-			echo '  --refresh-interval: "0"' >> ${MICROK8S_CONFIG}
-			echo '  --traefik-config: /usr/local/etc/microk8s/traefik.yaml' >> ${MICROK8S_CONFIG}
+		echo "join:" >> ${MICROK8S_CONFIG}
+		echo "  worker: true" >> ${MICROK8S_CONFIG}
 
-			mkdir -p /usr/local/etc/microk8s
+		if [ ${PLATEFORM} == "aws" ]; then
+			echo "  url: ${JOIN_MASTER_IP}:25000/${TOKEN}" >> ${MICROK8S_CONFIG}
+		else
+			echo "  url: ${CONTROL_PLANE_ENDPOINT_ADDR}:25000/${TOKEN}" >> ${MICROK8S_CONFIG}
 
-			cat > /usr/local/etc/microk8s/traefik.yaml <<EOF
+			if [ ${USE_LOADBALANCER} = "true" ]; then
+				echo 'extraMicroK8sAPIServerProxyArgs:' >> ${MICROK8S_CONFIG}
+				echo '  --refresh-interval: "0"' >> ${MICROK8S_CONFIG}
+				echo '  --traefik-config: /usr/local/etc/microk8s/traefik.yaml' >> ${MICROK8S_CONFIG}
+
+				mkdir -p /usr/local/etc/microk8s
+
+				cat > /usr/local/etc/microk8s/traefik.yaml <<EOF
 entryPoints:
   apiserver:
     address: ':${JOIN_MASTER_PORT}'
@@ -351,7 +367,7 @@ providers:
     watch: true
 EOF
 
-			cat > /usr/local/etc/microk8s/provider.yaml <<EOF
+				cat > /usr/local/etc/microk8s/provider.yaml <<EOF
 tcp:
   routers:
     Router-1:
@@ -363,13 +379,13 @@ tcp:
     kube-apiserver:
       loadBalancer:
         servers:
-        - address: ${CONTROL_PLANE_ENDPOINT_ADDR}:${JOIN_MASTER_PORT}
 EOF
+				for ADDRESS in ${LOAD_BALANCER_IP[@]}
+				do
+					echo "        - address: ${ADDRESS}:${JOIN_MASTER_PORT}" >> /usr/local/etc/microk8s/provider.yaml
+				done
+			fi
 		fi
-
-		echo "join:" >> ${MICROK8S_CONFIG}
-		echo "  url: ${CONTROL_PLANE_ENDPOINT_ADDR}:25000/${TOKEN}" >> ${MICROK8S_CONFIG}
-		echo "  worker: true" >> ${MICROK8S_CONFIG}
 	fi
 
 	cat ${MICROK8S_CONFIG}

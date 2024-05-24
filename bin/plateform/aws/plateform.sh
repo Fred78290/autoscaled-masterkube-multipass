@@ -13,10 +13,7 @@ export SEED_IMAGE_ARM64="ami-0c5789c17ae99a2fa"
 export ACM_CERTIFICATE_ARN=
 export ACM_CERTIFICATE_FORCE=NO
 export ACM_CERTIFICATE_TAGGING=
-export CONTROLPLANE_INSTANCEID_NLB_TARGET=
-export LAUNCHED_INSTANCES=()
 export PRIVATE_SUBNET_NLB_TARGET=
-export PUBLIC_ADDR_IPS=()
 export PUBLIC_SUBNET_NLB_TARGET=
 export RESERVED_ADDR_IPS=()
 export RESERVED_ENI=()
@@ -691,12 +688,15 @@ function create_plateform_nlb() {
     local PUBLIC_INSTANCEID_NLB_TARGET=()
     local PRIVATE_NLB_DNS=
     local PUBLIC_NLB_DNS=
+    local INSTANCE_INDEX=
+    local SUFFIX=
+    local INSTANCE_ID=
 
     # NLB For control plane
-	for INSTANCE_INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES})))
+	for INSTANCE_INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES} - 1)))
 	do
-		LAUNCHED_INSTANCE=${LAUNCHED_INSTANCES[${INSTANCE_INDEX}]}
-		INSTANCE_ID=$(echo ${LAUNCHED_INSTANCE} | jq -r '.InstanceId // ""')
+		SUFFIX=$(named_index_suffix ${INSTANCE_INDEX})
+		INSTANCE_ID=$(jq -r '.InstanceId // ""' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
 
         CONTROLPLANE_INSTANCEID_NLB_TARGET+=(${INSTANCE_ID})
 	done
@@ -705,12 +705,12 @@ function create_plateform_nlb() {
 	if [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
 		for INSTANCE_INDEX in $(seq ${FIRSTNODE} $((FIRSTNODE + ${#VPC_PUBLIC_SUBNET_IDS[@]} - 1)))
 		do
-			LAUNCHED_INSTANCE=${LAUNCHED_INSTANCES[${INSTANCE_INDEX}]}
-			INSTANCE_ID=$(echo ${LAUNCHED_INSTANCE} | jq -r '.InstanceId // ""')
+            SUFFIX=$(named_index_suffix ${INSTANCE_INDEX})
+			INSTANCE_ID=$(jq -r '.InstanceId // ""' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
 			PUBLIC_INSTANCEID_NLB_TARGET+=(${INSTANCE_ID})
 		done
     else
-        PUBLIC_INSTANCEID_NLB_TARGET=CONTROLPLANE_INSTANCEID_NLB_TARGET
+        PUBLIC_INSTANCEID_NLB_TARGET=(${CONTROLPLANE_INSTANCEID_NLB_TARGET[@]})
 	fi
 
     CONTROLPLANE_INSTANCEID_NLB_TARGET=$(echo -n ${CONTROLPLANE_INSTANCEID_NLB_TARGET[@]} | tr ' ' ',')
@@ -739,7 +739,13 @@ function create_plateform_nlb() {
     PRIVATE_NLB_DEF=$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} \
         | jq -r --arg NLB_NAME c-${MASTERKUBE} '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)')
 
-	LOAD_BALANCER_IP="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}"
+    if [ $KUBERNETES_DISTRO == "microk8s" ]; then
+        LOAD_BALANCER_IP=$(echo ${PRIVATE_NLB_DEF} | jq -r '.LoadBalancerArn' | cut -d '/' -f 2,3,4)
+        LOAD_BALANCER_IP=($(aws ec2 describe-network-interfaces --filters Name=description,Values="ELB ${LOAD_BALANCER_IP}" --query 'NetworkInterfaces[*].PrivateIpAddresses[*].PrivateIpAddress' --output text))
+        LOAD_BALANCER_IP=$(echo ${LOAD_BALANCER_IP[@]} | tr ' ' ',')
+    else
+    	LOAD_BALANCER_IP="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}"
+    fi
 
 	if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
         PUBLIC_NLB_DEF="$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} | jq -r --arg NLB_NAME p-${MASTERKUBE} '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)')"
@@ -996,12 +1002,6 @@ EOF
 		PUBADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PublicIpAddress // ""')
 		PRIVATEDNS=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateDnsName // ""')
 
-		if [ -z "${PUBADDR}" ] || [ "${PREFER_SSH_PUBLICIP}" = "NO" ]; then
-			SSHADDR=${IPADDR}
-		else
-			SSHADDR=${PUBADDR}
-		fi
-
 		if [ "${PUBLICIP}" = "true" ] || [ -z ${NETWORK_INTERFACE_ID} ]; then
 			NETWORK_INTERFACE_ID=$(echo ${LAUNCHED_INSTANCE} | jq -r '.NetworkInterfaces[0].NetworkInterfaceId // ""')
 			ENI=$(aws ec2 describe-network-interfaces \
@@ -1012,23 +1012,12 @@ EOF
 		fi
 
 		echo -n ${LAUNCHED_INSTANCE} | jq . > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json
-
-		echo_title "Wait ssh ready on ${KUBERNETES_USER}@${SSHADDR}"
-		wait_ssh_ready ${KUBERNETES_USER}@${SSHADDR}
-
-		echo_blue_bold "SSH is ready on ${MASTERKUBE_NODE}, private-ip=${IPADDR}, ssh-ip=${SSHADDR}, public-ip=${PUBADDR}"
 	else
 		IPADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateIpAddress // ""')
 		PUBADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PublicIpAddress // ""')
 		PRIVATEDNS=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateDnsName // ""')
 
-		if [ -z "${PUBADDR}" ] || [ "${PREFER_SSH_PUBLICIP}" = "NO" ]; then
-			SSHADDR=${IPADDR}
-		else
-			SSHADDR=${PUBADDR}
-		fi
-
-		echo_blue_bold "Already launched ${MASTERKUBE_NODE}, private-ip=${IPADDR}, ssh-ip=${SSHADDR}, public-ip=${PUBADDR}"
+		echo_blue_bold "Already launched ${MASTERKUBE_NODE}, private-ip=${IPADDR}, public-ip=${PUBADDR}"
 
 		echo -n ${LAUNCHED_INSTANCE} | jq . > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json
 	fi
@@ -1036,11 +1025,6 @@ EOF
     PRIVATE_ADDR_IPS[${INDEX}]=${IPADDR}
     PUBLIC_ADDR_IPS[${INDEX}]=${PUBADDR}
     PRIVATE_DNS_NAMES[${INDEX}]=${PRIVATEDNS}
-
-	eval ssh ${SSH_OPTIONS} "${KUBERNETES_USER}@${SSHADDR}" mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
-	eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-	eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
-	eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
 }
 
 #===========================================================================================================================================

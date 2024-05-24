@@ -183,18 +183,6 @@ EOF
 					echo_red_bold "Failed to get ip for ${MASTERKUBE_NODE}"
 					exit 1
 				fi
-
-				echo_title "Wait ssh ready on ${KUBERNETES_USER}@${IPADDR}"
-				wait_ssh_ready ${KUBERNETES_USER}@${IPADDR}
-
-				echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${IPADDR}"
-				eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
-				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
-
-				# Update /etc/hosts
-				register_dns ${INDEX} ${NODE_IP} ${MASTERKUBE_NODE}
 			fi
 		fi
 	else

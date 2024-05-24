@@ -156,19 +156,21 @@ done
 
 function create_nlb() {
 	local NLB_NAME=$1
-	local PLATEFORM=$2
+	local SCHEME=$2
 	local AWS_SUBNETID=$3
 	local TARGET_PORTS=$4
 	local TYPE=$5
 	local INSTANCES=$6
-	local NLB_ARN
-	local TARGET_ARN
-	local TARGET_PORT
+	local NLB_ARN=
+	local TARGET_ARN=
+	local TARGET_PORT=
 
 	if [ ${TYPE} == "network" ]; then
-		NLB_ARN=$(aws elbv2 create-load-balancer --profile=${AWS_PROFILE} --region=${AWS_REGION} --name ${NLB_NAME} --scheme ${PLATEFORM} --type ${TYPE} --subnets ${AWS_SUBNETID} | jq -r '.LoadBalancers[0].LoadBalancerArn')
+		NLB_ARN=$(aws elbv2 create-load-balancer --profile=${AWS_PROFILE} --region=${AWS_REGION} --name ${NLB_NAME} \
+			--scheme ${SCHEME} --type ${TYPE} --subnets ${AWS_SUBNETID} | jq -r '.LoadBalancers[0].LoadBalancerArn')
 	else
-		NLB_ARN=$(aws elbv2 create-load-balancer --profile=${AWS_PROFILE} --region=${AWS_REGION} --name ${NLB_NAME} --security-groups ${AWS_SECURITY_GROUP} --scheme ${PLATEFORM} --type ${TYPE} --subnets ${AWS_SUBNETID} | jq -r '.LoadBalancers[0].LoadBalancerArn')
+		NLB_ARN=$(aws elbv2 create-load-balancer --profile=${AWS_PROFILE} --region=${AWS_REGION} --name ${NLB_NAME} \
+			--security-groups ${AWS_SECURITY_GROUP} --scheme ${SCHEME} --type ${TYPE} --subnets ${AWS_SUBNETID} | jq -r '.LoadBalancers[0].LoadBalancerArn')
 	fi
 
 	for TARGET_PORT in ${TARGET_PORTS}
@@ -208,12 +210,13 @@ function create_nlb() {
 }
 
 if [ ${AWS_USE_PUBLICIP} = "true" ]; then
-	create_nlb "p-${AWS_NLB_NAME}" internet-facing "${AWS_PUBLIC_SUBNETID[@]}" "80 443" network "${PUBLIC_INSTANCES_IP[@]}"
+	create_nlb "p-${AWS_NLB_NAME}" internet-facing "${AWS_PUBLIC_SUBNETID[*]}" "80 443" network "${PUBLIC_INSTANCES_IP[*]}"
 fi
 
-NLB_ARN=$(create_nlb "c-${AWS_NLB_NAME}" internal "${AWS_PRIVATE_SUBNETID[@]}" "${LOAD_BALANCER_PORT[@]}" network "${CONTROLPLANE_INSTANCES_IP[@]}")
+NLB_ARN=$(create_nlb "c-${AWS_NLB_NAME}" internal "${AWS_PRIVATE_SUBNETID[*]}" "${LOAD_BALANCER_PORT[*]}" network "${CONTROLPLANE_INSTANCES_IP[*]}")
+NBL_DESCRIBE=
 
-echo_blue_dot_title -n "Wait NLB to start ${NLB_ARN}"
+echo_blue_dot_title "Wait NLB to start ${NLB_ARN}"
 
 while [ "$(echo "${NBL_DESCRIBE}" | jq -r '.LoadBalancers[0].State.Code // ""')" != "active" ];
 do

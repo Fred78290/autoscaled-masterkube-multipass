@@ -2594,7 +2594,7 @@ function create_cluster() {
 					--cluster-nodes="${CLUSTER_NODES}" \
 					--cni-plugin=${CNI_PLUGIN} \
 					--container-runtime=${CONTAINER_ENGINE} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP}" \
+					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP%%,*}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--ha-cluster=${HA_CLUSTER} \
 					--kube-engine=${KUBERNETES_DISTRO} \

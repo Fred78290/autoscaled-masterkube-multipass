@@ -16,7 +16,7 @@ EOF")
 		echo ${CONFIG} | jq \
 			--arg SERVER "https://acme.zerossl.com/v2/DV90" \
 			--arg CERT_ZEROSSL_EAB_KID ${CERT_ZEROSSL_EAB_KID} \
-			'.spec.acme.server = ${SERVER} | .spec.acme.externalAccountBinding = {"keyID": $CERT_ZEROSSL_EAB_KID, "keyAlgorithm": "HS256", "keySecretRef": { "name": "zero-ssl-eabsecret", "key": "secret"}}' > ${ETC_DIR}/cluster-issuer.json
+			'.spec.acme.server = $SERVER | .spec.acme.externalAccountBinding = {"keyID": $CERT_ZEROSSL_EAB_KID, "keyAlgorithm": "HS256", "keySecretRef": { "name": "zero-ssl-eabsecret", "key": "secret"}}' > ${ETC_DIR}/cluster-issuer.json
 	else
 		echo ${CONFIG} | jq \
 			--arg SERVER "https://acme-v02.api.letsencrypt.org/directory" \
@@ -60,11 +60,13 @@ case ${KUBERNETES_MINOR_RELEASE} in
 		echo_red_bold "Unsupported k8s release: ${KUBERNETES_VERSION}"
 		exit 1
 esac
-set -x
+
 mkdir -p ${ETC_DIR}
 
 kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml \
-	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+	| tee ${ETC_DIR}/namespace.yaml \
+	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 helm repo add jetstack https://charts.jetstack.io
 helm repo update
@@ -81,14 +83,18 @@ if [ -z "${PUBLIC_DOMAIN_NAME}" ] || [ "${CERT_SELFSIGNED}" == "YES" ]; then
 		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 		--namespace ${NAMESPACE} \
 		--from-file=tls.crt=${CA_LOCATION}/masterkube.pem \
-		--from-file=tls.key=${CA_LOCATION}/masterkube.key | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+		--from-file=tls.key=${CA_LOCATION}/masterkube.key \
+		| tee ${ETC_DIR}/ca-key-pair.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 	deploy cluster-issuer-selfsigned
 else
 	if [ "${USE_ZEROSSL}" = "YES" ]; then
 		kubectl create secret generic zero-ssl-eabsecret -n ${NAMESPACE} --dry-run=client -o yaml \
 			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-			--from-literal secret="${CERT_ZEROSSL_EAB_HMAC_SECRET}" | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+			--from-literal secret="${CERT_ZEROSSL_EAB_HMAC_SECRET}" \
+			| tee ${ETC_DIR}/zero-ssl-eabsecret.yaml \
+			| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 	fi
 
 	if [ "${EXTERNAL_DNS_PROVIDER}" == "aws" ]; then
@@ -96,7 +102,9 @@ else
 			echo_blue_bold "Register route53 issuer"
 			kubectl create secret generic route53-credentials-secret -n ${NAMESPACE} --dry-run=client -o yaml \
 				--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-				--from-literal=secret=${AWS_ROUTE53_SECRETKEY} | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+				--from-literal=secret=${AWS_ROUTE53_SECRETKEY} \
+				| tee ${ETC_DIR}/route53-credentials-secret.yaml \
+				| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 			deploy cluster-issuer-route53
 		fi
@@ -114,7 +122,9 @@ else
 		kubectl create secret generic godaddy-api-key-prod -n ${NAMESPACE} --dry-run=client -o yaml \
 			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 			--from-literal=key=${CERT_GODADDY_API_KEY} \
-			--from-literal=secret=${CERT_GODADDY_API_SECRET} | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+			--from-literal=secret=${CERT_GODADDY_API_SECRET} \
+			| tee ${ETC_DIR}/godaddy-api-key-prod.yaml \
+			| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 		deploy cluster-issuer-godaddy
 	elif [ "${EXTERNAL_DNS_PROVIDER}" == "designate" ]; then
@@ -149,7 +159,9 @@ else
 		done
 
 		kubectl --namespace cert-manager create secret generic cloud-credentials --dry-run=client -o yaml ${FROM_LITERAL[@]} \
-			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/cloud-credentials -f -
+			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+			| tee ${ETC_DIR}/cloud-credentials.yaml \
+			| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/cloud-credentials -f -
 
 		deploy cluster-issuer-designate
 	fi

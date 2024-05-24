@@ -739,13 +739,9 @@ function create_plateform_nlb() {
     PRIVATE_NLB_DEF=$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} \
         | jq -r --arg NLB_NAME c-${MASTERKUBE} '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)')
 
-    if [ $KUBERNETES_DISTRO == "microk8s" ]; then
-        LOAD_BALANCER_IP=$(echo ${PRIVATE_NLB_DEF} | jq -r '.LoadBalancerArn' | cut -d '/' -f 2,3,4)
-        LOAD_BALANCER_IP=($(aws ec2 describe-network-interfaces --filters Name=description,Values="ELB ${LOAD_BALANCER_IP}" --query 'NetworkInterfaces[*].PrivateIpAddresses[*].PrivateIpAddress' --output text))
-        LOAD_BALANCER_IP=$(echo ${LOAD_BALANCER_IP[@]} | tr ' ' ',')
-    else
-    	LOAD_BALANCER_IP="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}"
-    fi
+    LOAD_BALANCER_IP=$(echo ${PRIVATE_NLB_DEF} | jq -r '.LoadBalancerArn' | cut -d '/' -f 2,3,4)
+    LOAD_BALANCER_IP=($(aws ec2 describe-network-interfaces --filters Name=description,Values="ELB ${LOAD_BALANCER_IP}" --query 'NetworkInterfaces[*].PrivateIpAddresses[*].PrivateIpAddress' --output text))
+    LOAD_BALANCER_IP=$(echo ${LOAD_BALANCER_IP[@]} | tr ' ' ',')
 
 	if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
         PUBLIC_NLB_DEF="$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} | jq -r --arg NLB_NAME p-${MASTERKUBE} '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)')"

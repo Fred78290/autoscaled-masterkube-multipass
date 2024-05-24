@@ -31,6 +31,7 @@ TOKEN=$(cat ./cluster/token)
 USE_ETC_HOSTS=true
 USE_LOADBALANCER=false
 ZONEID=office
+KUBEPATCH=/tmp/patch.yaml
 
 OPTIONS=(
 	"allow-deployment:"
@@ -305,8 +306,12 @@ extraKubeletArgs:
   --node-ip: ${APISERVER_ADVERTISE_ADDRESS}
 EOF
 
-	if [ -n "${CLOUD_PROVIDER}" ]; then
+	if [ "${CLOUD_PROVIDER}" == "external" ]; then
 		echo "  --cloud-provider: ${CLOUD_PROVIDER}" >> ${MICROK8S_CONFIG}
+    cat > ${KUBEPATCH} <<EOF
+spec:
+    providerID: "${PROVIDERID}"
+EOF
 	fi
 
 	if [ -f /etc/kubernetes/credential.yaml ]; then
@@ -544,6 +549,10 @@ EOF
 fi
 
 wait_node_ready
+
+if [ -f "${KUBEPATCH}" ]; then
+    kubectl patch node ${NODENAME} --patch-file ${KUBEPATCH}
+fi
 
 if [ "${CONTROL_PLANE}" = "true" ]; then
 	kubectl label nodes ${NODENAME} \

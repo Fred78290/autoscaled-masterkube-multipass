@@ -46,8 +46,7 @@ function usage() {
 --volume-size=<value>                            # Override the root EBS volume size in Gb, default ${VOLUME_SIZE}
 
   # Flags in ha mode only
---use-nlb                                        # Use AWS NLB as load balancer in public AZ
---create-nginx-apigateway                        # Create NGINX instance to install an apigateway, default ${USE_NGINX_GATEWAY}
+--use-nlb=[none|cloud|nginx]                     # Use AWS NLB as load balancer or create nginx gateway in public AZ 
 
   # Flags to configure network in ${PLATEFORM}
 --prefer-ssh-publicip                            # Allow to SSH on publicip when available, default ${PREFER_SSH_PUBLICIP}
@@ -77,7 +76,7 @@ function parse_arguments() {
         "create-nginx-apigatewa"y
         "prefer-ssh-publicip"
         "private-domain:"
-        "use-nlb"
+        "use-nlb:"
         "volume-size:"
         "volume-type:"
         "internet-facing"
@@ -228,10 +227,6 @@ function parse_arguments() {
             ;;
         --ha-cluster)
             HA_CLUSTER=true
-            shift 1
-            ;;
-        --create-nginx-apigateway)
-            USE_NGINX_GATEWAY=YES
             shift 1
             ;;
         --create-external-etcd)
@@ -413,8 +408,16 @@ function parse_arguments() {
             shift 2
             ;;
         --use-nlb)
-            USE_NLB=YES
-            shift 1
+			case $2 in
+				none|cloud|nginx)
+					USE_NLB="$2"
+					;;
+				*)
+					echo_red_bold "Load balancer of type: $2 is not supported"
+					exit 1
+					;;
+			esac
+            shift 2
             ;;
         --volume-size)
             VOLUME_SIZE=$2
@@ -702,7 +705,7 @@ function create_plateform_nlb() {
 	done
 
     # NLB + NGINX Gateway
-	if [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
+	if [ "${USE_NLB}" = "nginx" ]; then
 		for INSTANCE_INDEX in $(seq ${FIRSTNODE} $((FIRSTNODE + ${#VPC_PUBLIC_SUBNET_IDS[@]} - 1)))
 		do
             SUFFIX=$(named_index_suffix ${INSTANCE_INDEX})
@@ -894,7 +897,7 @@ EOF
 				MACHINE_TYPE=${NGINX_MACHINE}
 
 				# Use subnet public for NGINX Load balancer
-				if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "NO" ]; then
+				if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "none" ]; then
 					PUBLICIP=true
 					IAM_PROFILE_OPTIONS=
 				fi
@@ -912,7 +915,7 @@ EOF
 
 			# Use subnet public for NGINX Load balancer
 			if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
-				if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "NO" ]; then
+				if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "none" ]; then
 					PUBLICIP=true
 					IAM_PROFILE_OPTIONS=
 				fi
@@ -1049,7 +1052,7 @@ function create_network_interfaces() {
 	if [ ${HA_CLUSTER} = "true" ]; then
 		if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
 			# Use subnet public for NGINX Load balancer if we don't use a NLB
-			if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "NO" ]; then
+			if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "none" ]; then
 				PUBLICIP=true
 				SUBNET_INDEX=$(( $((NODEINDEX - 1)) % ${#VPC_PUBLIC_SUBNET_IDS[@]} ))
 				SUBNETID="${VPC_PUBLIC_SUBNET_IDS[${SUBNET_INDEX}]}"

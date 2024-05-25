@@ -1,5 +1,5 @@
 # Mandatory
-VC_NETWORK_PRIVATE="lxdbr0"
+VC_NETWORK_PRIVATE="virbr0"
 VC_NETWORK_PUBLIC="mpbr0"
 
 # Optional

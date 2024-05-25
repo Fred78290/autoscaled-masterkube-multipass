@@ -4,7 +4,6 @@ REGION=${OS_REGION_NAME}
 ZONEID=${OS_ZONE_NAME}
 PUBLIC_NODE_IP=NONE
 PUBLIC_VIP_ADDRESS=
-PRIVATE_VIP_ADDRESS=
 CERT_SELFSIGNED_FORCED=YES
 SEED_ARCH=amd64
 PRIVATE_IP=$(openstack subnet show $(openstack network show ${VC_NETWORK_PRIVATE} -f json | jq -r '.subnets[0]') -f json | jq -r '.cidr' | cut -d '/' -f 1)
@@ -32,8 +31,7 @@ function usage() {
 --kube-password | -p=<value>                   # Override the password to ssh the cluster VM, default random word
 
   # Flags in ha mode only
---use-keepalived | -u                          # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
---use-nlb                                      # Use plateform load balancer in public AZ
+--use-nlb=[none|nginx|cloud|keepalived]        # Use plateform load balancer in public AZ
 
   # Flags to configure network in ${PLATEFORM}
 --vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
@@ -72,7 +70,7 @@ function parse_arguments() {
 		"nfs-storage-class:"
 		"prefer-ssh-publicip"
 		"private-domain:"
-		"use-nlb"
+		"use-nlb:"
 		"vm-private-network:"
 		"vm-public-network:"
 		"worker-node-public"
@@ -228,10 +226,6 @@ function parse_arguments() {
 			HA_CLUSTER=true
 			shift 1
 			;;
-        --create-nginx-apigateway)
-            USE_NGINX_GATEWAY=YES
-            shift 1
-            ;;
 		--create-external-etcd)
 			EXTERNAL_ETCD=true
 			shift 1
@@ -419,8 +413,16 @@ function parse_arguments() {
 			shift 2
 			;;
 		--use-nlb)
-			USE_NLB=YES
-			shift 1
+			case $2 in
+				none|keepalived|cloud|nginx)
+					USE_NLB="$2"
+					;;
+				*)
+					echo_red_bold "Load balancer of type: $2 is not supported"
+					exit 1
+					;;
+			esac
+			shift 2
 			;;
 		--internal-security-group)
 			INTERNAL_SECURITY_GROUP=$2
@@ -464,7 +466,7 @@ function vm_use_floating_ip() {
 	local INDEX=$1
 
 	if [ ${HA_CLUSTER} = "true" ]; then
-		if [ ${USE_NLB} = "YES" ]; then
+		if [ ${USE_NLB} != "none" ]; then
 			echo -n false
 		elif [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
 			echo -n ${EXPOSE_PUBLIC_CLUSTER}
@@ -698,17 +700,9 @@ function prepare_ssh() {
 #
 #===========================================================================================================================================
 function prepare_plateform() {
-	if [ ${USE_NLB} = "YES" ]; then
-		if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
-			PUBLIC_VIP_ADDRESS="${NODE_IP}"
-			NODE_IP=$(nextip ${NODE_IP})
-		fi
-
-		if [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
-			PRIVATE_VIP_ADDRESS="${NODE_IP}"
-			NODE_IP=$(nextip ${NODE_IP})
-		fi
-
+	if [ ${USE_NLB} = "cloud" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
+		PUBLIC_VIP_ADDRESS="${NODE_IP}"
+		NODE_IP=$(nextip ${NODE_IP})
 	fi
 
 	prepare_node_indexes
@@ -818,11 +812,11 @@ function get_security_group() {
 			SG=${EXTERNAL_SECURITY_GROUP}
 		elif [ "${WORKERNODE_USE_PUBLICIP}" == "true" ] && [ ${INDEX} -ge ${WORKERNODE_INDEX} ]; then
 			SG=${EXTERNAL_SECURITY_GROUP}
-		elif [ ${INDEX} -lt ${CONTROLNODE_INDEX} ] && [ "${USE_NGINX_GATEWAY}" == "YES" ]; then
+		elif [ ${INDEX} -lt ${CONTROLNODE_INDEX} ] && [ "${USE_NLB}" == "nginx" ]; then
 			SG=${EXTERNAL_SECURITY_GROUP}
 		fi
 	elif [ ${INDEX} -eq 0 ]; then
-		if [ "${USE_NGINX_GATEWAY}" == "YES" ] || [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ]; then
+		if [ "${USE_NLB}" == "nginx" ] || [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ]; then
 			SG=${EXTERNAL_SECURITY_GROUP}
 		fi
 	fi
@@ -966,13 +960,8 @@ function create_plateform_nlb() {
 	local NLB_TARGETS=
 	local VIP_ADDRESS=
 
-	if [ ${USE_NGINX_GATEWAY} = "YES" ]; then
-		NLB_TARGETS="${MASTERKUBE}:${PRIVATE_ADDR_IPS[0]}"
-		VIP_ADDRESS=${PRIVATE_VIP_ADDRESS}
-	else
-		NLB_TARGETS=${CLUSTER_NODES}
-		VIP_ADDRESS=${PRIVATE_ADDR_IPS[0]}
-	fi
+	NLB_TARGETS=${CLUSTER_NODES}
+	VIP_ADDRESS=${PRIVATE_ADDR_IPS[0]}
 
 	echo_title "Create internal NLB ${MASTERKUBE} with target: ${NLB_TARGETS} at: ${VIP_ADDRESS}"
 

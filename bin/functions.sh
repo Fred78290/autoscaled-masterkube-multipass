@@ -39,7 +39,6 @@ Options are:
 --worker-node-machine=<value>                    # Override machine type used for worker nodes, default ${WORKER_NODE_MACHINE}
 --worker-nodes=<value>                           # Specify the number of worker nodes created in HA cluster, default ${WORKERNODES}
 --create-external-etcd | -e                      # Create an external HA etcd cluster, default ${EXTERNAL_ETCD}
---create-nginx-apigateway                        # Create NGINX instance to install an apigateway, default ${USE_NGINX_GATEWAY}
 --use-cloud-init                                 # Use cloud-init to configure autoscaled nodes instead off ssh, default ${USE_CLOUDINIT_TO_CONFIGURE}
 
 ### Design domain
@@ -104,10 +103,8 @@ function usage() {
 --kube-user=<value>                            # Override the seed user in template, default ${KUBERNETES_USER}
 --kube-password | -p=<value>                   # Override the password to ssh the cluster VM, default random word
 
-  # Flags in ha mode only
---use-keepalived | -u                          # Use keepalived as load balancer else NGINX is used  # Flags to configure nfs client provisionner
-
   # Flags to configure network in ${PLATEFORM}
+--use-nlb=[none|keepalived|nginx]              # Use keepalived or NGINX as load balancer
 --vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
 --vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default ${VC_NETWORK_PUBLIC}
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
@@ -132,29 +129,29 @@ EOF
 #===========================================================================================================================================
 function parse_arguments() {
 	OPTIONS+=(
+		"add-route-private:"
+		"add-route-public:"
+		"dhcp-autoscaled-node"
+		"dont-use-dhcp-routes-private"
+		"dont-use-dhcp-routes-public"
+		"install-named-server"
+		"metallb-ip-range:"
+		"named-server-host:"
+		"named-server-key:"
+		"named-server-port:"
+		"net-address:"
+		"net-dns:"
+		"net-gateway:"
 		"nfs-server-adress:"
 		"nfs-server-mount:"
 		"nfs-storage-class:"
+		"no-dhcp-autoscaled-node"
+		"private-domain:"
+		"public-address:"
+		"use-named-server"
+		"use-nlb:"
 		"vm-private-network:"
 		"vm-public-network:"
-		"dont-use-dhcp-routes-private"
-		"dont-use-dhcp-routes-public"
-		"add-route-private:"
-		"add-route-public:"
-		"net-address:"
-		"net-gateway:"
-		"net-dns:"
-		"private-domain:"
-		"no-dhcp-autoscaled-node"
-		"dhcp-autoscaled-node"
-		"public-address:"
-		"metallb-ip-range:"
-		"use-keepalived"
-		"use-named-server"
-		"install-named-server"
-		"named-server-host:"
-		"named-server-port:"
-		"named-server-key:"
 	)
 
 	PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
@@ -302,10 +299,6 @@ function parse_arguments() {
 			HA_CLUSTER=true
 			shift 1
 			;;
-        --create-nginx-apigateway)
-            USE_NGINX_GATEWAY=YES
-            shift 1
-            ;;
 		--create-external-etcd)
 			EXTERNAL_ETCD=true
 			shift 1
@@ -533,9 +526,17 @@ function parse_arguments() {
 			METALLB_IP_RANGE="$2"
 			shift 2
 			;;
-		--use-keepalived)
-			USE_KEEPALIVED=YES
-			shift 1
+		--use-nlb)
+			case $2 in
+				none|keepalived|nginx)
+					USE_NLB="$2"
+					;;
+				*)
+					echo_red_bold "Load balancer of type: $2 is not supported"
+					exit 1
+					;;
+			esac
+			shift 2
 			;;
 		--)
 			shift
@@ -744,7 +745,7 @@ function get_vm_name() {
 
 	if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
 		if [ ${HA_CLUSTER} = "true" ]; then
-			if [ ${USE_NLB} = "YES" ] && [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
+			if [ ${USE_NLB} = "nginx" ]; then
 				if [ ${CONTROLNODE_INDEX} -gt 1 ]; then
 					MASTERKUBE_NODE="${NODEGROUP_NAME}-gateway-$(named_index_suffix $NODEINDEX)"
 				else
@@ -761,7 +762,7 @@ function get_vm_name() {
 			MASTERKUBE_NODE="${MASTERKUBE}"
 		fi
 	elif [[ ${INDEX} -lt ${WORKERNODE_INDEX} ]]; then
-		if [ ${HA_CLUSTER} = "false" ] && [ ${INDEX} -eq ${CONTROLNODE_INDEX} ]; then
+		if [ ${HA_CLUSTER} = "false" ] && [ ${INDEX} -eq ${CONTROLNODE_INDEX} ] && [ ${USE_NLB} = "none" ]; then
 			MASTERKUBE_NODE="${MASTERKUBE}"
 		else
 			MASTERKUBE_NODE="${NODEGROUP_NAME}-master-$(named_index_suffix $NODEINDEX)"
@@ -1029,7 +1030,7 @@ function wait_nlb_ready() {
 	echo_line
 
 	# Microk8s doesn't support fqdn
-	if [[ ${KUBERNETES_DISTRO} != "microk8s" || ${USE_KEEPALIVED} == "YES" ]] || [[ ${USE_NLB} == "YES" && ${PLATEFORM} == "openstack" ]];  then
+	if [ ${KUBERNETES_DISTRO} != "microk8s" ];  then
 		echo -n ${CONTROL_PLANE_ENDPOINT}:${APISERVER_ADVERTISE_PORT} > ${TARGET_CLUSTER_LOCATION}/manager-ip
 	fi
 }
@@ -1042,34 +1043,35 @@ function prepare_node_indexes() {
 		CONTROLNODES=3
 		CONTROLNODE_INDEX=1
 
-		if [ ${USE_KEEPALIVED} = "YES" ]; then
-			FIRSTNODE=1
-		elif [ "${USE_NLB}" = "YES" ]; then
-			if [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
+		case ${USE_NLB} in
+			"keepalived")
+				FIRSTNODE=1
+				;;
+			"cloud")
+				FIRSTNODE=1
+				;;
+			"nginx")
 				if [ $PLATEFORM == "aws" ]; then
 					CONTROLNODE_INDEX=${#VPC_PUBLIC_SUBNET_IDS[@]}
 				fi
-			else
-				FIRSTNODE=1
-			fi
-		else
-			CONTROLNODE_INDEX=${#VPC_PUBLIC_SUBNET_IDS[@]}
-		fi
+				;;
+		esac
 
 	else
 		CONTROLNODES=1
 		CONTROLNODE_INDEX=0
 		EXTERNAL_ETCD=false
-		USE_KEEPALIVED=NO
+
+		if [ ${USE_NLB} = "nginx" ]; then
+			CONTROLNODE_INDEX=1
+		fi
 
 		if [ "${EXPOSE_PUBLIC_CLUSTER}" != "${CONTROLPLANE_USE_PUBLICIP}" ]; then
 			if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
 				CONTROLNODE_INDEX=1
 
-				if [ ${USE_NLB} = "YES" ]; then
-					if [ "${USE_NGINX_GATEWAY}" != "YES" ]; then
-						FIRSTNODE=1
-					fi
+				if [ ${USE_NLB} = "cloud" ]; then
+					FIRSTNODE=1
 				fi
 			fi
 		fi
@@ -1147,18 +1149,18 @@ function prepare_environment() {
 	fi
 
 	if [ ${HA_CLUSTER} = "false" ]; then
-		if [ "${USE_NGINX_GATEWAY}" = "NO" ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "false" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
-			echo_red_bold "Single plane cluster can not be exposed to internet because because control plane require public IP or require NGINX gateway in front"
+		if [ "${USE_NLB}" != "nginx" ] && [ "${USE_NLB}" != "none" ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "false" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
+			echo_red_bold "Single plane cluster can not be exposed to internet because because control plane require public IP or cloud network balancer or NGINX gateway in front"
 			exit
 		fi
-	elif [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ]; then
-		USE_NLB=NO
+	elif [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ "${USE_NLB}" != "nginx" ] ; then
+		USE_NLB=keepalived
 	fi
 
 	if [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ]; then
 		PREFER_SSH_PUBLICIP=NO
 
-		if [ "${USE_NGINX_GATEWAY}" = "YES" ] || [ "${USE_NLB}" = "YES" ] || [ "${EXPOSE_PUBLIC_CLUSTER}" = "false" ]; then
+		if [ "${USE_NLB}" = "nginx" ] || [ "${USE_NLB}" = "cloud" ] || [ "${EXPOSE_PUBLIC_CLUSTER}" = "false" ]; then
 			echo_red_bold "Control plane can not have public IP because nginx gatewaway or NLB is required or cluster is not exposed to internet"
 			exit 1
 		fi
@@ -1177,25 +1179,18 @@ function prepare_environment() {
 
 	if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
 		APISERVER_ADVERTISE_PORT=16443
-
-		# microk8s can't join thru tcp load balancer
-#		if [ "${HA_CLUSTER}" = "true" ]; then
-#			USE_KEEPALIVED=YES
-#			USE_NLB=NO
-#			USE_NGINX_GATEWAY=NO
-#		fi
+	else
+		APISERVER_ADVERTISE_PORT=6443
 	fi
 
 	if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},9345"
 		EXTERNAL_ETCD=false
-	elif [ "${KUBERNETES_DISTRO}" == "microk8s" ] && [ "${KUBERNETES_DISTRO}" != "aws" ]; then
-		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},25000"
 	else
 		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT}"
 	fi
 
-	if [ "${USE_NLB}" = "YES" ] || [ "${USE_KEEPALIVED}" = "YES" ]; then
+	if [ "${USE_NLB}" != "none" ]; then
 		USE_LOADBALANCER=true
 	fi
 
@@ -1757,8 +1752,6 @@ export UPGRADE_CLUSTER=${UPGRADE_CLUSTER}
 export USE_DHCP_ROUTES_PRIVATE=${USE_DHCP_ROUTES_PRIVATE}
 export USE_DHCP_ROUTES_PUBLIC=${USE_DHCP_ROUTES_PUBLIC}
 export USE_ETC_HOSTS=${USE_ETC_HOSTS}
-export USE_KEEPALIVED=${USE_KEEPALIVED}
-export USE_NGINX_GATEWAY=${USE_NGINX_GATEWAY}
 export USE_NLB=${USE_NLB}
 export USE_ZEROSSL=${USE_ZEROSSL}
 export VC_NETWORK_PRIVATE=${VC_NETWORK_PRIVATE}
@@ -1891,7 +1884,7 @@ function prepare_networking() {
 	fi
 
 	# No external elb, use keep alived
-	if [ ${USE_KEEPALIVED} = "YES" ] || [[ "${USE_NLB}" = "YES" && ${USE_NGINX_GATEWAY} = "NO" ]]; then
+	if [ ${USE_NLB} = "keepalived" ] || [ "${USE_NLB}" = "cloud" ]; then
 		PRIVATE_ADDR_IPS[0]="${NODE_IP}"
 		PRIVATE_DNS_NAMES[0]=""
 		PUBLIC_ADDR_IPS[0]=${PUBLIC_NODE_IP}
@@ -2332,7 +2325,7 @@ function create_plateform_nlb_member() {
 function create_nlb_member() {
 	local NODEINDEX=$1
 
-	if [ "${HA_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "YES" ]; then
+	if [ "${USE_NLB}" = "cloud" ]; then
 		local NAME=$(get_vm_name ${NODEINDEX})
 		local ADDR=${PRIVATE_ADDR_IPS[${INDEX}]}
 
@@ -2344,16 +2337,14 @@ function create_nlb_member() {
 #===========================================================================================================================================
 function create_load_balancer() {
 	if [ "${HA_CLUSTER}" = "true" ]; then
-		if [ "${USE_NGINX_GATEWAY}" = "YES" ]; then
+		if [ "${USE_NLB}" = "nginx" ]; then
 			create_nginx_gateway
-		fi
-
-		if [ ${USE_KEEPALIVED} = "YES" ]; then
+		elif [ ${USE_NLB} = "keepalived" ]; then
 			create_keepalived
-		elif [ "${USE_NLB}" = "YES" ]; then
+		elif [ "${USE_NLB}" = "cloud" ]; then
 			create_plateform_nlb
 		fi
-	elif [ ${CONTROLNODE_INDEX} -gt 0 ]; then
+	elif [ "${USE_NLB}" = "nginx" ]; then
 		create_nginx_gateway
 	fi
 }
@@ -2401,7 +2392,7 @@ EOF
 EOF
 )
 
-	if [ "${USE_KEEPALIVED}" == "YES" ]; then
+	if [ "${USE_NLB}" == "keepalived" ]; then
 		local PRIVATEIPADDR=${PRIVATE_ADDR_IPS[0]}
 
 		for PRIVATEIPADDR in $(echo ${LOAD_BALANCER_IP} | tr ',' ' ')
@@ -2423,12 +2414,10 @@ EOF
 		PRIVATE_ADDR_IPS[${INDEX}]=${PRIVATEIPADDR}
 		PUBLIC_ADDR_IPS[${INDEX}]=${PUBLICIPADDR}
 
-		if [[ ${USE_KEEPALIVED} == "NO" ]] && [[ "${USE_NLB}" = "NO" || "${HA_CLUSTER}" = "false" ]]; then
+		if [[ "${USE_NLB}" = "none" || "${HA_CLUSTER}" = "false" ]]; then
 			local REGISTER_IP=
 
-#			if [ ${INDEX} -lt ${WORKERNODE_INDEX} ] && [ ${INDEX} -ge ${CONTROLNODE_INDEX} ] && [ ${EXPOSE_PUBLIC_CLUSTER} = "true" ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ] && [ "${USE_NLB}" = "NO" ] && [ "${USE_NGINX_GATEWAY}" = "NO" ]; then
-
-			if [ ${HA_CLUSTER} = "true" ] && [ ${INDEX} -lt ${WORKERNODE_INDEX} ] && [ ${INDEX} -ge ${CONTROLNODE_INDEX} ] && [ "${USE_NLB}" = "NO" ] && [ "${USE_NGINX_GATEWAY}" = "NO" ]; then
+			if [ ${HA_CLUSTER} = "true" ] && [ ${INDEX} -lt ${WORKERNODE_INDEX} ] && [ ${INDEX} -ge ${CONTROLNODE_INDEX} ] && [ "${USE_NLB}" = "none" ]; then
 				REGISTER_IP=${PRIVATEIPADDR}
 			elif [ ${INDEX} -eq 0 ] || [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
 				REGISTER_IP=${PRIVATEIPADDR}

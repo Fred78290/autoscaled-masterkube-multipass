@@ -349,20 +349,16 @@ EOF
 	else
 		echo "join:" >> ${MICROK8S_CONFIG}
 		echo "  worker: true" >> ${MICROK8S_CONFIG}
+		echo "  url: ${JOIN_MASTER_IP}:25000/${TOKEN}" >> ${MICROK8S_CONFIG}
 
-		if [ ${PLATEFORM} == "aws" ]; then
-			echo "  url: ${JOIN_MASTER_IP}:25000/${TOKEN}" >> ${MICROK8S_CONFIG}
-		else
-			echo "  url: ${CONTROL_PLANE_ENDPOINT_ADDR}:25000/${TOKEN}" >> ${MICROK8S_CONFIG}
+		if [ ${USE_LOADBALANCER} = "true" ]; then
+			echo 'extraMicroK8sAPIServerProxyArgs:' >> ${MICROK8S_CONFIG}
+			echo '  --refresh-interval: "0"' >> ${MICROK8S_CONFIG}
+			echo '  --traefik-config: /usr/local/etc/microk8s/traefik.yaml' >> ${MICROK8S_CONFIG}
 
-			if [ ${USE_LOADBALANCER} = "true" ]; then
-				echo 'extraMicroK8sAPIServerProxyArgs:' >> ${MICROK8S_CONFIG}
-				echo '  --refresh-interval: "0"' >> ${MICROK8S_CONFIG}
-				echo '  --traefik-config: /usr/local/etc/microk8s/traefik.yaml' >> ${MICROK8S_CONFIG}
+			mkdir -p /usr/local/etc/microk8s
 
-				mkdir -p /usr/local/etc/microk8s
-
-				cat > /usr/local/etc/microk8s/traefik.yaml <<EOF
+			cat > /usr/local/etc/microk8s/traefik.yaml <<EOF
 entryPoints:
   apiserver:
     address: ':${JOIN_MASTER_PORT}'
@@ -385,11 +381,10 @@ tcp:
       loadBalancer:
         servers:
 EOF
-				for ADDRESS in ${LOAD_BALANCER_IP[@]}
-				do
-					echo "        - address: ${ADDRESS}:${JOIN_MASTER_PORT}" >> /usr/local/etc/microk8s/provider.yaml
-				done
-			fi
+			for ADDRESS in ${LOAD_BALANCER_IP[@]}
+			do
+				echo "        - address: ${ADDRESS}:${JOIN_MASTER_PORT}" >> /usr/local/etc/microk8s/provider.yaml
+			done
 		fi
 	fi
 

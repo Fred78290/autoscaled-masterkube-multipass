@@ -56,6 +56,13 @@ source ${CURDIR}/vmrest-utility.sh
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function plateform_prepare_routes() {
+	:
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function plateform_create_vm() {
 	local INDEX=$1
 	local EXTERNAL_IP=$2
@@ -83,7 +90,6 @@ function plateform_create_vm() {
 				"version": 2,
 				"ethernets": {
 					"eth0": {
-						"gateway4": "${PRIVATE_GATEWAY}",
 						"addresses": [
 							"${NODE_IP}/${PRIVATE_MASK_CIDR}"
 						],
@@ -110,10 +116,9 @@ EOF
 					'.|.network.ethernets += { "eth1": { "dhcp4": true, "dhcp4-overrides": { "use-routes": $USE_DHCP_ROUTES_PUBLIC } } }')
 			else
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
-					--arg PRIVATE_GATEWAY ${PRIVATE_GATEWAY} \
 					--arg NODE_IP "${EXTERNAL_IP}/${PUBLIC_MASK_CIDR}" \
 					--arg PRIVATE_DNS ${PRIVATE_DNS} \
-					'.|.network.ethernets += { "eth1": { "gateway4": $PRIVATE_GATEWAY, "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $PRIVATE_DNS ] } }}')
+					'.|.network.ethernets += { "eth1": { "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $PRIVATE_DNS ] } }}')
 			fi
 
 			if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then

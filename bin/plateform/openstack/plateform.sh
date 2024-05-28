@@ -40,7 +40,6 @@ function usage() {
 --dhcp-autoscaled-node                         # Autoscaled node use DHCP, default ${SCALEDNODES_DHCP}
 --private-domain=<value>                       # Override the domain name, default ${PRIVATE_DOMAIN_NAME}
 --net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${PRIVATE_IP}
---net-gateway=<value>                          # Override the IP gateway, default ${PRIVATE_GATEWAY}
 --net-dns=<value>                              # Override the IP DNS, default ${PRIVATE_DNS}
 
 --prefer-ssh-publicip                          # Allow to SSH on publicip when available, default ${PREFER_SSH_PUBLICIP}
@@ -482,6 +481,13 @@ function vm_use_floating_ip() {
 	else
 		echo -n ${WORKERNODE_USE_PUBLICIP}
 	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function plateform_prepare_routes() {
+	:
 }
 
 #===========================================================================================================================================

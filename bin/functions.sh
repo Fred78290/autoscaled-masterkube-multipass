@@ -112,6 +112,7 @@ function usage() {
 --private-domain=<value>                       # Override the domain name, default ${PRIVATE_DOMAIN_NAME}
 --net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${PRIVATE_IP}
 --net-gateway=<value>                          # Override the IP gateway, default ${PRIVATE_GATEWAY}
+--net-gateway-metric=<value>                   # Override the IP gateway metric, default ${PRIVATE_GATEWAY_METRIC}
 --net-dns=<value>                              # Override the IP DNS, default ${PRIVATE_DNS}
 
 --public-address=<value>                       # The public address to expose kubernetes endpoint[ipv4/cidr, DHCP, NONE], default ${PUBLIC_IP}
@@ -500,6 +501,10 @@ function parse_arguments() {
 			;;
 		--net-gateway)
 			PRIVATE_GATEWAY="$2"
+			shift 2
+			;;
+		--net-gateway-metric)
+			PRIVATE_GATEWAY_METRIC="$2"
 			shift 2
 			;;
 		--net-dns)
@@ -1716,12 +1721,15 @@ export PRIVATE_DNS_NAMES=(${PRIVATE_DNS_NAMES[@]})
 export PRIVATE_DNS=${PRIVATE_DNS}
 export PRIVATE_DOMAIN_NAME=${PRIVATE_DOMAIN_NAME}
 export PRIVATE_GATEWAY=${PRIVATE_GATEWAY}
+export PRIVATE_GATEWAY_METRIC=${PRIVATE_GATEWAY_METRIC}
 export PRIVATE_IP=${PRIVATE_IP}
 export PRIVATE_MASK_CIDR=${PRIVATE_MASK_CIDR}
 export PRIVATE_NET_INF=${PRIVATE_NET_INF}
 export PRIVATE_NETMASK=${PRIVATE_NETMASK}
 export PUBLIC_ADDR_IPS=(${PUBLIC_ADDR_IPS[@]})
 export PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME}
+export PUBLIC_GATEWAY=${PUBLIC_GATEWAY}
+export PUBLIC_GATEWAY_METRIC=${PUBLIC_GATEWAY_METRIC}
 export PUBLIC_IP="${PUBLIC_IP}"
 export REGION=${REGION}
 export REGISTRY=${REGISTRY}
@@ -1870,7 +1878,38 @@ EOF
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function prepare_routes() {
+	plateform_prepare_routes
+
+	# Add default gateway
+	if [ -n "${PRIVATE_GATEWAY}" ]; then
+		NETWORK_PRIVATE_ROUTES=("to=default,via=${PRIVATE_GATEWAY},metric=${PRIVATE_GATEWAY_METRIC}" ${NETWORK_PRIVATE_ROUTES[@]})
+	fi
+
+	# Add default gateway
+	if [ -n "${PUBLIC_GATEWAY}" ]; then
+		NETWORK_PUBLIC_ROUTES=("to=default,via=${PUBLIC_GATEWAY},metric=${PUBLIC_GATEWAY_METRIC}" ${NETWORK_PUBLIC_ROUTES[@]})
+	fi
+
+	if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
+		PUBLIC_ROUTES_DEFS=$(build_routes ${NETWORK_PUBLIC_ROUTES[@]})
+	else
+		PUBLIC_ROUTES_DEFS='[]'
+	fi
+
+	if [ ${#NETWORK_PRIVATE_ROUTES[@]} -gt 0 ]; then
+		PRIVATE_ROUTES_DEFS=$(build_routes ${NETWORK_PRIVATE_ROUTES[@]})
+	else
+		PRIVATE_ROUTES_DEFS='[]'
+	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function prepare_networking() {
+	prepare_routes
+
 	if [ -z "${VC_NETWORK_PUBLIC}" ] || [ "${PUBLIC_IP}" == "NONE" ]; then
 		PUBLIC_IP=NONE
 		PUBLIC_NODE_IP=NONE
@@ -1891,18 +1930,6 @@ function prepare_networking() {
 
 		NODE_IP=$(nextip ${NODE_IP})
 		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
-	fi
-
-	if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
-		PUBLIC_ROUTES_DEFS=$(build_routes ${NETWORK_PUBLIC_ROUTES[@]})
-	else
-		PUBLIC_ROUTES_DEFS='[]'
-	fi
-
-	if [ ${#NETWORK_PRIVATE_ROUTES[@]} -gt 0 ]; then
-		PRIVATE_ROUTES_DEFS=$(build_routes ${NETWORK_PRIVATE_ROUTES[@]})
-	else
-		PRIVATE_ROUTES_DEFS='[]'
 	fi
 }
 

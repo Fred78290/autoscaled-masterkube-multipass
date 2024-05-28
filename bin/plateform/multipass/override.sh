@@ -1,19 +1,3 @@
 # Mandatory
 VC_NETWORK_PRIVATE="virbr0"
 VC_NETWORK_PUBLIC="mpbr0"
-
-# Optional
-DEPLOY_COMPONENTS=NO
-EXTERNAL_ETCD=false
-HA_CLUSTER=false
-KUBERNETES_DISTRO=microk8s
-LAUNCH_CA=YES
-REGISTRY=devregistry.aldunelabs.com
-SCALEDNODES_DHCP=true
-WORKERNODES=3
-
-# Override machine type
-AUTOSCALE_MACHINE="medium"
-CONTROL_PLANE_MACHINE="medium"
-NGINX_MACHINE="tiny"
-WORKER_NODE_MACHINE="medium"

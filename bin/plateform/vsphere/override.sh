@@ -1,19 +1,3 @@
 # Mandatory
 VC_NETWORK_PRIVATE="VLAN20"
 VC_NETWORK_PUBLIC="VM Network"
-
-# Control full deployment
-DEPLOY_COMPONENTS=YES
-LAUNCH_CA=YES
-
-# Control cluster
-EXTERNAL_ETCD=false
-HA_CLUSTER=false
-KUBERNETES_DISTRO=k3s
-WORKERNODES=1
-
-# Override machine type
-AUTOSCALE_MACHINE="medium"
-CONTROL_PLANE_MACHINE="medium"
-NGINX_MACHINE="tiny"
-WORKER_NODE_MACHINE="medium"

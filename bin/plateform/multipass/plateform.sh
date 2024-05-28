@@ -24,7 +24,7 @@ if [ -n "${VC_NETWORK_PRIVATE}" ]; then
 fi
 
 if [ -n "${VC_NETWORK_PUBLIC}" ] && [ ${PUBLIC_IP} != "NONE" ]; then
-	SUBNET=$(ipv4 ${VC_NETWORK_PRIVATE})
+	SUBNET=$(ipv4 ${VC_NETWORK_PUBLIC})
 	SUBNET=${SUBNET%.*}
 
 	METALLB_IP_RANGE=${SUBNET}.20-${SUBNET}.24

@@ -36,7 +36,8 @@ EOF
 			--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 			--from-file ${ETC_DIR}/credentials | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
-		[ "${DOMAIN_NAME}" = "${PRIVATE_DOMAIN_NAME}" ] && ZONE_TYPE=private || ZONE_TYPE=public
+		ZONE_TYPE=public
+#		[ "${DOMAIN_NAME}" = "${PRIVATE_DOMAIN_NAME}" ] && ZONE_TYPE=private || ZONE_TYPE=public
 
 		sed -e "s/__ZONE_TYPE__/${ZONE_TYPE}/g" \
 			-e "s/__AWS_REGION__/${AWS_REGION}/g" \

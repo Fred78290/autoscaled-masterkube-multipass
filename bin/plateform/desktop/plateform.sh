@@ -222,14 +222,6 @@ function delete_vm_by_name() {
 #===========================================================================================================================================
 function update_build_env() {
 	save_buildenv
-
-	cat >> ${TARGET_CONFIG_LOCATION}/buildenv <<EOF
-export AUTOSCALER_DESKTOP_UTILITY_ADDR=${AUTOSCALER_DESKTOP_UTILITY_ADDR}
-export AUTOSCALER_DESKTOP_UTILITY_CACERT=${AUTOSCALER_DESKTOP_UTILITY_CACERT}
-export AUTOSCALER_DESKTOP_UTILITY_CERT=${AUTOSCALER_DESKTOP_UTILITY_CERT}
-export AUTOSCALER_DESKTOP_UTILITY_KEY=${AUTOSCALER_DESKTOP_UTILITY_CERT}
-export AUTOSCALER_DESKTOP_UTILITY_TLS=${AUTOSCALER_DESKTOP_UTILITY_TLS}
-EOF
 }
 
 #===========================================================================================================================================

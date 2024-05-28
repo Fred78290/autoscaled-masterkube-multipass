@@ -145,20 +145,11 @@ EOF
 			--network name=${VC_NETWORK_PRIVATE},mode=manual \
 			--cloud-init ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml \
 			file://${TARGET_IMAGE}
-
-		IPADDR=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE}  '.info|.[$NAME].ipv4[1]')
-
-		echo_title "Prepare ${MASTERKUBE_NODE} instance with IP:${IPADDR}"
-		eval scp ${SCP_OPTIONS} tools ${KUBERNETES_USER}@${IPADDR}:~ ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} mkdir -p /home/${KUBERNETES_USER}/cluster ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo chown -R root:adm /home/${KUBERNETES_USER}/tools ${SILENT}
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/tools/* /usr/local/bin ${SILENT}
 	else
-		IPADDR=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE}  '.info|.[$NAME].ipv4[1]')
-
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
 	fi
 
+	IPADDR=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE}  '.info|.[$NAME].ipv4[1]')
 	PRIVATE_ADDR_IPS[${INDEX}]=${IPADDR}
 
 	#echo_separator
@@ -185,14 +176,6 @@ function delete_vm_by_name() {
 #===========================================================================================================================================
 function update_build_env() {
 	save_buildenv
-
-	cat >> ${TARGET_CONFIG_LOCATION}/buildenv <<EOF
-export AUTOSCALER_DESKTOP_UTILITY_ADDR=${AUTOSCALER_DESKTOP_UTILITY_ADDR}
-export AUTOSCALER_DESKTOP_UTILITY_CACERT=${AUTOSCALER_DESKTOP_UTILITY_CACERT}
-export AUTOSCALER_DESKTOP_UTILITY_CERT=${AUTOSCALER_DESKTOP_UTILITY_CERT}
-export AUTOSCALER_DESKTOP_UTILITY_KEY=${AUTOSCALER_DESKTOP_UTILITY_CERT}
-export AUTOSCALER_DESKTOP_UTILITY_TLS=${AUTOSCALER_DESKTOP_UTILITY_TLS}
-EOF
 }
 
 #===========================================================================================================================================

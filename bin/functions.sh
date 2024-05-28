@@ -1409,12 +1409,18 @@ function find_public_dns_provider() {
 		AWS_ROUTE53_PUBLIC_ZONE_ID=$(zoneid_by_name ${PUBLIC_DOMAIN_NAME})
 
 		if [ -n "${AWS_ROUTE53_PUBLIC_ZONE_ID}" ]; then
-			echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} AWS_ROUTE53_PUBLIC_ZONE_ID=$AWS_ROUTE53_PUBLIC_ZONE_ID"
-			echo_red_bold "Route53 will be used to register public domain hosts"
-            EXTERNAL_DNS_PROVIDER=aws
-			CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
+			if [ ${PLATEFORM} != "aws" ] && [[ -z "${AWS_ACCESSKEY}" || -z "${AWS_SECRETKEY}" ]]; then
+				echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} AWS_ROUTE53_PUBLIC_ZONE_ID=$AWS_ROUTE53_PUBLIC_ZONE_ID"
+				echo_red_bold "Any of AWS_ACCESSKEY AWS_SECRETKEY is defined"
+				AWS_ROUTE53_PUBLIC_ZONE_ID=
+			else
+				echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} AWS_ROUTE53_PUBLIC_ZONE_ID=$AWS_ROUTE53_PUBLIC_ZONE_ID"
+				echo_red_bold "Route53 will be used to register public domain hosts"
+				EXTERNAL_DNS_PROVIDER=aws
+				CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
 
-			return
+				return
+			fi
 		fi
 
 		# Check if godaddy is candidate

@@ -132,13 +132,6 @@ if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
 
 	echo_title "Create External DNS"
 	create-external-dns.sh
-
-	if [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ]; then
-		NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o json | jq -r '.status.loadBalancer.ingress[0].ip//""')
-
-		sudo sed -i '' -e "/masterkube-${PLATEFORM}/d" /etc/hosts
-		sudo bash -c "echo '${NGINX_IP} masterkube-${PLATEFORM}.${DOMAIN_NAME} ${DASHBOARD_HOSTNAME}.${DOMAIN_NAME}' >> /etc/hosts"
-	fi
 fi
 
 # Add cluster config in configmap

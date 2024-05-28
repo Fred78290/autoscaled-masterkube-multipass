@@ -202,7 +202,6 @@ if [ -f ${TARGET_CONFIG_LOCATION}/autoscaler.pid ]; then
 fi
 
 delete_host "${MASTERKUBE}"
-delete_host "masterkube-${PLATEFORM}"
 
 popd &>/dev/null
 

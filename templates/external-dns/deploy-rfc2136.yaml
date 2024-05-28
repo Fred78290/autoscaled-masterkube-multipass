@@ -68,6 +68,7 @@ spec:
               memory: 100Mi
           args:
             - --source=ingress
+            - --source=service
             - --registry=txt
             - --log-level=info
             - --domain-filter=__DOMAIN_NAME__

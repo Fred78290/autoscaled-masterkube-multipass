@@ -4,13 +4,19 @@ CURDIR=$(dirname $0)
 
 pushd ${CURDIR}/../ &>/dev/null
 
+
 export NAMESPACE=ingress-nginx
 export ETC_DIR=${TARGET_DEPLOY_LOCATION}/ingress
-export KUBERNETES_TEMPLATE=./templates/ingress/${PLATEFORM}
+
+if [ ${USE_NLB} == "none" ]; then
+	export KUBERNETES_TEMPLATE=./templates/ingress/loadbalancer
+else
+	export KUBERNETES_TEMPLATE=./templates/ingress/nodeport
+fi
 
 mkdir -p ${ETC_DIR}
 
-sed "s/__K8NAMESPACE__/${NAMESPACE}/g" ${KUBERNETES_TEMPLATE}/deploy.yaml > ${ETC_DIR}/deploy.yaml
+sed -e "s/__K8NAMESPACE__/${NAMESPACE}/g" -e "s/__EXTERNAL_DNS_TARGET__/${EXTERNAL_DNS_TARGET}/g" ${KUBERNETES_TEMPLATE}/deploy.yaml > ${ETC_DIR}/deploy.yaml
 
 kubectl apply -f ${ETC_DIR}/deploy.yaml --kubeconfig=${TARGET_CLUSTER_LOCATION}/config
 

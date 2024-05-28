@@ -335,6 +335,9 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+		external-dns.alpha.kubernetes.io/register: "true"
+    external-dns.alpha.kubernetes.io/hostname:  __EXTERNAL_DNS_TARGET__
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: ingress-nginx
@@ -368,6 +371,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname:  __EXTERNAL_DNS_TARGET__
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: ingress-nginx

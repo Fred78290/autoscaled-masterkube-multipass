@@ -1,6 +1,4 @@
 # Recopy config file on master node
-export EXTERNAL_DNS_TARGET="${MASTERKUBE}.${DOMAIN_NAME}"
-
 mkdir -p ${TARGET_DEPLOY_LOCATION}/configmap
 mkdir -p ${TARGET_DEPLOY_LOCATION}/secrets
 

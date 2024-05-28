@@ -1067,19 +1067,16 @@ function prepare_node_indexes() {
 		CONTROLNODE_INDEX=0
 		EXTERNAL_ETCD=false
 
-		if [ ${USE_NLB} = "nginx" ]; then
-			CONTROLNODE_INDEX=1
-		fi
-
-		if [ "${EXPOSE_PUBLIC_CLUSTER}" != "${CONTROLPLANE_USE_PUBLICIP}" ]; then
-			if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
+		case ${USE_NLB} in
+			"cloud"|"keepalived")
+				FIRSTNODE=1
 				CONTROLNODE_INDEX=1
-
-				if [ ${USE_NLB} = "cloud" ]; then
-					FIRSTNODE=1
-				fi
-			fi
-		fi
+				;;
+			"nginx")
+				FIRSTNODE=0
+				CONTROLNODE_INDEX=1
+				;;
+		esac
 	fi
 
 	WORKERNODE_INDEX=$((CONTROLNODE_INDEX + ${CONTROLNODES}))
@@ -1154,8 +1151,11 @@ function prepare_environment() {
 	fi
 
 	if [ ${HA_CLUSTER} = "false" ]; then
-		if [ "${USE_NLB}" != "nginx" ] && [ "${USE_NLB}" != "none" ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "false" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
-			echo_red_bold "Single plane cluster can not be exposed to internet because because control plane require public IP or cloud network balancer or NGINX gateway in front"
+		if [ "${USE_NLB}" == "keepalived" ]; then
+			echo_red_bold "Single plane cluster can't used keepalived as loadbalancer"
+			exit
+		elif [ "${USE_NLB}" != "nginx" ] && [ "${USE_NLB}" != "none" ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "false" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
+			echo_red_bold "Single plane cluster can't be exposed to internet because because control plane require public IP or cloud network balancer or NGINX gateway in front"
 			exit
 		fi
 	elif [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ "${USE_NLB}" != "nginx" ] ; then
@@ -1685,6 +1685,7 @@ export CORESTOTAL="${CORESTOTAL}"
 export DOMAIN_NAME=${DOMAIN_NAME}
 export ETCD_DST_DIR=${ETCD_DST_DIR}
 export EXTERNAL_DNS_PROVIDER=${EXTERNAL_DNS_PROVIDER}
+export EXTERNAL_DNS_TARGET=${EXTERNAL_DNS_TARGET}
 export EXTERNAL_ETCD_ARGS=${EXTERNAL_ETCD_ARGS}
 export EXTERNAL_ETCD=${EXTERNAL_ETCD}
 export FIRSTNODE=${FIRSTNODE}
@@ -1697,6 +1698,7 @@ export KUBERNETES_USER=${KUBERNETES_USER}
 export KUBERNETES_VERSION=${KUBERNETES_VERSION}
 export LASTNODE_INDEX=${LASTNODE_INDEX}
 export LAUNCH_CA=${LAUNCH_CA}
+export LOAD_BALANCER_IP=${LOAD_BALANCER_IP}
 export LOAD_BALANCER_PORT=${LOAD_BALANCER_PORT}
 export MASTER_NODE_ALLOW_DEPLOYMENT=${MASTER_NODE_ALLOW_DEPLOYMENT}
 export MASTERKUBE="${MASTERKUBE}"
@@ -2059,6 +2061,8 @@ function create_all_vms() {
 function create_keepalived() {
 	echo_title "Created keepalived cluster: ${CLUSTER_NODES}"
 
+	LOAD_BALANCER_IP=${PRIVATE_ADDR_IPS[0]}
+
 	for INDEX in $(seq 1 ${CONTROLNODES})
 	do
 		local SUFFIX=$(named_index_suffix ${INDEX})
@@ -2419,9 +2423,7 @@ EOF
 EOF
 )
 
-	if [ "${USE_NLB}" == "keepalived" ]; then
-		local PRIVATEIPADDR=${PRIVATE_ADDR_IPS[0]}
-
+	if [ "${USE_NLB}" != "none" ]; then
 		for PRIVATEIPADDR in $(echo ${LOAD_BALANCER_IP} | tr ',' ' ')
 		do
 			DESIGNATE_REGISTER+=(${PRIVATEIPADDR})
@@ -2431,37 +2433,23 @@ EOF
 		done
 	fi
 
-	for INDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
+	for INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES} - 1)))
 	do
-		local SUFFIX=$(named_index_suffix ${INDEX})
-		local LAUNCHED_INSTANCE=$(cat ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
-		local PRIVATEIPADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateIpAddress // ""')
-		local PUBLICIPADDR=$(echo ${LAUNCHED_INSTANCE} | jq --arg IPADDR ${PRIVATEIPADDR} -r '.PublicIpAddress // $IPADDR')
+		PRIVATE_ROUTE53_REGISTER=$(echo ${PRIVATE_ROUTE53_REGISTER} | jq --arg IPADDR "${PRIVATE_ADDR_IPS[${INDEX}]}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
 
-		PRIVATE_ADDR_IPS[${INDEX}]=${PRIVATEIPADDR}
-		PUBLIC_ADDR_IPS[${INDEX}]=${PUBLICIPADDR}
-
-		if [[ "${USE_NLB}" = "none" || "${HA_CLUSTER}" = "false" ]]; then
+		if [ "${USE_NLB}" == "none" ]; then
 			local REGISTER_IP=
 
-			if [ ${HA_CLUSTER} = "true" ] && [ ${INDEX} -lt ${WORKERNODE_INDEX} ] && [ ${INDEX} -ge ${CONTROLNODE_INDEX} ] && [ "${USE_NLB}" = "none" ]; then
-				REGISTER_IP=${PRIVATEIPADDR}
-			elif [ ${INDEX} -eq 0 ] || [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
-				REGISTER_IP=${PRIVATEIPADDR}
+			if [ -n "${PUBLIC_ADDR_IPS[${INDEX}]}" ]; then
+				REGISTER_IP=${PUBLIC_ADDR_IPS[${INDEX}]}
+			else
+				REGISTER_IP=${PRIVATE_ADDR_IPS[${INDEX}]}
 			fi
 
-			if [ -n "${REGISTER_IP}" ]; then
-				PRIVATE_ROUTE53_REGISTER=$(echo ${PRIVATE_ROUTE53_REGISTER} | jq --arg IPADDR "${REGISTER_IP}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
-
-				if [ -n "${PUBLICIPADDR}" ]; then
-					REGISTER_IP=${PUBLICIPADDR}
-				fi
-
-				DESIGNATE_REGISTER+=(${REGISTER_IP})
-				GODADDY_REGISTER=$(echo ${GODADDY_REGISTER} | jq --arg IPADDR "${REGISTER_IP}" '. += [ { "data": $IPADDR, "ttl": 600 } ]')
-				RECORDS+=("--record ${REGISTER_IP}")
-				PUBLIC_ROUTE53_REGISTER=$(echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg IPADDR "${REGISTER_IP}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
-			fi
+			DESIGNATE_REGISTER+=(${REGISTER_IP})
+			GODADDY_REGISTER=$(echo ${GODADDY_REGISTER} | jq --arg IPADDR "${REGISTER_IP}" '. += [ { "data": $IPADDR, "ttl": 600 } ]')
+			RECORDS+=("--record ${REGISTER_IP}")
+			PUBLIC_ROUTE53_REGISTER=$(echo ${PUBLIC_ROUTE53_REGISTER} | jq --arg IPADDR "${REGISTER_IP}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
 		fi
 	done
 
@@ -2470,6 +2458,8 @@ EOF
 
 		# Register in Route53 IP addresses point in private IP
 		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
+			echo_title "Register private dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} in route53"
+
 			echo ${PRIVATE_ROUTE53_REGISTER} | jq . > ${TARGET_CONFIG_LOCATION}/route53-nlb.json
 			aws route53 change-resource-record-sets --profile ${AWS_ROUTE53_PROFILE} \
 				--hosted-zone-id ${AWS_ROUTE53_PRIVATE_ZONE_ID} \

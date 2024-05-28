@@ -888,7 +888,7 @@ EOF
     # Register node in public zone DNS if we don't use private DNS
     elif [ "${EXTERNAL_DNS_PROVIDER}" = "aws" ]; then
 		echo_blue_bold "Register ${NAME} address: ${IPADDR} into public Route33 dns zone ${PUBLIC_DOMAIN_NAME}"
-		cat > ${TARGET_CONFIG_LOCATION}/route53-public-${SUFFIX}.cmd <<EOF
+		cat > ${TARGET_CONFIG_LOCATION}/route53-public-${SUFFIX}.json <<EOF
 {
 	"Comment": "${NAME} private DNS entry",
 	"Changes": [

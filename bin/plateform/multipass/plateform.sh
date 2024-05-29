@@ -1,6 +1,7 @@
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl kubernetes-desktop-autoscaler-utility packer qemu-img"
 PRIVATE_NET_INF=eth1 # eth0 is multipass interface
 CLOUD_PROVIDER=
+PRIVATE_GATEWAY_METRIC=250
 
 AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)
 AUTOSCALER_DESKTOP_UTILITY_KEY="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientKey)"

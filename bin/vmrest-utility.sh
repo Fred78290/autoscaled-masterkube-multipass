@@ -148,6 +148,18 @@ function vmrest_get_net_type() {
 	echo -n "${TYPE}"
 }
 
+function vmrest_get_vmnic() {
+	local VMUUID=$1
+
+	do_get "/api/vms/${VMUUID}/nic"
+}
+
+function vmrest_get_vmnicips() {
+	local VMUUID=$1
+
+	do_get "/api/vms/${VMUUID}/nicips"
+}
+
 function vmrest_get_vmname() {
 	local VMUUID=$1
 

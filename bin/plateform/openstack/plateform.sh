@@ -544,14 +544,25 @@ fi
 		echo_line
 
 		if [ ${FLOATING_IP} == "true" ]; then
-			PUBLIC_IP=$(openstack floating ip list --tags ${MASTERKUBE_NODE} -f json 2>/dev/null | jq -r '.[0]."Floating IP Address"//""')
+			if [ ${PUBLIC_IP} != "DHCP" ]; then
+				FLOATING_IP_NAME=$(openstack floating ip show ${PUBLIC_IP} -f json 2>/dev/null | jq -r '.name')
 
-			if [ -z "${PUBLIC_IP}" ]; then
-				PUBLIC_IP=$(openstack floating ip create --tag ${MASTERKUBE_NODE} -f json ${VC_NETWORK_PUBLIC} | jq -r '.floating_ip_address // ""')
-
-				echo_blue_bold "Create floating ip: ${PUBLIC_IP} for ${MASTERKUBE_NODE} on network ${VC_NETWORK_PUBLIC}"
+				if [ -z "${FLOATING_IP_NAME}" ]; then
+					echo_blue_bold "Create floating ip: ${PUBLIC_IP} for ${MASTERKUBE_NODE} on network ${VC_NETWORK_PUBLIC}"
+					PUBLIC_IP=$(openstack floating ip create --tag ${MASTERKUBE_NODE} --floating-ip-address ${PUBLIC_IP} -f json ${VC_NETWORK_PUBLIC} | jq -r '.floating_ip_address // ""')
+				else
+					echo_blue_bold "Use floating ip: ${PUBLIC_IP} for ${MASTERKUBE_NODE} on network ${VC_NETWORK_PUBLIC}"
+				fi
 			else
-				echo_blue_bold "Use floating ip: ${PUBLIC_IP} for ${MASTERKUBE_NODE} on network ${VC_NETWORK_PUBLIC}"
+				PUBLIC_IP=$(openstack floating ip list --tags ${MASTERKUBE_NODE} -f json 2>/dev/null | jq -r '.[0]."Floating IP Address"//""')
+
+				if [ -z "${PUBLIC_IP}" ]; then
+					PUBLIC_IP=$(openstack floating ip create --tag ${MASTERKUBE_NODE} -f json ${VC_NETWORK_PUBLIC} | jq -r '.floating_ip_address // ""')
+
+					echo_blue_bold "Create floating ip: ${PUBLIC_IP} for ${MASTERKUBE_NODE} on network ${VC_NETWORK_PUBLIC}"
+				else
+					echo_blue_bold "Use floating ip: ${PUBLIC_IP} for ${MASTERKUBE_NODE} on network ${VC_NETWORK_PUBLIC}"
+				fi
 			fi
 		fi
 
@@ -577,15 +588,53 @@ fi
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
 
-		LOCALIP=$(openstack server show -f json ${MASTERKUBE_NODE} 2/dev/null | jq -r --arg NETWORK ${VC_NETWORK_PRIVATE} '.addresses|.[$NETWORK][0]')
+		LOCALIP=$(openstack server show -f json ${MASTERKUBE_NODE} 2>/dev/null | jq -r --arg NETWORK ${VC_NETWORK_PRIVATE} '.addresses|.[$NETWORK][0]')
 
 		if [ ${FLOATING_IP} == "true" ]; then
 			PUBLIC_IP=$(openstack floating ip list --fixed-ip-address ${LOCALIP} -f json | jq -r '.[0]."Floating IP Address"')
 		fi
 	fi
+}
 
-	PRIVATE_ADDR_IPS[${INDEX}]=${LOCALIP}
-	PUBLIC_ADDR_IPS[${INDEX}]=${PUBLIC_IP}
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function plateform_info_vm() {
+	local INDEX=$1
+	local PUBLIC_IP=$2
+	local NODE_IP=$3
+	local FLOATING_IP=$(vm_use_floating_ip ${INDEX})
+	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
+	local MASTERKUBE_NODE_UUID=$(get_vmuuid ${MASTERKUBE_NODE})
+	local SUFFIX=$(named_index_suffix $1)
+	local PRIVATE_IP=$(openstack server show -f json ${MASTERKUBE_NODE} 2>/dev/null | jq -r --arg NETWORK ${VC_NETWORK_PRIVATE} '.addresses|.[$NETWORK][0]')
+
+	if [ ${FLOATING_IP} == "true" ]; then
+		PUBLIC_IP=$(openstack floating ip list --fixed-ip-address ${PRIVATE_IP} -f json | jq -r '.[0]."Floating IP Address"')
+	else
+		PUBLIC_IP=${PRIVATE_IP}
+	fi
+
+    PRIVATE_ADDR_IPS[${INDEX}]=${PRIVATE_IP}
+    PUBLIC_ADDR_IPS[${INDEX}]=${PUBLIC_IP}
+    PRIVATE_DNS_NAMES[${INDEX}]=${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}
+
+	cat > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json <<EOF
+{
+	"Index": ${INDEX},
+	"InstanceId": "${MASTERKUBE_NODE_UUID}",
+	"PrivateIpAddress": "${PRIVATE_IP}",
+	"PrivateDnsName": "${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}",
+	"PublicIpAddress": "${PUBLIC_IP}",
+	"PublicDnsName": "${MASTERKUBE_NODE}.${PUBLIC_DOMAIN_NAME}",
+	"Tags": [
+		{
+			"Key": "Name",
+			"Value": "${MASTERKUBE_NODE}"
+		}
+	]
+}
+EOF
 }
 
 #===========================================================================================================================================

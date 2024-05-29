@@ -1002,10 +1002,6 @@ EOF
 			--profile ${AWS_PROFILE} \
 			--instance-ids ${LAUNCHED_ID} | jq .Reservations[0].Instances[0])
 
-		IPADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateIpAddress // ""')
-		PUBADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PublicIpAddress // ""')
-		PRIVATEDNS=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateDnsName // ""')
-
 		if [ "${PUBLICIP}" = "true" ] || [ -z ${NETWORK_INTERFACE_ID} ]; then
 			NETWORK_INTERFACE_ID=$(echo ${LAUNCHED_INSTANCE} | jq -r '.NetworkInterfaces[0].NetworkInterfaceId // ""')
 			ENI=$(aws ec2 describe-network-interfaces \
@@ -1014,21 +1010,36 @@ EOF
 				| jq -r '.NetworkInterfaces[0]//""')
 			echo ${ENI} | jq . > ${TARGET_CONFIG_LOCATION}/eni-${SUFFIX}.json
 		fi
-
-		echo -n ${LAUNCHED_INSTANCE} | jq . > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json
 	else
 		IPADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateIpAddress // ""')
 		PUBADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PublicIpAddress // ""')
-		PRIVATEDNS=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateDnsName // ""')
 
 		echo_blue_bold "Already launched ${MASTERKUBE_NODE}, private-ip=${IPADDR}, public-ip=${PUBADDR}"
-
-		echo -n ${LAUNCHED_INSTANCE} | jq . > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json
 	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function plateform_info_vm() {
+	local INDEX=$1
+	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
+	local SUFFIX=$(named_index_suffix ${INDEX})
+
+	LAUNCHED_INSTANCE=$(aws ec2  describe-instances \
+		--profile ${AWS_PROFILE} \
+		--filters "Name=tag:Name,Values=${MASTERKUBE_NODE}" \
+		| jq -r '.Reservations[].Instances[]|select(.State.Code == 16)' )
+
+    IPADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateIpAddress // ""')
+    PUBADDR=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PublicIpAddress // ""')
+    PRIVATEDNS=$(echo ${LAUNCHED_INSTANCE} | jq -r '.PrivateDnsName // ""')
 
     PRIVATE_ADDR_IPS[${INDEX}]=${IPADDR}
     PUBLIC_ADDR_IPS[${INDEX}]=${PUBADDR}
     PRIVATE_DNS_NAMES[${INDEX}]=${PRIVATEDNS}
+
+	echo -n ${LAUNCHED_INSTANCE} | jq . > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json
 }
 
 #===========================================================================================================================================

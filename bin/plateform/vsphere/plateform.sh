@@ -28,7 +28,7 @@ function plateform_prepare_routes() {
 #===========================================================================================================================================
 function plateform_create_vm() {
 	local INDEX=$1
-	local EXTERNAL_IP=$2
+	local PUBLIC_IP=$2
 	local NODE_IP=$3
 	local MACHINE_TYPE=
 	local MASTERKUBE_NODE=
@@ -72,18 +72,18 @@ EOF
 			NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PRIVATE_ROUTES_DEFS}" '.network.ethernets.eth0.routes = $ROUTES')
 		fi
 
-		if [ ${EXTERNAL_IP} != "NONE" ]; then
-			if [ "${EXTERNAL_IP}" = "DHCP" ]; then
+		if [ ${PUBLIC_IP} != "NONE" ]; then
+			if [ "${PUBLIC_IP}" = "DHCP" ]; then
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
 					--arg USE_DHCP_ROUTES_PUBLIC "${USE_DHCP_ROUTES_PUBLIC}" \
 					'.|.network.ethernets += { "eth1": { "dhcp4": true, "dhcp4-overrides": { "use-routes": $USE_DHCP_ROUTES_PUBLIC } } }')
 			elif [ -z "${PUBLIC_GATEWAY}" ] && [ -z "${PUBLIC_DNS}" ]; then
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
-					--arg NODE_IP "${EXTERNAL_IP}/${PUBLIC_MASK_CIDR}" \
+					--arg NODE_IP "${PUBLIC_IP}/${PUBLIC_MASK_CIDR}" \
 					'.|.network.ethernets += { "eth1": { "addresses": [ $NODE_IP ] }}')
 			else
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
-					--arg NODE_IP "${EXTERNAL_IP}/${PUBLIC_MASK_CIDR}" \
+					--arg NODE_IP "${PUBLIC_IP}/${PUBLIC_MASK_CIDR}" \
 					--arg PUBLIC_DNS ${PUBLIC_DNS} \
 					'.|.network.ethernets += { "eth1": { "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $PUBLIC_DNS ] } }}')
 			fi
@@ -164,18 +164,52 @@ EOF
 
 		echo_title "Wait for IP from ${MASTERKUBE_NODE}"
 
-		IPADDR=$(govc vm.ip -wait 5m "${MASTERKUBE_NODE}")
+		PRIVATE_IP=$(govc vm.ip -wait 5m "${MASTERKUBE_NODE}")
 		VMHOST=$(govc vm.info "${MASTERKUBE_NODE}" | grep 'Host:' | awk '{print $2}')
 		eval govc host.autostart.add -host="${VMHOST}" "${MASTERKUBE_NODE}" ${SILENT}
-
-		PRIVATE_ADDR_IPS[${INDEX}]=${IPADDR}
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
+	fi
+}
 
-		PRIVATE_ADDR_IPS[${INDEX}]=$(govc vm.ip ${MASTERKUBE_NODE})
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function plateform_info_vm() {
+	local INDEX=$1
+	local PUBLIC_IP=$2
+	local NODE_IP=$3
+	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
+	local MASTERKUBE_NODE_UUID=$(get_vmuuid "${MASTERKUBE_NODE}")
+	local PRIVATE_IP=$(govc vm.info -json "${MASTERKUBE_NODE}" | jq -r -arg NETWORK "${VC_NETWORK_PRIVATE}" '.virtualMachines[0].guest.net[]|select(.network == $NETWORK)|.ipConfig.ipAddress[]|select(.prefixLength == 24)|.ipAddress')
+
+	if [ ${PUBLIC_IP} == "NONE" ]; then
+		PUBLIC_IP=${PRIVATE_IP}
+	elif [ ${PUBLIC_IP} == "DHCP" ]; then
+		PUBLIC_IP=$(govc vm.info -json "${MASTERKUBE_NODE}" | jq -r -arg NETWORK "${VC_NETWORK_PUBLIC}" '.virtualMachines[0].guest.net[]|select(.network == $NETWORK)|.ipConfig.ipAddress[]|select(.prefixLength == 24)|.ipAddress')
 	fi
 
-	#echo_separator
+	PRIVATE_ADDR_IPS[${INDEX}]=${PRIVATE_IP}
+    PUBLIC_ADDR_IPS[${INDEX}]=${PUBLIC_IP}
+    PRIVATE_DNS_NAMES[${INDEX}]=${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}
+
+	cat > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json <<EOF
+{
+	"Index": ${INDEX},
+	"InstanceId": "${MASTERKUBE_NODE_UUID}",
+	"PrivateIpAddress": "${PRIVATE_IP}",
+	"PrivateDnsName": "${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}",
+	"PublicIpAddress": "${PUBLIC_IP}",
+	"PublicDnsName": "${MASTERKUBE_NODE}.${PUBLIC_DOMAIN_NAME}",
+	"Tags": [
+		{
+			"Key": "Name",
+			"Value": "${MASTERKUBE_NODE}"
+		}
+	]
+}
+EOF
+
 }
 
 #===========================================================================================================================================

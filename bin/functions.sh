@@ -786,7 +786,6 @@ function plateform_info_vm() {
 	local INDEX=$1
 	local NAME=$(get_vm_name $1)
 	local SUFFIX=$(named_index_suffix $1)
-	local DNSNAME=${NAME}.${PRIVATE_DOMAIN_NAME}
 	local PRIVATE_IP=${PRIVATE_ADDR_IPS[${INDEX}]}
 	local PUBLIC_IP=${PUBLIC_ADDR_IPS[${INDEX}]}
 
@@ -796,14 +795,14 @@ function plateform_info_vm() {
 		PUBLIC_IP=${PRIVATE_IP}
 	fi
 
-	local INSTANCE=$(cat <<EOF
+cat > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json <<EOF
 {
 	"Index": ${INDEX},
 	"InstanceId": "$(get_vmuuid ${NAME})",
 	"PrivateIpAddress": "${PRIVATE_IP}",
-	"PrivateDnsName": "${DNSNAME}",
+	"PrivateDnsName": "${NAME}.${PRIVATE_DOMAIN_NAME}",
 	"PublicIpAddress": "${PUBLIC_IP}",
-	"PublicDnsName": "${DNSNAME}",
+	"PublicDnsName": "${NAME}.${PUBLIC_DOMAIN_NAME}",
 	"Tags": [
 		{
 			"Key": "Name",
@@ -812,8 +811,6 @@ function plateform_info_vm() {
 	]
 }
 EOF
-)
-	echo "${INSTANCE}" | jq . > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json
 }
 
 #===========================================================================================================================================
@@ -1014,7 +1011,7 @@ function create_vm() {
 	local NAME=$(get_vm_name ${INDEX})
 
 	plateform_create_vm $@
-	plateform_info_vm ${INDEX}
+	plateform_info_vm $@
 	prepare_vm ${INDEX} ${NAME}
 }
 
@@ -1898,12 +1895,12 @@ function prepare_routes() {
 	plateform_prepare_routes
 
 	# Add default gateway
-	if [ -n "${PRIVATE_GATEWAY}" ]; then
+	if [ -n "${PRIVATE_GATEWAY}" ] && [ "${PRIVATE_GATEWAY}" != "NONE" ] && [ "${PRIVATE_GATEWAY}" != "DHCP" ]; then
 		NETWORK_PRIVATE_ROUTES=("to=default,via=${PRIVATE_GATEWAY},metric=${PRIVATE_GATEWAY_METRIC}" ${NETWORK_PRIVATE_ROUTES[@]})
 	fi
 
 	# Add default gateway
-	if [ -n "${PUBLIC_GATEWAY}" ]; then
+	if [ -n "${VC_NETWORK_PUBLIC}" ] && [ "${PUBLIC_IP}" != "NONE" ] && [ -n "${PUBLIC_GATEWAY}" ] && [ "${PUBLIC_GATEWAY}" != "NONE" ]; then
 		NETWORK_PUBLIC_ROUTES=("to=default,via=${PUBLIC_GATEWAY},metric=${PUBLIC_GATEWAY_METRIC}" ${NETWORK_PUBLIC_ROUTES[@]})
 	fi
 
@@ -2043,13 +2040,10 @@ function create_all_vms() {
 		for INDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
 		do
 			local SUFFIX=$(named_index_suffix ${INDEX})
-			local PRIV_ADDR=$(jq -r '.PrivateIpAddress' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
-			local PRIV_DNS=$(jq -r '.PrivateDnsName' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json )
-			local PUBLIC_ADDR=$(jq -r '.PublicIpAddress' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
 
-			PRIVATE_ADDR_IPS[${INDEX}]=${PRIV_ADDR}
-			PRIVATE_DNS_NAMES[${INDEX}]=${PRIV_DNS}
-			PUBLIC_ADDR_IPS[${INDEX}]=${PUBLIC_ADDR}
+			PRIVATE_ADDR_IPS[${INDEX}]=$(jq -r '.PrivateIpAddress' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
+			PRIVATE_DNS_NAMES[${INDEX}]=$(jq -r '.PrivateDnsName' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json )
+			PUBLIC_ADDR_IPS[${INDEX}]=$(jq -r '.PublicIpAddress' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
 		done
 	fi
 
@@ -2184,9 +2178,7 @@ function register_nlb_dns() {
 		if [ -n "${AWS_ROUTE53_PRIVATE_ZONE_ID}" ]; then
 			echo_title "Register dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} in route53: ${AWS_ROUTE53_PRIVATE_ZONE_ID}, record: ${PRIVATE_NLB_DNS}"
 
-			#if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
-				CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
-			#fi
+			CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 
 			cat > ${TARGET_CONFIG_LOCATION}/route53-nlb.json <<EOF
 			{
@@ -2220,9 +2212,7 @@ EOF
 			
 			DNS_ENTRY=$(openstack recordset create -f json --ttl 60 --type ${RECORDTYPE} --record ${PRIVATE_NLB_DNS} "${PRIVATE_DOMAIN_NAME}." ${MASTERKUBE} 2>/dev/null | jq -r '.id // ""')
 
-			#if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
-				CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
-			#fi
+			CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 
 			cat > ${TARGET_CONFIG_LOCATION}/designate-nlb.json <<EOF
 			{
@@ -2236,9 +2226,7 @@ EOF
 		elif [ ${USE_BIND9_SERVER} = "true" ]; then
 			echo_title "Register bind9 dns ${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} designate, record: ${PRIVATE_NLB_DNS}"
 
-			#if [ "${KUBERNETES_DISTRO}" != "microk8s" ]; then
-				CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
-			#fi
+			CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 
 			cat > ${TARGET_CONFIG_LOCATION}/rfc2136-nlb.cmd <<EOF
 server ${BIND9_HOST} ${BIND9_PORT}

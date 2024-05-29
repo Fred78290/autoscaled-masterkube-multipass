@@ -65,7 +65,7 @@ function plateform_prepare_routes() {
 #===========================================================================================================================================
 function plateform_create_vm() {
 	local INDEX=$1
-	local EXTERNAL_IP=$2
+	local PUBLIC_IP=$2
 	local NODE_IP=$3
 	local MACHINE_TYPE=
 	local MASTERKUBE_NODE=
@@ -109,14 +109,14 @@ EOF
 			NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PRIVATE_ROUTES_DEFS}" '.network.ethernets.eth0.routes = $ROUTES')
 		fi
 
-		if [ ${EXTERNAL_IP} != "NONE" ]; then
-			if [ "${EXTERNAL_IP}" = "DHCP" ]; then
+		if [ ${PUBLIC_IP} != "NONE" ]; then
+			if [ "${PUBLIC_IP}" = "DHCP" ]; then
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
 					--arg USE_DHCP_ROUTES_PUBLIC "${USE_DHCP_ROUTES_PUBLIC}" \
 					'.|.network.ethernets += { "eth1": { "dhcp4": true, "dhcp4-overrides": { "use-routes": $USE_DHCP_ROUTES_PUBLIC } } }')
 			else
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
-					--arg NODE_IP "${EXTERNAL_IP}/${PUBLIC_MASK_CIDR}" \
+					--arg NODE_IP "${PUBLIC_IP}/${PUBLIC_MASK_CIDR}" \
 					--arg PRIVATE_DNS ${PRIVATE_DNS} \
 					'.|.network.ethernets += { "eth1": { "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $PRIVATE_DNS ] } }}')
 			fi
@@ -198,6 +198,49 @@ EOF
 
 	PRIVATE_ADDR_IPS[${INDEX}]=${NODE_IP}
 	#echo_separator
+}
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function plateform_info_vm() {
+	local INDEX=$1
+	local PUBLIC_IP=$2
+	local NODE_IP=$3
+	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
+	local MASTERKUBE_NODE_UUID=$(vmrest_get_vmuuid ${MASTERKUBE_NODE})
+	local SUFFIX=$(named_index_suffix $1)
+	local VMNIC=$(vmrest_get_vmnic ${MASTERKUBE_NODE_UUID})
+	local VMNICIPS=$(vmrest_get_vmnicips ${MASTERKUBE_NODE_UUID})
+	local MACADDRESS=$(echo ${VMNIC} | jq -r --arg NETWORK "${VC_NETWORK_PRIVATE}" '.nics[]|select(.vmnet == $NETWORK)|.macAddress')
+	local PRIVATE_IP=$(echo ${VMNICIPS} | jq -r --arg MACADDRESS "${MACADDRESS}" '.nics[]|select(.mac == $MACADDRESS)|.ip|first' | cut -d '/' -f 1)
+
+	if [ ${PUBLIC_IP} == "NONE" ]; then
+		PUBLIC_IP=${PRIVATE_IP}
+	elif [ ${PUBLIC_IP} == "DHCP" ]; then
+		MACADDRESS=$(echo ${VMNIC} | jq -r --arg NETWORK "${VC_NETWORK_PUBLIC}" '.nics[]|select(.vmnet == $NETWORK)|.macAddress')
+		PUBLIC_IP=$(echo ${VMNICIPS} | jq -r --arg MACADDRESS "${MACADDRESS}" '.nics[]|select(.mac == $MACADDRESS)|.ip|first' | cut -d '/' -f 1)
+	fi
+
+    PRIVATE_ADDR_IPS[${INDEX}]=${PRIVATE_IP}
+    PUBLIC_ADDR_IPS[${INDEX}]=${PUBLIC_IP}
+    PRIVATE_DNS_NAMES[${INDEX}]=${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}
+
+	cat > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json <<EOF
+{
+	"Index": ${INDEX},
+	"InstanceId": "${MASTERKUBE_NODE_UUID}",
+	"PrivateIpAddress": "${PRIVATE_IP}",
+	"PrivateDnsName": "${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}",
+	"PublicIpAddress": "${PUBLIC_IP}",
+	"PublicDnsName": "${MASTERKUBE_NODE}.${PUBLIC_DOMAIN_NAME}",
+	"Tags": [
+		{
+			"Key": "Name",
+			"Value": "${MASTERKUBE_NODE}"
+		}
+	]
+}
+EOF
 }
 
 #===========================================================================================================================================

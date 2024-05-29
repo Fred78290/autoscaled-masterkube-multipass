@@ -46,7 +46,7 @@ function plateform_prepare_routes() {
 #===========================================================================================================================================
 function plateform_create_vm() {
 	local INDEX=$1
-	local EXTERNAL_IP=$2
+	local PUBLIC_IP=$2
 	local NODE_IP=$3
 	local MACHINE_TYPE=
 	local MASTERKUBE_NODE=
@@ -56,10 +56,12 @@ function plateform_create_vm() {
 	local DISK_SIZE=
 	local NUM_VCPUS=
 	local MEMSIZE=
+	local SUFFIX=
 
 	MACHINE_TYPE=$(get_machine_type ${INDEX})
 	MASTERKUBE_NODE=$(get_vm_name ${INDEX})
 	MASTERKUBE_NODE_UUID=$(get_vmuuid ${MASTERKUBE_NODE})
+	SUFFIX=$(named_index_suffix $1)
 
 	if [ -z "${MASTERKUBE_NODE_UUID}" ]; then
 		NETWORK_DEFS=$(cat <<EOF
@@ -87,9 +89,9 @@ EOF
 			NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PRIVATE_ROUTES_DEFS}" '.network.ethernets.eth1.routes = $ROUTES')
 		fi
 
-		if [ ${EXTERNAL_IP} != "DHCP" ] && [ ${EXTERNAL_IP} != "NONE" ]; then
+		if [ ${PUBLIC_IP} != "DHCP" ] && [ ${PUBLIC_IP} != "NONE" ]; then
 			NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
-				--arg NODE_IP "${EXTERNAL_IP}/${PUBLIC_MASK_CIDR}" \
+				--arg NODE_IP "${PUBLIC_IP}/${PUBLIC_MASK_CIDR}" \
 				'.|.network.ethernets += { "eth0": { "dhcp4": true, "addresses": [{ ($NODE_IP): { "label": "eth0:1" } }]}}')
 
 			if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
@@ -148,13 +150,46 @@ EOF
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
 	fi
-
-	IPADDR=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE}  '.info|.[$NAME].ipv4[1]')
-	PRIVATE_ADDR_IPS[${INDEX}]=${IPADDR}
-
-	#echo_separator
 }
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function plateform_info_vm() {
+	local INDEX=$1
+	local PUBLIC_IP=$2
+	local NODE_IP=$3
+	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
+	local MASTERKUBE_NODE_UUID=$(get_vmuuid ${MASTERKUBE_NODE})
+	local SUFFIX=$(named_index_suffix $1)
+	local IPV4=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE} '.info|.[$NAME].ipv4')
+	local PRIVATE_IP=$(echo ${IPV4} | jq -r '.|last')
+
+	if [ ${PUBLIC_IP} == "DHCP" ] || [ ${PUBLIC_IP} == "NONE" ]; then
+		PUBLIC_IP=$(echo ${IPV4} | jq -r '.|first')
+	fi
+
+    PRIVATE_ADDR_IPS[${INDEX}]=${PRIVATE_IP}
+    PUBLIC_ADDR_IPS[${INDEX}]=${PUBLIC_IP}
+    PRIVATE_DNS_NAMES[${INDEX}]=${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}
+
+	cat > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json <<EOF
+{
+	"Index": ${INDEX},
+	"InstanceId": "${MASTERKUBE_NODE_UUID}",
+	"PrivateIpAddress": "${PRIVATE_IP}",
+	"PrivateDnsName": "${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}",
+	"PublicIpAddress": "${PUBLIC_IP}",
+	"PublicDnsName": "${MASTERKUBE_NODE}.${PUBLIC_DOMAIN_NAME}",
+	"Tags": [
+		{
+			"Key": "Name",
+			"Value": "${MASTERKUBE_NODE}"
+		}
+	]
+}
+EOF
+}
 
 #===========================================================================================================================================
 #

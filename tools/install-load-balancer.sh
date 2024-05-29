@@ -60,6 +60,13 @@ done
 
 apt install nginx -y || echo "Need to reconfigure NGINX"
 
+UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2)
+IFS=. read UBUNTU_VERSION_MAJOR UBUNTU_VERSION_MINOR <<< "${UBUNTU_VERSION_ID}"
+
+if [ ${UBUNTU_VERSION_MAJOR} -gt 22 ]; then
+	apt install libnginx-mod-stream -y
+fi
+
 # Remove http default listening
 rm -rf /etc/nginx/sites-enabled/*
 

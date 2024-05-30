@@ -8,7 +8,7 @@ pushd ${CURDIR}/../ &>/dev/null
 export NAMESPACE=ingress-nginx
 export ETC_DIR=${TARGET_DEPLOY_LOCATION}/ingress
 
-if [ ${USE_NLB} == "none" ]; then
+if [[ "${USE_NLB}" == "none" && "${PLATEFORM}" != "aws" && "${PLATEFORM}" != "openstack" ]] || [ "${USE_NLB}" == "keepalived" ]; then
 	export KUBERNETES_TEMPLATE=./templates/ingress/loadbalancer
 else
 	export KUBERNETES_TEMPLATE=./templates/ingress/nodeport

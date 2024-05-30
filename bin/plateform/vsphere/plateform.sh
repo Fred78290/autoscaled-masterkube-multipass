@@ -187,7 +187,7 @@ function plateform_info_vm() {
 	if [ ${PUBLIC_IP} == "NONE" ]; then
 		PUBLIC_IP=${PRIVATE_IP}
 	elif [ ${PUBLIC_IP} == "DHCP" ]; then
-		PUBLIC_IP=$(govc vm.info -json "${MASTERKUBE_NODE}" | jq -r -arg NETWORK "${VC_NETWORK_PUBLIC}" '.virtualMachines[0].guest.net[]|select(.network == $NETWORK)|.ipConfig.ipAddress[]|select(.prefixLength == 24)|.ipAddress')
+		PUBLIC_IP=$(govc vm.info -json "${MASTERKUBE_NODE}" | jq -r --arg NETWORK "${VC_NETWORK_PUBLIC}" '.virtualMachines[0].guest.net[]|select(.network == $NETWORK)|.ipConfig.ipAddress[]|select(.prefixLength == 24)|.ipAddress')
 	fi
 
 	PRIVATE_ADDR_IPS[${INDEX}]=${PRIVATE_IP}

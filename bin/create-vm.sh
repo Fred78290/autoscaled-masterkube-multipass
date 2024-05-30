@@ -26,7 +26,6 @@ prepare_vendordata
 prepare_networking
 create_all_vms
 create_load_balancer
-create_dns_rentries
 create_etcd
 create_cluster
 create_config

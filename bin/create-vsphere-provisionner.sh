@@ -169,8 +169,10 @@ openssl req -new -key "${ETC_DIR}"/webhook-server-tls.key \
 	-subj "/CN=${service}.vmware-system-csi.svc" \
 	-config "${ETC_DIR}"/server.conf \
 	| openssl x509 -req -CA "${ETC_DIR}"/ca.crt \
-		-CAkey "${ETC_DIR}"/ca.key -days $((validity-1)) \
-		-CAcreateserial -out "${ETC_DIR}"/webhook-server-tls.crt \
+		-CAkey "${ETC_DIR}"/ca.key \
+		-days 1800 \
+		-CAcreateserial \
+		-out "${ETC_DIR}"/webhook-server-tls.crt \
 		-extensions v3_req -extfile "${ETC_DIR}"/server.conf
 
 cat <<EOF >"${ETC_DIR}"/webhook.config

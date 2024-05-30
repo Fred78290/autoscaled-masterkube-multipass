@@ -1155,6 +1155,9 @@ function prepare_environment() {
 			echo_red_bold "Single plane cluster can't be exposed to internet because because control plane require public IP or cloud network balancer or NGINX gateway in front"
 			exit
 		fi
+	elif [[ ${PLATEFORM} == "aws" || ${PLATEFORM} == "openstack" ]] && [ "${USE_NLB}" == "keepalived" ] ; then
+		echo_red_bold "NLB keepalived is not supported on plateform: ${PLATEFORM}"
+		exit
 	elif [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ "${USE_NLB}" != "nginx" ] ; then
 		USE_NLB=keepalived
 	fi

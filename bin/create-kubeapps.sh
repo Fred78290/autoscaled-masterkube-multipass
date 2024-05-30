@@ -47,7 +47,7 @@ ingress:
     cert-manager.io/cluster-issuer: cert-issuer-prod
     external-dns.alpha.kubernetes.io/register: 'true'
     external-dns.alpha.kubernetes.io/ttl: '600'
-    external-dns.alpha.kubernetes.io/target: ${MASTERKUBE}.${DOMAIN_NAME}
+    external-dns.alpha.kubernetes.io/target: ${EXTERNAL_DNS_TARGET}
     external-dns.alpha.kubernetes.io/hostname: kubeapps-${NODEGROUP_NAME}.${DOMAIN_NAME}
 EOF
 

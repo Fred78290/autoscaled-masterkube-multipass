@@ -371,8 +371,6 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    external-dns.alpha.kubernetes.io/hostname:  __EXTERNAL_DNS_TARGET__
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: ingress-nginx
@@ -394,7 +392,7 @@ spec:
   type: ClusterIP
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   labels:
     app.kubernetes.io/component: controller
@@ -412,10 +410,6 @@ spec:
       app.kubernetes.io/component: controller
       app.kubernetes.io/instance: ingress-nginx
       app.kubernetes.io/name: ingress-nginx
-  strategy:
-    rollingUpdate:
-      maxUnavailable: 1
-    type: RollingUpdate
   template:
     metadata:
       labels:
@@ -631,6 +625,12 @@ spec:
             type: RuntimeDefault
       nodeSelector:
         kubernetes.io/os: linux
+        master: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
       restartPolicy: OnFailure
       serviceAccountName: ingress-nginx-admission
 ---

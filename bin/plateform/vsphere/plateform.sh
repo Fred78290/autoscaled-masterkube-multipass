@@ -181,7 +181,8 @@ function plateform_info_vm() {
 	local NODE_IP=$3
 	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
 	local MASTERKUBE_NODE_UUID=$(get_vmuuid "${MASTERKUBE_NODE}")
-	local PRIVATE_IP=$(govc vm.info -json "${MASTERKUBE_NODE}" | jq -r -arg NETWORK "${VC_NETWORK_PRIVATE}" '.virtualMachines[0].guest.net[]|select(.network == $NETWORK)|.ipConfig.ipAddress[]|select(.prefixLength == 24)|.ipAddress')
+	local PRIVATE_IP=$(govc vm.info -json "${MASTERKUBE_NODE}" | jq -r --arg NETWORK "${VC_NETWORK_PRIVATE}" '.virtualMachines[0].guest.net[]|select(.network == $NETWORK)|.ipConfig.ipAddress[]|select(.prefixLength == 24)|.ipAddress')
+	local SUFFIX=$(named_index_suffix ${INDEX})
 
 	if [ ${PUBLIC_IP} == "NONE" ]; then
 		PUBLIC_IP=${PRIVATE_IP}

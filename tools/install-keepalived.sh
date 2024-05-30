@@ -74,6 +74,8 @@ if [ -f /etc/keepalived/check_apiserver.sh ]; then
 	exit 0
 fi
 
+TRANSPORT_IF=$(ip route get ${KEEPALIVED_PEER1} | awk '{print $3;exit}')
+
 echo "net.ipv4.ip_nonlocal_bind = 1" >> /etc/sysctl.conf
 
 apt install keepalived -y
@@ -115,7 +117,7 @@ vrrp_script check_apiserver {
 
 vrrp_instance VI_1 {
   state ${KEEPALIVED_STATUS}
-  interface eth1
+  interface ${TRANSPORT_IF}
   virtual_router_id 151
   priority ${KEEPALIVED_PRIORITY}
   advert_int 1

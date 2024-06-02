@@ -4,6 +4,9 @@ CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl govc"
 SEED_ARCH=amd64
 FOLDER_OPTIONS=
 
+export VSPHERE_START_DELAY=10
+export VSPHERE_STOP_DELAY=10
+
 if [ "${GOVC_INSECURE}" == "1" ]; then
 	export INSECURE=true
 else
@@ -21,6 +24,40 @@ fi
 #===========================================================================================================================================
 function plateform_prepare_routes() {
 	:
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function last_startorder() {
+	local LASTORDER=$(govc host.autostart.info -host=$1 -json | jq -r '.config.powerInfo[]|.startOrder' | sort -u | tail -n 1)
+
+	LASTORDER=${LASTORDER:=0}
+
+	if [ ${LASTORDER} -lt 0 ]; then
+		LASTORDER=0
+	fi
+
+	echo -n "${LASTORDER}"
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function plateform_autostart_ordered() {
+	local FIRSTNODE=$1
+	local LASTNODE=$2
+	local INDEX=
+
+	for INDEX in $(seq ${FIRSTNODE} ${LASTNODE})
+	do
+		local VMNAME=$(get_vm_name ${INDEX})
+		local VMHOST=$(govc vm.info "${VMNAME}" | grep 'Host:' | awk '{print $2}')
+		local VMORDER=$(($(last_startorder ${VMHOST}) + 1))
+
+		echo_blue_bold "Set autostart order for VM: ${VMNAME} to: ${VMORDER}"
+		eval govc host.autostart.add -start-order=${VMORDER} -start-delay=${VSPHERE_START_DELAY} -stop-delay=${VSPHERE_STOP_DELAY} -host="${VMHOST}" "${VMNAME}" ${SILENT}
+	done
 }
 
 #===========================================================================================================================================
@@ -165,8 +202,6 @@ EOF
 		echo_title "Wait for IP from ${MASTERKUBE_NODE}"
 
 		PRIVATE_IP=$(govc vm.ip -wait 5m "${MASTERKUBE_NODE}")
-		VMHOST=$(govc vm.info "${MASTERKUBE_NODE}" | grep 'Host:' | awk '{print $2}')
-		eval govc host.autostart.add -host="${VMHOST}" "${MASTERKUBE_NODE}" ${SILENT}
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
 	fi

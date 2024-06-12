@@ -286,7 +286,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 		# Prepare seed VM
 		echo_blue_bold "Install cloud-init VMWareGuestInfo datasource"
 
-		ssh -t "${SEED_USER}@${IPADDR}" <<EOF
+		ssh -t "${SEED_USER}@${IPADDR}" <<'EOF'
 		export DEBIAN_FRONTEND=noninteractive
 		export UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2)
 		sudo sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"/' /etc/default/grub

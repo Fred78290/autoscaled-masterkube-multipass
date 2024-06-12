@@ -4,54 +4,63 @@ else
     PATH=${HOME}/.local/vmware:${PATH}
 fi
 
+
 CMD_MANDATORIES="helm kubectl vmrun vmrest jq yq cfssl ovftool kubernetes-desktop-autoscaler-utility vmware-vdiskmanager"
 CLOUD_PROVIDER=
 DEPLOY_MODE="$(hostname | cut -d '.' -f 1 | cut -d '-' -f 1)"
 
-AUTOSCALER_DESKTOP_UTILITY_TLS=$(kubernetes-desktop-autoscaler-utility certificate generate)
-AUTOSCALER_DESKTOP_UTILITY_KEY="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientKey)"
-AUTOSCALER_DESKTOP_UTILITY_CERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientCertificate)"
-AUTOSCALER_DESKTOP_UTILITY_CACERT="$(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .Certificate)"
+source ${CURDIR}/vmrest-utility.sh
+
 AUTOSCALER_DESKTOP_UTILITY_ADDR=${LOCAL_IPADDR}:5701
 
 if [ "${LAUNCH_CA}" == YES ]; then
-    AUTOSCALER_DESKTOP_UTILITY_CERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CERT})"
-    AUTOSCALER_DESKTOP_UTILITY_KEY="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_KEY})"
-    AUTOSCALER_DESKTOP_UTILITY_CACERT="/etc/ssl/certs/autoscaler-utility/$(basename ${AUTOSCALER_DESKTOP_UTILITY_CACERT})"
+    AUTOSCALER_DESKTOP_UTILITY_KEY="/etc/ssl/certs/autoscaler-utility/$(basename ${LOCAL_AUTOSCALER_DESKTOP_UTILITY_KEY})"
+    AUTOSCALER_DESKTOP_UTILITY_CERT="/etc/ssl/certs/autoscaler-utility/$(basename ${LOCAL_AUTOSCALER_DESKTOP_UTILITY_CERT})"
+    AUTOSCALER_DESKTOP_UTILITY_CACERT="/etc/ssl/certs/autoscaler-utility/$(basename ${LOCAL_AUTOSCALER_DESKTOP_UTILITY_CACERT})"
+else
+	AUTOSCALER_DESKTOP_UTILITY_KEY="${LOCAL_AUTOSCALER_DESKTOP_UTILITY_KEY}"
+	AUTOSCALER_DESKTOP_UTILITY_CERT="${LOCAL_AUTOSCALER_DESKTOP_UTILITY_CERT}"
+	AUTOSCALER_DESKTOP_UTILITY_CACERT="${LOCAL_AUTOSCALER_DESKTOP_UTILITY_CACERT})"
 fi
 
 if [ "${OSDISTRO}" == "Darwin" ] && [ -z "$(command -v vmware-vdiskmanager)" ]; then
 	sudo ln -s /Applications/VMware\ Fusion.app/Contents/Library/vmware-vdiskmanager /usr/local/bin/vmware-vdiskmanager
 fi
 
-if [ -n ${VC_NETWORK_PRIVATE} ]; then
-	VNET_HOSTONLY_SUBNET=$(get_vmnet_subnet ${VC_NETWORK_PRIVATE})
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function parsed_arguments() {
+	VPC_PUBLIC_SUBNET_IDS=(${VC_NETWORK_PUBLIC})
+	VPC_PRIVATE_SUBNET_IDS=(${VC_NETWORK_PRIVATE})
 
-	if [ -z "${VNET_HOSTONLY_SUBNET}" ]; then
-		echo_red_bold "Can't determine VNET_HOSTONLY_SUBNET for ${VC_NETWORK_PRIVATE}"
+	if [ -n ${VC_NETWORK_PRIVATE} ]; then
+		VNET_HOSTONLY_SUBNET=$(get_vmnet_subnet ${VC_NETWORK_PRIVATE})
+
+		if [ -z "${VNET_HOSTONLY_SUBNET}" ]; then
+			echo_red_bold "Can't determine VNET_HOSTONLY_SUBNET for ${VC_NETWORK_PRIVATE}"
+		fi
+
+		METALLB_IP_RANGE=${VNET_HOSTONLY_SUBNET}.78-${VNET_HOSTONLY_SUBNET}.79
+
+		PRIVATE_GATEWAY=${VNET_HOSTONLY_SUBNET}.2
+		PRIVATE_IP=${VNET_HOSTONLY_SUBNET}.70
 	fi
 
-	METALLB_IP_RANGE=${VNET_HOSTONLY_SUBNET}.78-${VNET_HOSTONLY_SUBNET}.79
+	if [ -n "${VC_NETWORK_PUBLIC}" ] && [ "${PUBLIC_IP}" != "NONE" ]; then
+		VNET_HOSTONLY_SUBNET=$(get_vmnet_subnet ${VC_NETWORK_PUBLIC})
 
-	PRIVATE_GATEWAY=${VNET_HOSTONLY_SUBNET}.2
-	PRIVATE_IP=${VNET_HOSTONLY_SUBNET}.70
-fi
+		if [ -z "${VNET_HOSTONLY_SUBNET}" ]; then
+			echo_red_bold "Can't determine VNET_HOSTONLY_SUBNET for ${VC_NETWORK_PUBLIC}"
+		fi
 
-if [ -n "${VC_NETWORK_PUBLIC}" ] && [ "${PUBLIC_IP}" != "NONE" ]; then
-	VNET_HOSTONLY_SUBNET=$(get_vmnet_subnet ${VC_NETWORK_PUBLIC})
+		METALLB_IP_RANGE=${VNET_HOSTONLY_SUBNET}.78-${VNET_HOSTONLY_SUBNET}.79
 
-	if [ -z "${VNET_HOSTONLY_SUBNET}" ]; then
-		echo_red_bold "Can't determine VNET_HOSTONLY_SUBNET for ${VC_NETWORK_PUBLIC}"
+		if [ "${PUBLIC_IP}" != "DHCP" ]; then
+			PUBLIC_IP=${VNET_HOSTONLY_SUBNET}.70/24
+		fi
 	fi
-
-	METALLB_IP_RANGE=${VNET_HOSTONLY_SUBNET}.78-${VNET_HOSTONLY_SUBNET}.79
-
-	if [ "${PUBLIC_IP}" != "DHCP" ]; then
-		PUBLIC_IP=${VNET_HOSTONLY_SUBNET}.70/24
-	fi
-fi
-
-source ${CURDIR}/vmrest-utility.sh
+}
 
 #===========================================================================================================================================
 #
@@ -296,6 +305,7 @@ function get_net_type() {
 function get_vmnet_subnet() {
 	local VMNETNUM=$1
 	local OSDISTRO="$(uname -s)"
+	local LOCAL_IPADDR=
 
 	VMNETNUM=${VMNETNUM:5}
 

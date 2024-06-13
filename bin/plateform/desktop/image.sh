@@ -254,7 +254,6 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 
 		if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 			echo_red_bold "Register ${SEED_IMAGE} failed!"
-			read -p "Continue..."
 			rm -rf "${VMFOLDER}"
 			exit -1
 		fi

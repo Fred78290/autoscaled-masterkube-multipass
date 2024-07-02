@@ -485,7 +485,7 @@ EOF
 	echo "==============================================================================================================================="
 
 	if [ "${CNI_PLUGIN}" = "aws" ]; then
-		AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.16.0/config/master/aws-k8s-cni.yaml
+		AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.18.2/config/master/aws-k8s-cni.yaml
 		pull_image ${AWS_CNI_URL} AWS ${ECR_PASSWORD}
 	elif [ "${CNI_PLUGIN}" = "calico" ]; then
 		curl -s -O -L "https://github.com/projectcalico/calico/releases/download/v3.27.0/calicoctl-linux-${ARCH}"

@@ -226,6 +226,7 @@ LAUNCHED_INSTANCE=$(aws ec2 run-instances \
 	--user-data "file://${CACHE}/user-data.yaml" \
 	--block-device-mappings "file://${CACHE}/mapping.json" \
 	--tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${TARGET_IMAGE}}]" \
+	--metadata-options "HttpEndpoint=enabled,HttpTokens=optional,HttpPutResponseHopLimit=2,InstanceMetadataTags=enabled" \
 	${PUBLIC_IP_OPTIONS})
 
 LAUNCHED_ID=$(echo ${LAUNCHED_INSTANCE} | jq -r '.Instances[0].InstanceId//""')

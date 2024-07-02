@@ -301,7 +301,7 @@ function parse_arguments() {
 			shift 2
 			;;
 		# Same argument as cluster-autoscaler
-		--cloudprovider)
+		--grpc-provider)
 			GRPC_PROVIDER="$2"
 			shift 2
 			;;

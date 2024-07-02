@@ -10,7 +10,7 @@ OPTIONS=(
 	"arch:"
 	"autoscale-machine:"
 	"cert-email:"
-	"cloudprovider:"
+	"grpc-provider:"
 	"cni-plugin:"
 	"cni-version:"
 	"configuration-location:"

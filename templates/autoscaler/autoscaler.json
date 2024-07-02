@@ -56,7 +56,7 @@
 							"--v=1",
 							"--stderrthreshold=info",
 							"--cloud-provider=${GRPC_PROVIDER}",
-							"--cloud-config=${CLOUD_PROVIDER_CONFIG}",
+							"--cloud-config=${AUTOSCALER_CLOUD_PROVIDER_CONFIG}",
 							"--nodes=${MINNODES}:${MAXNODES}:true/${NODEGROUP_NAME}",
 							"--max-nodes-total=${MAXTOTALNODES}",
 							"--cores-total=${CORESTOTAL}",

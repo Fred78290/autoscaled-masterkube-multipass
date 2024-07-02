@@ -20,7 +20,7 @@ export KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | cut -d . -f 2)
 export CLUSTER_AUTOSCALER_VERSION=v1.29.0
 export CLOUD_AUTOSCALER_VERSION=v1.29.0
 export AUTOSCALER_REGISTRY=${REGISTRY}
-export CLOUD_PROVIDER_CONFIG=/etc/cluster/grpc-config.json
+export AUTOSCALER_CLOUD_PROVIDER_CONFIG=/etc/cluster/grpc-config.json
 export MAX_MEMORY=$(($(echo -n ${MEMORYTOTAL} | cut -d ':' -f 2) * 1024))
 export MAX_VCPUS=$(echo -n ${CORESTOTAL} | cut -d ':' -f 2)
 export MANAGED_NODES_MAX_VCPUS=$((${MAX_VCPUS} / 2))
@@ -28,7 +28,7 @@ export MANAGED_NODES_MAX_MEMORY=$((${MAX_MEMORY} / 2))
 
 if [ "${GRPC_PROVIDER}" = "externalgrpc" ]; then
 	AUTOSCALER_REGISTRY=registry.k8s.io/autoscaling
-	CLOUD_PROVIDER_CONFIG=/etc/cluster/grpc-config.yaml
+	AUTOSCALER_CLOUD_PROVIDER_CONFIG=/etc/cluster/grpc-config.yaml
 fi
 
 case ${KUBERNETES_MINOR_RELEASE} in

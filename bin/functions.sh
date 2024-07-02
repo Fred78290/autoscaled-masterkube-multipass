@@ -66,7 +66,7 @@ Options are:
 --route53-secret-key                             # Specify the route53 aws secret key, default ${AWS_ROUTE53_SECRETKEY}
 
 ### Flags for autoscaler
---cloudprovider=<value>                          # autoscaler flag <grpc|externalgrpc>, default: ${GRPC_PROVIDER}
+--grpc-provider=<value>                          # autoscaler flag <grpc|externalgrpc>, default: ${GRPC_PROVIDER}
 --max-nodes-total=<value>                        # autoscaler flag, default: ${MAXTOTALNODES}
 --cores-total=<value>                            # autoscaler flag, default: ${CORESTOTAL}
 --memory-total=<value>                           # autoscaler flag, default: ${MEMORYTOTAL}
@@ -384,7 +384,7 @@ function parse_arguments() {
 			shift 2
 			;;
 		# Same argument as cluster-autoscaler
-		--cloudprovider)
+		--grpc-provider)
 			GRPC_PROVIDER="$2"
 			shift 2
 			;;

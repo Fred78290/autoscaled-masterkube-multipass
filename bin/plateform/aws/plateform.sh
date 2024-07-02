@@ -991,6 +991,13 @@ EOF
 			exit -1
 		fi
 
+		echo_blue_bold "Wait for ${MASTERKUBE_NODE} instanceID ${LAUNCHED_ID} to boot"
+
+		while [ ! $(aws ec2  describe-instances --profile ${AWS_PROFILE} --instance-ids "${LAUNCHED_ID}" | jq -r '.Reservations[0].Instances[0].State.Code') -eq 16 ];
+		do
+			sleep 1
+		done
+
 		if [ ${CNI_PLUGIN} == "flannel" ]; then
 			aws ec2 modify-instance-attribute \
                 --profile "${AWS_PROFILE}" \
@@ -998,13 +1005,6 @@ EOF
                 --instance-id=${LAUNCHED_ID} \
                 --no-source-dest-check
 		fi
-
-		echo_blue_bold "Wait for ${MASTERKUBE_NODE} instanceID ${LAUNCHED_ID} to boot"
-
-		while [ ! $(aws ec2  describe-instances --profile ${AWS_PROFILE} --instance-ids "${LAUNCHED_ID}" | jq -r '.Reservations[0].Instances[0].State.Code') -eq 16 ];
-		do
-			sleep 1
-		done
 
 		LAUNCHED_INSTANCE=$(aws ec2  describe-instances \
 			--profile ${AWS_PROFILE} \

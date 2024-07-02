@@ -395,7 +395,7 @@ EOF
 
 	if [ "${CONTROL_PLANE}" = "true" ]; then
 		echo "Wait microk8s get ready"
-		microk8s status --wait-ready -t 120
+		microk8s status --wait-ready -t 600
 	fi
 
 elif [ ${KUBERNETES_DISTRO} == "rke2" ]; then

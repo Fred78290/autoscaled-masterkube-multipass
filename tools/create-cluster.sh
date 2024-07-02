@@ -372,7 +372,7 @@ EOF
 	snap install microk8s --classic --channel=${MICROK8S_CHANNEL}
 	
 	echo "Wait microk8s get ready"
-	microk8s status --wait-ready -t 120
+	microk8s status --wait-ready -t 600
 
 	mkdir -p ${CLUSTER_DIR}/kubernetes/pki
 

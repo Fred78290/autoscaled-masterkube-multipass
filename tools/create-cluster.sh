@@ -758,7 +758,9 @@ EOF
 
 		KUBERNETES_MINOR_RELEASE=$(kubectl version -o json | jq -r .serverVersion.minor)
 
-		kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.16.2/config/master/aws-k8s-cni.yaml
+		curl -sL https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.18.2/config/master/aws-k8s-cni.yaml \
+			| sed -e 's/602401143452\.dkr\.ecr\.us-west-2\.amazonaws.com\/amazon\//public.ecr.aws\/eks\//g' -e 's/602401143452\.dkr\.ecr\.us-west-2\.amazonaws.com/public.ecr.aws\/eks/g' \
+			| kubectl apply -f -
 
 		kubectl set env daemonset -n kube-system aws-node AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS=${VPC_IPV4_CIDR_BLOCK}
 

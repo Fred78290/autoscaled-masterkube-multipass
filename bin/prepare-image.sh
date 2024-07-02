@@ -237,17 +237,21 @@ elif [ "${KUBERNETES_DISTRO}" == "kubeadm" ]; then
 	echo "prepare kubeadm image"
 
 	function pull_image() {
-		local DOCKER_IMAGES=$(curl -s $1 | yq eval -P - | grep -E "\simage: " | sed -E 's/.+image: (.+)/\1/g')
+		local DOCKER_IMAGES=$(curl -s $1 | yq eval -P - | grep "image: " \
+			| awk '{print $2}' \
+			| sed -e 's/602401143452\.dkr\.ecr\.us-west-2\.amazonaws.com\/amazon\//public.ecr.aws\/eks\//g' -e 's/602401143452\.dkr\.ecr\.us-west-2\.amazonaws.com/public.ecr.aws\/eks/g')
 		local USERNAME=$2
 		local PASSWORD=$3
+		local AUTHENT=
 
-		if [ "${USERNAME}X${PASSWORD}" != "X" ]; then
-			if [ ${CONTAINER_CTL} == crictl ]; then
-				AUTHENT="--creds ${USERNAME}:${PASSWORD}"
-			else
-				${CONTAINER_CTL} login -u ${USERNAME} -p "${PASSWORD}" "602401143452.dkr.ecr.us-west-2.amazonaws.com"
-			fi
-		fi
+# Use public ecr
+#		if [ "${USERNAME}X${PASSWORD}" != "X" ]; then
+#			if [ ${CONTAINER_CTL} == crictl ]; then
+#				AUTHENT="--creds ${USERNAME}:${PASSWORD}"
+#			else
+#				${CONTAINER_CTL} login -u ${USERNAME} -p "${PASSWORD}" "602401143452.dkr.ecr.us-west-2.amazonaws.com"
+#			fi
+#		fi
 
 		for DOCKER_IMAGE in ${DOCKER_IMAGES}
 		do

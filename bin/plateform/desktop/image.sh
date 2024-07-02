@@ -226,6 +226,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 
 			ovftool --overwrite --allowExtraConfig --allowAllExtraConfig "${CACHE}/${CLOUDIMG_NAME}.ovf" "${CACHE}/${CLOUDIMG_NAME}.ova"
 		else
+			echo_blue_bold "Download https://${CLOUD_IMAGES_UBUNTU}/${DISTRO}/current/${CLOUDIMG_NAME}.ova"
 			curl -Ls "https://${CLOUD_IMAGES_UBUNTU}/${DISTRO}/current/${CLOUDIMG_NAME}.ova" -o "${CACHE}/${CLOUDIMG_NAME}.ova"
 		fi
 

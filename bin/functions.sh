@@ -2073,7 +2073,7 @@ function create_all_vms() {
 
 			PRIVATE_ADDR_IPS[${INDEX}]=$(jq -r '.PrivateIpAddress' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
 			PRIVATE_DNS_NAMES[${INDEX}]=$(jq -r '.PrivateDnsName' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json )
-			PUBLIC_ADDR_IPS[${INDEX}]=$(jq -r '.PublicIpAddress' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
+			PUBLIC_ADDR_IPS[${INDEX}]=$(jq -r '.PublicIpAddress//""' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
 		done
 	fi
 

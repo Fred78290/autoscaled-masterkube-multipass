@@ -955,7 +955,8 @@ EOF
 				--security-group-ids "${SGID}" \
 				--user-data "file://${TARGET_CONFIG_LOCATION}/userdata-${SUFFIX}.yaml" \
 				--block-device-mappings "file://${TARGET_CONFIG_LOCATION}/mapping-${SUFFIX}.json" \
-				--tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${MASTERKUBE_NODE}},{Key=NodeGroup,Value=${NODEGROUP_NAME}},{Key=kubernetes.io/cluster/${NODEGROUP_NAME},Value=owned},{Key=KubernetesCluster,Value=${NODEGROUP_NAME}}]" \
+				--tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${MASTERKUBE_NODE}},{Key=NodeGroup,Value=${NODEGROUP_NAME}},{Key=KubernetesCluster,Value=${NODEGROUP_NAME}}]" \
+                --metadata-options "HttpEndpoint=enabled,HttpTokens=optional,HttpPutResponseHopLimit=2,InstanceMetadataTags=enabled" \
 				${PUBLIC_IP_OPTIONS} \
 				${IAM_PROFILE_OPTIONS})
 
@@ -972,7 +973,8 @@ EOF
 				--network-interfaces DeviceIndex=0,NetworkInterfaceId=${NETWORK_INTERFACE_ID} \
 				--user-data "file://${TARGET_CONFIG_LOCATION}/userdata-${SUFFIX}.yaml" \
 				--block-device-mappings "file://${TARGET_CONFIG_LOCATION}/mapping-${SUFFIX}.json" \
-				--tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${MASTERKUBE_NODE}},{Key=NodeGroup,Value=${NODEGROUP_NAME}},{Key=kubernetes.io/cluster/${NODEGROUP_NAME},Value=owned},{Key=KubernetesCluster,Value=${NODEGROUP_NAME}}]" \
+				--tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${MASTERKUBE_NODE}},{Key=NodeGroup,Value=${NODEGROUP_NAME}},{Key=KubernetesCluster,Value=${NODEGROUP_NAME}}]" \
+                --metadata-options "HttpEndpoint=enabled,HttpTokens=optional,HttpPutResponseHopLimit=2,InstanceMetadataTags=enabled" \
 				${IAM_PROFILE_OPTIONS})
 
 			LAUNCHED_ID=$(echo ${LAUNCHED_INSTANCE} | jq -r '.Instances[0].InstanceId // ""')

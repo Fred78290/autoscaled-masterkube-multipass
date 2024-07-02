@@ -1513,9 +1513,15 @@ function prepare_plateform() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function get_image_uuid() {
+	get_vmuuid $1
+}
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function prepare_image() {
 	# If the VM template doesn't exists, build it from scrash
-	TARGET_IMAGE_UUID=$(get_vmuuid ${TARGET_IMAGE})
+	TARGET_IMAGE_UUID=$(get_image_uuid ${TARGET_IMAGE})
 
 	if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 		echo_title "Create ${PLATEFORM} preconfigured image ${TARGET_IMAGE}"
@@ -1542,7 +1548,12 @@ function prepare_image() {
 			--ssh-priv-key="${SSH_PRIVATE_KEY}" \
 			--user="${KUBERNETES_USER}"
 
-		TARGET_IMAGE_UUID=$(get_vmuuid ${PRIMARY_NETWORK})
+		TARGET_IMAGE_UUID=$(get_image_uuid ${TARGET_IMAGE})
+	fi
+
+	if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
+		echo_red_bold "Create image failed..."
+		exit 1
 	fi
 
 	if [ "${CREATE_IMAGE_ONLY}" = "YES" ]; then

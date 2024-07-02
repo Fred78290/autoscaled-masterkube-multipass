@@ -427,7 +427,22 @@ EOF
 
 		/sbin/iptables-save > /etc/sysconfig/iptables
 
-		wget https://raw.githubusercontent.com/awslabs/amazon-eks-ami/master/files/iptables-restore.service -O /etc/systemd/system/iptables-restore.service
+		# wget https://raw.githubusercontent.com/awslabs/amazon-eks-ami/master/files/iptables-restore.service -O /etc/systemd/system/iptables-restore.service
+
+		cat > /etc/systemd/system/iptables-restore.service <<EOF
+[Unit]
+Description=Restore iptables
+# iptables-restore must start after docker because docker will
+# reconfigure iptables to drop forwarded packets.
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c "/sbin/iptables-restore < /etc/sysconfig/iptables"
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
 		sudo systemctl daemon-reload
 		sudo systemctl enable iptables-restore

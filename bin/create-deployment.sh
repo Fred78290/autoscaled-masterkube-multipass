@@ -12,64 +12,6 @@ else
 	touch ${TARGET_CLUSTER_LOCATION}/rndc.key
 fi
 
-kubectl create configmap config-cluster-autoscaler -n kube-system --dry-run=client -o yaml \
-	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--from-file ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} \
-	--from-file ${TARGET_CONFIG_LOCATION}/provider.json \
-	--from-file ${TARGET_CONFIG_LOCATION}/machines.json \
-	--from-file ${TARGET_CONFIG_LOCATION}/autoscaler.json \
-	--from-file ${TARGET_CLUSTER_LOCATION}/rndc.key \
-	| tee ${TARGET_DEPLOY_LOCATION}/configmap/config-cluster-autoscaler.yaml \
-	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
-
-kubectl create configmap kubernetes-pki -n kube-system --dry-run=client -o yaml \
-	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-	--from-file ${TARGET_CLUSTER_LOCATION}/kubernetes/pki \
-	| tee ${TARGET_DEPLOY_LOCATION}/configmap/kubernetes-pki.yaml \
-	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
-
-if [ "${EXTERNAL_ETCD}" = "true" ]; then
-	kubectl create secret generic etcd-ssl -n kube-system --dry-run=client -o yaml \
-		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-		--from-file ${TARGET_CLUSTER_LOCATION}/etcd/ssl \
-		| tee ${TARGET_DEPLOY_LOCATION}/secrets/etcd-ssl.yaml \
-		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
-else
-	mkdir -p ${TARGET_CLUSTER_LOCATION}/kubernetes/pki/etcd
-	kubectl create secret generic etcd-ssl -n kube-system --dry-run=client -o yaml \
-		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-		--from-file ${TARGET_CLUSTER_LOCATION}/kubernetes/pki/etcd \
-		| tee ${TARGET_DEPLOY_LOCATION}/secrets/etcd-ssl.yaml \
-		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
-fi
-
-if [ ${PLATEFORM} == "multipass" ] || [ ${PLATEFORM} == "desktop" ]; then
-	kubectl create secret generic autoscaler-utility-cert -n kube-system --dry-run=client -o yaml \
-		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-		--from-file $(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientKey) \
-		--from-file $(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientCertificate) \
-		--from-file $(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .Certificate) \
-		| tee ${TARGET_DEPLOY_LOCATION}/secrets/autoscaler-utility-cert.yaml \
-		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
-else
-	kubectl create secret generic autoscaler-utility-cert -n kube-system --dry-run=client -o yaml \
-		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-		| tee ${TARGET_DEPLOY_LOCATION}/secrets/autoscaler-utility-cert.yaml \
-		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
-fi
-
-if [ "${PLATEFORM}" != "openstack" ]; then
-	# Empty configmap for autoscaler deployment
-	kubectl create configmap openstack-env -n kube-system \
-		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-		--from-literal=OS_CLOUD=
-
-	kubectl create configmap openstack-cloud-config -n kube-system \
-		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
-		--from-literal=clouds.yaml= \
-		--from-literal=cloud.conf=
-fi
-
 echo_title "Save templates into cluster"
 
 # Save template

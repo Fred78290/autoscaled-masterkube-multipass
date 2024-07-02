@@ -58,11 +58,91 @@ else
 fi
 
 function deploy {
-	echo "Create ${ETC_DIR}/$1.json"
+	echo "Create ${ETC_DIR}/$1.yaml"
+	echo "---" >> ${ETC_DIR}/autoscaler.yaml
+
 echo $(eval "cat <<EOF
 $(<${KUBERNETES_TEMPLATE}/$1.json)
-EOF") | jq . | tee ${ETC_DIR}/$1.json | kubectl apply ${DRY} --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+EOF") \
+	| yq -p=json -P \
+	| tee -a ${ETC_DIR}/autoscaler.yaml \
+	| kubectl apply ${DRY} --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 }
+
+echo "---" > ${ETC_DIR}/autoscaler.yaml
+
+kubectl create configmap config-cluster-autoscaler -n kube-system --dry-run=client -o yaml \
+	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+	--from-file ${TARGET_CONFIG_LOCATION}/${CLOUD_PROVIDER_CONFIG} \
+	--from-file ${TARGET_CONFIG_LOCATION}/provider.json \
+	--from-file ${TARGET_CONFIG_LOCATION}/machines.json \
+	--from-file ${TARGET_CONFIG_LOCATION}/autoscaler.json \
+	--from-file ${TARGET_CLUSTER_LOCATION}/rndc.key \
+	| tee -a ${ETC_DIR}/autoscaler.yaml \
+	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+
+echo "---" >> ${ETC_DIR}/autoscaler.yaml
+
+kubectl create configmap kubernetes-pki -n kube-system --dry-run=client -o yaml \
+	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+	--from-file ${TARGET_CLUSTER_LOCATION}/kubernetes/pki \
+	| tee -a ${ETC_DIR}/autoscaler.yaml \
+	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+
+echo "---" >> ${ETC_DIR}/autoscaler.yaml
+
+if [ "${EXTERNAL_ETCD}" = "true" ]; then
+	kubectl create secret generic etcd-ssl -n kube-system --dry-run=client -o yaml \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		--from-file ${TARGET_CLUSTER_LOCATION}/etcd/ssl \
+		| tee -a ${ETC_DIR}/autoscaler.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+else
+	mkdir -p ${TARGET_CLUSTER_LOCATION}/kubernetes/pki/etcd
+	kubectl create secret generic etcd-ssl -n kube-system --dry-run=client -o yaml \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		--from-file ${TARGET_CLUSTER_LOCATION}/kubernetes/pki/etcd \
+		| tee -a ${ETC_DIR}/autoscaler.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+fi
+
+echo "---" >> ${ETC_DIR}/autoscaler.yaml
+
+if [ ${PLATEFORM} == "multipass" ] || [ ${PLATEFORM} == "desktop" ]; then
+	kubectl create secret generic autoscaler-utility-cert -n kube-system --dry-run=client -o yaml \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		--from-file $(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientKey) \
+		--from-file $(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .ClientCertificate) \
+		--from-file $(echo ${AUTOSCALER_DESKTOP_UTILITY_TLS} | jq -r .Certificate) \
+		| tee -a ${ETC_DIR}/autoscaler.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+else
+	kubectl create secret generic autoscaler-utility-cert -n kube-system --dry-run=client -o yaml \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		| tee -a ${ETC_DIR}/autoscaler.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+fi
+
+if [ "${PLATEFORM}" != "openstack" ]; then
+	echo "---" >> ${ETC_DIR}/autoscaler.yaml
+	# Empty configmap for autoscaler deployment
+	kubectl create configmap openstack-env -n kube-system --dry-run=client -o yaml \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		--from-literal=OS_CLOUD= \
+		| tee -a ${ETC_DIR}/autoscaler.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+
+	echo "---" >> ${ETC_DIR}/autoscaler.yaml
+	
+	kubectl create configmap openstack-cloud-config -n kube-system --dry-run=client -o yaml\
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		--from-literal=clouds.yaml= \
+		--from-literal=cloud.conf= \
+		| tee -a ${ETC_DIR}/autoscaler.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+fi
+
+echo "---" >> ${ETC_DIR}/autoscaler.yaml
 
 deploy service-account-autoscaler
 deploy cluster-role

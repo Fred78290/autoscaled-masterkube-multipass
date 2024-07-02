@@ -156,6 +156,20 @@ EOF
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function multipass_infos() {
+	local INFOS=$(multipass info "$1" --format json 2>/dev/null)
+
+	while [ -z "${INFOS}" ]
+	do
+		sleep 1
+		INFOS=$(multipass info "$1" --format json 2>/dev/null)
+	done
+
+	echo ${INFOS}
+}
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function plateform_info_vm() {
 	local INDEX=$1
 	local PUBLIC_IP=$2
@@ -163,7 +177,7 @@ function plateform_info_vm() {
 	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
 	local MASTERKUBE_NODE_UUID=$(get_vmuuid ${MASTERKUBE_NODE})
 	local SUFFIX=$(named_index_suffix $1)
-	local IPV4=$(multipass info "${MASTERKUBE_NODE}" --format json | jq -r --arg NAME ${MASTERKUBE_NODE} '.info|.[$NAME].ipv4')
+	local IPV4=$(multipass_infos ${MASTERKUBE_NODE} | jq -r --arg NAME ${MASTERKUBE_NODE} '.info|.[$NAME].ipv4')
 	local PRIVATE_IP=$(echo ${IPV4} | jq -r '.|last')
 
 	if [ ${PUBLIC_IP} == "DHCP" ] || [ ${PUBLIC_IP} == "NONE" ]; then

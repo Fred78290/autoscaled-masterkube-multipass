@@ -184,7 +184,7 @@ function vmrest_vm_register() {
 	local VMPATH=$2
 	local BODY=$(echo '{}' | jq --arg VMNAME "${VMNAME}" --arg VMPATH "${VMPATH}" '.name = $VMNAME|.path = $VMPATH')
 
-	do_post "/api/vms/registration" "${BODY}" | jq -r '.id // "ERROR"'
+	do_post "/vm/registration" "${BODY}" | jq -r '.result.uuid // "ERROR"'
 }
 
 # Add a network adapter

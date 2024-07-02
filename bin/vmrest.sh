@@ -121,7 +121,7 @@ function vmrest_vm_register() {
 	local VMPATH=$2
 	local BODY=$(echo '{}' | jq --arg VMNAME "${VMNAME}" --arg VMPATH "${VMPATH}" '.name = $VMNAME|.path = $VMPATH')
 
-	do_post "${VMREST_URL}/api/vms/registration" "${BODY}" | jq -r '.id // ""'
+	do_post "/vm/registration" "${BODY}" | jq -r '.result.uuid // "ERROR"'
 }
 
 function vmrest_vm_create() {

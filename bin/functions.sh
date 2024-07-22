@@ -1162,11 +1162,12 @@ function prepare_environment() {
 			echo_red_bold "Single plane cluster can't be exposed to internet because because control plane require public IP or cloud network balancer or NGINX gateway in front"
 			exit
 		fi
-	elif [[ ${PLATEFORM} == "aws" || ${PLATEFORM} == "openstack" ]] && [ "${USE_NLB}" == "keepalived" ] ; then
+	elif [[ ${PLATEFORM} == "aws" || ${PLATEFORM} == "openstack" || ${PLATEFORM} == "cloudstack" ]] && [ "${USE_NLB}" == "keepalived" ] ; then
 		echo_red_bold "NLB keepalived is not supported on plateform: ${PLATEFORM}"
 		exit
-	elif [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ "${USE_NLB}" != "nginx" ] ; then
-		USE_NLB=keepalived
+	elif [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ ${PLATEFORM} != "cloudstack" ] && [ "${USE_NLB}" = "cloud" ] ; then
+		echo_red_bold "NLB cloud is not supported on plateform: ${PLATEFORM}"
+		eexit
 	fi
 
 	if [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ]; then
@@ -1322,8 +1323,37 @@ function prepare_transport() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function vm_use_floating_ip() {
+	local INDEX=$1
+	local NLB=$2
+	local RESULT=false
+
+	if [ ${HA_CLUSTER} = "true" ]; then
+		if [ ${NLB} == "none" ]; then
+			if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
+				RESULT=${EXPOSE_PUBLIC_CLUSTER}
+			elif [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
+				RESULT=${CONTROLPLANE_USE_PUBLICIP}
+			else
+				RESULT=${WORKERNODE_USE_PUBLICIP}
+			fi
+		fi
+	elif [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
+		RESULT=${EXPOSE_PUBLIC_CLUSTER}
+	elif [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
+		RESULT=${CONTROLPLANE_USE_PUBLICIP}
+	else
+		RESULT=${WORKERNODE_USE_PUBLICIP}
+	fi
+
+	echo -n ${RESULT}
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function prepare_ssh() {
-echo -n
+	:
 }
 
 #===========================================================================================================================================
@@ -1516,6 +1546,38 @@ function prepare_plateform() {
 function get_image_uuid() {
 	get_vmuuid $1
 }
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function create_image_extras_args() {
+	:
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function create_image() {
+	./bin/create-image.sh \
+		--arch="${SEED_ARCH}" \
+		--cni-version="${CNI_VERSION}" \
+		--container-runtime=${CONTAINER_ENGINE} \
+		--custom-image="${TARGET_IMAGE}" \
+		--distribution="${DISTRO}" \
+		--kube-engine=${KUBERNETES_DISTRO} \
+		--kube-version="${KUBERNETES_VERSION}" \
+		--password="${KUBERNETES_PASSWORD}" \
+		--plateform=${PLATEFORM} \
+		--primary-network="${VC_NETWORK_PRIVATE}" \
+		--seed="${SEED_IMAGE}-${SEED_ARCH}" \
+		--ssh-key="${SSH_KEY}" \
+		--ssh-priv-key="${SSH_PRIVATE_KEY}" \
+		--user="${KUBERNETES_USER}" \
+		create_image_extras_args
+
+	get_image_uuid ${TARGET_IMAGE}
+}
+
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
@@ -1526,13 +1588,7 @@ function prepare_image() {
 	if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 		echo_title "Create ${PLATEFORM} preconfigured image ${TARGET_IMAGE}"
 
-		if [ ${PLATEFORM} == "multipass" ]; then
-			PRIMARY_NETWORK="${VC_NETWORK_PUBLIC}"
-		else
-			PRIMARY_NETWORK="${VC_NETWORK_PRIVATE}"
-		fi
-
-		./bin/create-image.sh \
+		TARGET_IMAGE_UUID=$(create_image \
 			--arch="${SEED_ARCH}" \
 			--cni-version="${CNI_VERSION}" \
 			--container-runtime=${CONTAINER_ENGINE} \
@@ -1546,9 +1602,7 @@ function prepare_image() {
 			--seed="${SEED_IMAGE}-${SEED_ARCH}" \
 			--ssh-key="${SSH_KEY}" \
 			--ssh-priv-key="${SSH_PRIVATE_KEY}" \
-			--user="${KUBERNETES_USER}"
-
-		TARGET_IMAGE_UUID=$(get_image_uuid ${TARGET_IMAGE})
+			--user="${KUBERNETES_USER}")
 	fi
 
 	if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
@@ -2035,7 +2089,7 @@ function plateform_autostart_ordered() {
 function create_all_vms() {
 	local LAUNCH_IN_BACKGROUND="NO"
 
-	if [ "${PLATEFORM}" == "openstack" ] || [ "${PLATEFORM}" == "aws" ] || [ "${PLATEFORM}" == "vsphere" ]; then
+	if [ "${PLATEFORM}" == "openstack" ] || [ "${PLATEFORM}" == "aws" ] || [ "${PLATEFORM}" == "vsphere" ] || [ "${PLATEFORM}" == "cloudstack" ]; then
 		LAUNCH_IN_BACKGROUND=YES
 	fi
 
@@ -2435,10 +2489,7 @@ function create_plateform_nlb() {
 #
 #===========================================================================================================================================
 function create_plateform_nlb_member() {
-	local NAME=$1
-	local ADDR=$2
-
-	echo -n
+	:
 }
 
 #===========================================================================================================================================

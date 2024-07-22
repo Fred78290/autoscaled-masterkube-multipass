@@ -1,0 +1,5 @@
+export CLOUDSTACK_ZONE_NAME=default
+export CLOUDSTACK_POD_NAME=default
+export CLOUDSTACK_CLUSTER_NAME=default
+export CLOUDSTACK_HOST_NAME=openstack
+export CLOUDSTACK_PROJECT_NAME=demo

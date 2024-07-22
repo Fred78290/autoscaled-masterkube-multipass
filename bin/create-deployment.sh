@@ -23,6 +23,9 @@ if [ ${PLATEFORM} == "vsphere" ]; then
 elif [ ${PLATEFORM} == "openstack" ]; then
 	echo_title "Create OpenStack controller"
 	create-openstack-controller.sh
+elif [ ${PLATEFORM} == "cloudstack" ]; then
+	echo_title "Create CloudStack controller"
+	create-cloudstack-controller.sh
 elif [ ${PLATEFORM} == "aws" ]; then
 	echo_title "Create AWS controller"
 	create-aws-controller.sh
@@ -41,12 +44,12 @@ fi
 
 if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
 	# Create Pods
-	if [ ${PLATEFORM} != "aws" ]; then
-		if [ ${PLATEFORM} != "openstack" ]; then
-			echo_title "Create MetalLB"
-			create-metallb.sh
-		fi
+	if [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ ${PLATEFORM} != "cloudstack" ]; then
+		echo_title "Create MetalLB"
+		create-metallb.sh
+	fi
 
+	if [ ${PLATEFORM} != "aws" ]; then
 		echo_title "Create NFS provisionner"
 		create-nfs-provisionner.sh
 	fi

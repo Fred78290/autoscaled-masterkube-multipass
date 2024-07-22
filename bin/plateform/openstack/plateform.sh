@@ -461,31 +461,6 @@ function parse_arguments() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-function vm_use_floating_ip() {
-	local INDEX=$1
-
-	if [ ${HA_CLUSTER} = "true" ]; then
-		if [ ${USE_NLB} != "none" ]; then
-			echo -n false
-		elif [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
-			echo -n ${EXPOSE_PUBLIC_CLUSTER}
-		elif [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
-			echo -n ${CONTROLPLANE_USE_PUBLICIP}
-		else
-			echo -n ${WORKERNODE_USE_PUBLICIP}
-		fi
-	elif [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
-		echo -n ${EXPOSE_PUBLIC_CLUSTER}
-	elif [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
-		echo -n ${CONTROLPLANE_USE_PUBLICIP}
-	else
-		echo -n ${WORKERNODE_USE_PUBLICIP}
-	fi
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
 function plateform_prepare_routes() {
 	:
 }
@@ -498,13 +473,10 @@ function plateform_create_vm() {
 	local PUBLIC_IP=$2
 	local NODE_IP=$3
 	local SECURITY_GROUP=$(get_security_group ${INDEX})
-	local FLOATING_IP=$(vm_use_floating_ip ${INDEX})
+	local FLOATING_IP=$(vm_use_floating_ip ${INDEX} ${USE_NLB})
 	local MACHINE_TYPE=
 	local MASTERKUBE_NODE=
 	local VMHOST=
-	local DISK_SIZE=
-	local NUM_VCPUS=
-	local MEMSIZE=
 	local NIC_OPTIONS=
 
 	MACHINE_TYPE=$(get_machine_type ${INDEX})
@@ -526,8 +498,8 @@ growpart:
   ignore_growroot_disabled: false
 EOF
 
-if [ -f "${TARGET_CONFIG_LOCATION}/credential.yaml" ]; then
-		cat >> ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
+		if [ -f "${TARGET_CONFIG_LOCATION}/credential.yaml" ]; then
+			cat >> ${TARGET_CONFIG_LOCATION}/userdata-${INDEX}.yaml <<EOF
 write_files:
 - encoding: gzip+base64
   content: $(cat ${TARGET_CONFIG_LOCATION}/credential.yaml | gzip -c9 | base64 -w 0)
@@ -537,7 +509,7 @@ write_files:
 runcmd:
 - hostnamectl set-hostname ${MASTERKUBE_NODE}
 EOF
-fi
+		fi
 
 		echo_line
 		echo_blue_bold "Launch ${MASTERKUBE_NODE} index: ${INDEX} with ${TARGET_IMAGE} and flavor=${MACHINE_TYPE} TARGET_IMAGE=${TARGET_IMAGE} MASTERKUBE_NODE=${MASTERKUBE_NODE}"
@@ -603,7 +575,7 @@ function plateform_info_vm() {
 	local INDEX=$1
 	local PUBLIC_IP=$2
 	local NODE_IP=$3
-	local FLOATING_IP=$(vm_use_floating_ip ${INDEX})
+	local FLOATING_IP=$(vm_use_floating_ip ${INDEX} ${USE_NLB})
 	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
 	local MASTERKUBE_NODE_UUID=$(get_vmuuid ${MASTERKUBE_NODE})
 	local SUFFIX=$(named_index_suffix $1)
@@ -717,6 +689,7 @@ function get_vmuuid() {
     
 	openstack server show -f json "${VMNAME}" 2>/dev/null| jq -r '.id // ""'
 }
+
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
@@ -725,6 +698,7 @@ function get_image_uuid() {
 
 	openstack image list --all -f json | jq -r --arg TARGET_IMAGE ${TARGET_IMAGE} '.[]|select(.Name == $TARGET_IMAGE)|.ID//""'
 }
+
 #===========================================================================================================================================
 #
 #===========================================================================================================================================

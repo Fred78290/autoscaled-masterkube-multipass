@@ -1,0 +1,39 @@
+{
+	"api-url": "${CLOUDSTACK_API_URL}",
+	"api-key": "${CLOUDSTACK_API_KEY}",
+	"secret-key": "${CLOUDSTACK_SECRET_KEY}",
+	"ssl-no-verify": true,
+	"ssh-key-name": "${SSH_KEYNAME}",
+	"project-id": "${CLOUDSTACK_PROJECT_ID}",
+	"zone-id": "${CLOUDSTACK_ZONE_ID}",
+	"pod-id": "${CLOUDSTACK_POD_ID}",
+	"cluster-id": "${CLOUDSTACK_CLUSTER_ID}",
+	"host-id": "${CLOUDSTACK_HOST_ID}",
+	"vpc-id": "${CLOUDSTACK_VPC_ID}",
+	"hypervisor": "${CLOUDSTACK_HYPERVISOR}",
+	"template": "${TARGET_IMAGE_UUID}",
+	"timeout": 300,
+	"use-bind9": ${USE_BIND9_SERVER},
+	"bind9-host": "${BIND9_HOST}:${BIND9_PORT}",
+	"rndc-key-file": "/etc/cluster/rndc.key",
+	"network": {
+		"security-group": {
+			"control-plane": "${EXTERNAL_SECURITY_GROUP}",
+			"worker-node": "${INTERNAL_SECURITY_GROUP}"
+		},
+		"public-control-plane": ${CONTROLPLANE_USE_PUBLICIP},
+		"public-worker-node": ${WORKERNODE_USE_PUBLICIP},
+		"domain": "${PRIVATE_DOMAIN_NAME}",
+		"interfaces": [
+			{
+				"enabled": true,
+				"primary": true,
+				"network": "${VC_NETWORK_PRIVATE}",
+				"nic": "eth0",
+				"dhcp": ${SCALEDNODES_DHCP},
+				"address": "${FIRST_WORKER_NODE_IP}",
+				"netmask": "${PRIVATE_NETMASK}"
+			}
+		]
+	}
+}

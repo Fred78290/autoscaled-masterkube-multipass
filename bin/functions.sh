@@ -2981,8 +2981,14 @@ EOF") | jq . | tee /dev/stderr > ${TARGET_CONFIG_LOCATION}/provider.json
 
 	echo_title "Create ${TARGET_CONFIG_LOCATION}/autoscaler.json"
 
+	if [ ${USE_ETC_HOSTS} == "true" ]; then
+		export RUNCMD="echo '${PRIVATE_ADDR_IPS[0]:=${PRIVATE_ADDR_IPS[1]}} ${MASTERKUBE} ${MASTERKUBE}.${DOMAIN_NAME}' >> /etc/hosts"
+	else
+		export RUNCMD=""
+	fi
+
 	echo $(eval "cat <<EOF
 	$(<${PWD}/templates/setup/${PLATEFORM}/autoscaler.json)
-EOF") | jq --argjson IMAGE_CREDENTIALS "${IMAGE_CREDENTIALS}" '. += $IMAGE_CREDENTIALS' | tee /dev/stderr > ${TARGET_CONFIG_LOCATION}/autoscaler.json
+EOF") | jq --argjson RUNCMD "[ \"${RUNCMD}\" ]" --argjson IMAGE_CREDENTIALS "${IMAGE_CREDENTIALS}" '."cloud-init".runcmd += $RUNCMD | . += $IMAGE_CREDENTIALS' | tee /dev/stderr > ${TARGET_CONFIG_LOCATION}/autoscaler.json
 }
 

@@ -64,7 +64,6 @@
 			]
 		},
 		"runcmd": [
-			"(${USE_ETC_HOSTS}) && echo '${PRIVATE_ADDR_IPS[0]} ${MASTERKUBE} ${MASTERKUBE}.${DOMAIN_NAME}' >> /etc/hosts"
 		]
 	},
 	"ssh-infos": {

@@ -776,7 +776,7 @@ function prepare_plateform() {
 	local NUM_VCPUS=
 	local DISK_SIZE=
 
-	for SECURITY_GROUP in ${INTERNAL_SECURITY_GROUP} ${INTERNAL_SECURITY_GROUP}
+	for SECURITY_GROUP in ${EXTERNAL_SECURITY_GROUP} ${INTERNAL_SECURITY_GROUP}
 	do
 		SECURITY_GROUP_ID=$(openstack security group show -f json ${SECURITY_GROUP} 2>/dev/null | jq -r '.id')
 

@@ -63,9 +63,6 @@ if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
 	echo_title "Create Kubernetes dashboard"
 	create-dashboard.sh
 
-	echo_title "Create Kubernetes metric scraper"
-	create-metrics.sh
-
 	echo_title "Create Rancher"
 	create-rancher.sh
 

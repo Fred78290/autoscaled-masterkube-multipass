@@ -331,7 +331,7 @@ EOF
 		echo "Install Containerd"
 		echo "==============================================================================================================================="
 
-		curl -sL https://github.com/containerd/containerd/releases/download/v1.7.11/cri-containerd-cni-1.7.11-linux-${ARCH}.tar.gz | tar -C / -xz
+		curl -sL https://github.com/containerd/containerd/releases/download/v1.7.20/cri-containerd-cni-1.7.20-linux-${ARCH}.tar.gz | tar -C / -xz
 
 		mkdir -p /etc/containerd
 		containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/g' | tee /etc/containerd/config.toml
@@ -339,7 +339,7 @@ EOF
 		systemctl enable containerd.service
 		systemctl restart containerd
 
-		curl -sL https://github.com/containerd/nerdctl/releases/download/v1.7.2/nerdctl-1.7.2-linux-${ARCH}.tar.gz | tar -C /usr/local/bin -xz
+		curl -sL https://github.com/containerd/nerdctl/releases/download/v1.7.6/nerdctl-1.7.6-linux-${ARCH}.tar.gz | tar -C /usr/local/bin -xz
 
 	else
 
@@ -499,7 +499,7 @@ EOF
 		AWS_CNI_URL=https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.18.2/config/master/aws-k8s-cni.yaml
 		pull_image ${AWS_CNI_URL} AWS ${ECR_PASSWORD}
 	elif [ "${CNI_PLUGIN}" = "calico" ]; then
-		curl -s -O -L "https://github.com/projectcalico/calico/releases/download/v3.27.0/calicoctl-linux-${ARCH}"
+		curl -s -O -L "https://github.com/projectcalico/calico/releases/download/v3.28.0/calicoctl-linux-${ARCH}"
 		chmod +x calicoctl-linux-${ARCH}
 		mv calicoctl-linux-${ARCH} /usr/local/bin/calicoctl
 		pull_image https://docs.projectcalico.org/manifests/calico-vxlan.yaml
@@ -508,7 +508,7 @@ EOF
 	elif [ "${CNI_PLUGIN}" = "weave" ]; then
 		pull_image "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 	elif [ "${CNI_PLUGIN}" = "canal" ]; then
-		pull_image https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/canal.yaml
+		pull_image https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/canal.yaml
 	elif [ "${CNI_PLUGIN}" = "kube" ]; then
 		pull_image https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
 		pull_image https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter-all-features.yaml

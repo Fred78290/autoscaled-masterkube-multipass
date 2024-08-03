@@ -1154,39 +1154,42 @@ function prepare_environment() {
 		fi
 	fi
 
-	if [ ${HA_CLUSTER} = "false" ]; then
-		if [ "${USE_NLB}" == "keepalived" ]; then
-			echo_red_bold "Single plane cluster can't used keepalived as loadbalancer"
-			exit
-		elif [ "${USE_NLB}" != "nginx" ] && [ "${USE_NLB}" != "none" ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "false" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
-			echo_red_bold "Single plane cluster can't be exposed to internet because because control plane require public IP or cloud network balancer or NGINX gateway in front"
-			exit
-		fi
-	elif [[ ${PLATEFORM} == "aws" || ${PLATEFORM} == "openstack" || ${PLATEFORM} == "cloudstack" ]] && [ "${USE_NLB}" == "keepalived" ] ; then
-		echo_red_bold "NLB keepalived is not supported on plateform: ${PLATEFORM}"
-		exit
-	elif [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ ${PLATEFORM} != "cloudstack" ] && [ "${USE_NLB}" = "cloud" ] ; then
+	if [ "${USE_NLB}" = "cloud" ] && [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ ${PLATEFORM} != "cloudstack" ]; then
 		echo_red_bold "NLB cloud is not supported on plateform: ${PLATEFORM}"
-		eexit
-	fi
-
-	if [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ]; then
-		PREFER_SSH_PUBLICIP=NO
-
-		if [ "${USE_NLB}" = "nginx" ] || [ "${USE_NLB}" = "cloud" ] || [ "${EXPOSE_PUBLIC_CLUSTER}" = "false" ]; then
-			echo_red_bold "Control plane can not have public IP because nginx gatewaway or NLB is required or cluster is not exposed to internet"
-			exit 1
-		fi
-
-	elif [ "${WORKERNODE_USE_PUBLICIP}" = "true" ]; then
-		echo_red_bold "Worker node can not have a public IP when control plane does not have public IP"
 		exit 1
 	fi
 
-	if [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ] || [ ${WORKERNODE_USE_PUBLICIP} == "true" ]; then
-		if [ "${VC_NETWORK_PUBLIC}" == "NONE" ] || [ -z "${VC_NETWORK_PUBLIC}" ]; then
-			echo_red_bold "nodes with floating-ip require public network"
+	if [ "${USE_NLB}" = "keepalived" ] && [[ ${PLATEFORM} == "aws" || ${PLATEFORM} == "openstack" || ${PLATEFORM} == "cloudstack" ]]; then
+		echo_red_bold "NLB keepalived is not supported on plateform: ${PLATEFORM}"
+		exit 1
+	fi
+
+	if [ "${USE_NLB}" == "none" ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "false" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
+		echo_red_bold "Cluster can't be exposed to public because control plane must be exposed to public or cloud network balancer or NGINX gateway in front"
+		exit 1
+	fi
+
+	if [ "${HA_CLUSTER}" == "false" ] && [ "${USE_NLB}" == "keepalived" ]; then
+		echo_red_bold "Single plane cluster can't used keepalived as loadbalancer"
+		exit 1
+	fi
+
+	if [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ]; then
+		if [ "${EXPOSE_PUBLIC_CLUSTER}" = "false" ]; then
+			echo_red_bold "Control plane can not be exposed to public because cluster is not exposed to public"
 			exit 1
+		fi
+	elif [ "${WORKERNODE_USE_PUBLICIP}" = "true" ]; then
+		echo_red_bold "Worker node can not be exposed to public when control plane is not exposed to public"
+		exit 1
+	fi
+
+	if [ ${PLATEFORM} != "cloudstack" ]; then
+		if [ ${USE_NLB} == "nginx" ] || [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ] || [ ${WORKERNODE_USE_PUBLICIP} == "true" ]; then
+			if [ "${VC_NETWORK_PUBLIC}" == "NONE" ] || [ -z "${VC_NETWORK_PUBLIC}" ]; then
+				echo_red_bold "nodes exposed to public require public network"
+				exit 1
+			fi
 		fi
 	fi
 
@@ -1341,7 +1344,9 @@ function vm_use_floating_ip() {
 	elif [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
 		RESULT=${EXPOSE_PUBLIC_CLUSTER}
 	elif [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
-		RESULT=${CONTROLPLANE_USE_PUBLICIP}
+		if [ ${NLB} == "none" ]; then
+			RESULT=${CONTROLPLANE_USE_PUBLICIP}
+		fi
 	else
 		RESULT=${WORKERNODE_USE_PUBLICIP}
 	fi
@@ -2513,22 +2518,30 @@ function create_nlb_member() {
 #
 #===========================================================================================================================================
 function create_load_balancer() {
-	if [ "${USE_NLB}" == "none" ]; then
-		create_dns_entries
-	elif [ "${USE_NLB}" = "nginx" ]; then
-		create_nginx_gateway
-	elif [ "${HA_CLUSTER}" = "true" ]; then
-		if [ ${USE_NLB} = "keepalived" ]; then
-			create_keepalived
-		elif [ "${USE_NLB}" = "cloud" ]; then
-			create_plateform_nlb
-		fi
-	fi
-
 	if [ "${VERBOSE}" == "YES" ]; then
 		echo_red_bold "PRIVATE_ADDR_IPS=${PRIVATE_ADDR_IPS[@]@K}"
 		echo_red_bold "PUBLIC_ADDR_IPS=${PUBLIC_ADDR_IPS[@]@K}"
 		echo_red_bold "PRIVATE_DNS_NAMES=${PRIVATE_DNS_NAMES[@]@K}"
+	fi
+
+	case ${USE_NLB} in
+		none)
+			create_dns_entries
+			;;
+		nginx)
+			create_nginx_gateway
+			;;
+		keepalived)
+			create_keepalived
+			;;
+		cloud)
+			create_plateform_nlb
+			;;
+	esac
+
+	if [ "${VERBOSE}" == "YES" ]; then
+		echo_red_bold "CONTROL_PLANE_ENDPOINT=${CONTROL_PLANE_ENDPOINT}"
+		echo_red_bold "LOAD_BALANCER_IP=${LOAD_BALANCER_IP}"
 	fi
 }
 
@@ -2670,32 +2683,30 @@ function create_etcd() {
 	local IPADDR=
 	local SUFFIX=
 
-	if [ "${HA_CLUSTER}" = "true" ]; then
-		if [ "${EXTERNAL_ETCD}" = "true" ]; then
-			echo_title "Created etcd cluster: ${CLUSTER_NODES}"
+	if [ "${HA_CLUSTER}" = "true" ] && [ "${EXTERNAL_ETCD}" = "true" ]; then
+		echo_title "Created etcd cluster: ${CLUSTER_NODES}"
 
-			prepare-etcd.sh --node-group=${NODEGROUP_NAME} \
-				--cluster-nodes="${CLUSTER_NODES}" \
-				--target-location="${TARGET_CLUSTER_LOCATION}" ${SILENT}
+		prepare-etcd.sh --node-group=${NODEGROUP_NAME} \
+			--cluster-nodes="${CLUSTER_NODES}" \
+			--target-location="${TARGET_CLUSTER_LOCATION}" ${SILENT}
 
-			for INDEX in $(seq 1 ${CONTROLNODES})
-			do
-	            INDEX=$((${INDEX} + ${CONTROLNODE_INDEX} - 1))
-				SUFFIX=$(named_index_suffix ${INDEX})
-				IPADDR=$(get_ssh_ip ${INDEX})
+		for INDEX in $(seq 1 ${CONTROLNODES})
+		do
+			INDEX=$((${INDEX} + ${CONTROLNODE_INDEX} - 1))
+			SUFFIX=$(named_index_suffix ${INDEX})
+			IPADDR=$(get_ssh_ip ${INDEX})
 
-				if [ ! -f ${TARGET_CONFIG_LOCATION}/etdc-${SUFFIX}-prepared ]; then
-					echo_title "Start etcd node: ${IPADDR}"
-					eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/etcd ${KUBERNETES_USER}@${IPADDR}:~/etcd ${SILENT}
-					eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh \
-						--user=${KUBERNETES_USER} \
-						--cluster-nodes="${CLUSTER_NODES}" \
-						--node-index="${INDEX}" ${SILENT}
+			if [ ! -f ${TARGET_CONFIG_LOCATION}/etdc-${SUFFIX}-prepared ]; then
+				echo_title "Start etcd node: ${IPADDR}"
+				eval scp ${SCP_OPTIONS} ${TARGET_CLUSTER_LOCATION}/etcd ${KUBERNETES_USER}@${IPADDR}:~/etcd ${SILENT}
+				eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh \
+					--user=${KUBERNETES_USER} \
+					--cluster-nodes="${CLUSTER_NODES}" \
+					--node-index="${INDEX}" ${SILENT}
 
-					touch ${TARGET_CONFIG_LOCATION}/etdc-${SUFFIX}-prepared
-				fi
-			done
-		fi
+				touch ${TARGET_CONFIG_LOCATION}/etdc-${SUFFIX}-prepared
+			fi
+		done
 	fi
 
 	cat >> ${TARGET_CONFIG_LOCATION}/buildenv <<EOF

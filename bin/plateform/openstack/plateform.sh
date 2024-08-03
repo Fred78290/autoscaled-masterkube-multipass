@@ -842,17 +842,15 @@ function prepare_dns() {
 function get_security_group() {
 	local INDEX=$1
 	local SG=${INTERNAL_SECURITY_GROUP}
-
-	if [ "${HA_CLUSTER}" == "true" ]; then
-		if [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ] && [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
-			SG=${EXTERNAL_SECURITY_GROUP}
-		elif [ "${WORKERNODE_USE_PUBLICIP}" == "true" ] && [ ${INDEX} -ge ${WORKERNODE_INDEX} ]; then
-			SG=${EXTERNAL_SECURITY_GROUP}
-		elif [ ${INDEX} -lt ${CONTROLNODE_INDEX} ] && [ "${USE_NLB}" == "nginx" ]; then
+	
+	if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
+		if [ "${EXPOSE_PUBLIC_CLUSTER}" == "true" ]; then
 			SG=${EXTERNAL_SECURITY_GROUP}
 		fi
-	elif [ ${INDEX} -eq 0 ]; then
-		if [ "${USE_NLB}" == "nginx" ] || [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ]; then
+	elif [ "${USE_NLB}" == "none" ]; then
+		if [ ${INDEX} -lt ${WORKERNODE_INDEX} ] && [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ]; then
+			SG=${EXTERNAL_SECURITY_GROUP}
+		elif [ ${INDEX} -ge ${WORKERNODE_INDEX} ] && [ "${WORKERNODE_USE_PUBLICIP}" == "true" ]; then
 			SG=${EXTERNAL_SECURITY_GROUP}
 		fi
 	fi

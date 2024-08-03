@@ -1197,10 +1197,10 @@ function prepare_environment() {
 	fi
 
 	if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT},9345"
+		LOAD_BALANCER_PORT="${EXPOSE_PUBLIC_PORTS},${APISERVER_ADVERTISE_PORT},9345"
 		EXTERNAL_ETCD=false
 	else
-		LOAD_BALANCER_PORT="80,443,${APISERVER_ADVERTISE_PORT}"
+		LOAD_BALANCER_PORT="${EXPOSE_PUBLIC_PORTS},${APISERVER_ADVERTISE_PORT}"
 	fi
 
 	if [ "${USE_NLB}" != "none" ]; then
@@ -2221,7 +2221,7 @@ function create_nameserver() {
 #
 #===========================================================================================================================================
 function create_nginx_gateway() {
-	local PUBLIC_NLB_DNS=
+	local PUBLIC_NLB_DNS=${PUBLIC_ADDR_IPS[${FIRSTNODE}]}
 
 	for INDEX in $(seq ${FIRSTNODE} $((CONTROLNODE_INDEX - 1)) )
 	do
@@ -2230,6 +2230,11 @@ function create_nginx_gateway() {
 		local PUBLICIP=${PUBLIC_ADDR_IPS[${INDEX}]}
 		local SUFFIX=$(named_index_suffix ${INDEX})
 		local SSHADDR=$(get_ssh_ip ${INDEX})
+		local LISTEN=${IPADDR}
+
+		if [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ]; then
+			LISTEN="0.0.0.0"
+		fi
 
 		if [ ${INDEX} -eq ${FIRSTNODE} ]; then
 			LOAD_BALANCER_IP="${IPADDR}"
@@ -2247,16 +2252,16 @@ function create_nginx_gateway() {
 			echo_blue_bold "Start load balancer ${MASTERKUBE_NODE} instance ${INDEX} with IP: ${IPADDR}"
 
 			eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${SSHADDR} sudo install-load-balancer.sh \
-				--listen-port=${LOAD_BALANCER_PORT} \
 				--cluster-nodes="${CLUSTER_NODES}" \
 				--control-plane-endpoint=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME} \
-				--listen-ip=0.0.0.0 ${SILENT}
+				--listen-port=${LOAD_BALANCER_PORT} \
+				--listen-ip=${LISTEN} ${SILENT}
 
 			touch ${TARGET_CONFIG_LOCATION}/node-${SUFFIX}-prepared
 		fi
 	done
 
-	register_nlb_dns A "${LOAD_BALANCER_IP}" "${PUBLIC_IP}" ""
+	register_nlb_dns A "${LOAD_BALANCER_IP}" "${PUBLIC_NLB_DNS}" ""
 
 	echo_red_bold LOAD_BALANCER_IP=$LOAD_BALANCER_IP
 }

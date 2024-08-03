@@ -83,11 +83,10 @@ EOF
 mkdir -p /etc/nginx/tcpconf.d
 
 function create_tcp_stream() {
-	local STREAM_NAME=$1
-	local TCP_PORT=$2
-	local NGINX_CONF=$3
-
-	TCP_PORT=$(echo -n ${TCP_PORT} | tr ',' ' ')
+	local STREAM_NAME="$1"
+	local LISTEN_ADDR="$2"
+	local TCP_PORT="$3"
+	local NGINX_CONF="$4"
 
 	touch ${NGINX_CONF}
 
@@ -108,13 +107,25 @@ function create_tcp_stream() {
 		echo "  }" >> ${NGINX_CONF}
 
 		echo "  server {" >> ${NGINX_CONF}
-		echo "    listen ${PRIVATE_IP}:${PORT};" >> ${NGINX_CONF}
+		echo "    listen ${LISTEN_ADDR}:${PORT};" >> ${NGINX_CONF}
 		echo "    proxy_pass ${STREAM_NAME}_${PORT};" >> ${NGINX_CONF}
 		echo "  }" >> ${NGINX_CONF}
 	done
 }
 
-create_tcp_stream tcp_lb ${LOAD_BALANCER_PORT} /etc/nginx/tcpconf.d/listen.conf
+# Remove 80 & 443 port"
+IFS=, read -a PORTS <<< "${LOAD_BALANCER_PORT}"
+LOAD_BALANCER_PORT=()
+
+for PORT in ${PORTS[@]}
+do
+	if [ ${PORT} -ne "80" ] && [ ${PORT} -ne "443" ]; then
+		LOAD_BALANCER_PORT+=(${PORT})
+	fi
+done
+
+create_tcp_stream tcp_public_lb "0.0.0.0" "80 443" /etc/nginx/tcpconf.d/listen.conf
+create_tcp_stream tcp_private_lb "${PRIVATE_IP}" "${LOAD_BALANCER_PORT[@]}" /etc/nginx/tcpconf.d/listen.conf
 
 apt install --fix-broken
 
@@ -123,3 +134,36 @@ systemctl restart nginx
 if [ -f /etc/systemd/system/kubelet.service ]; then
 	systemctl disable kubelet
 fi
+
+cat > /etc/sysctl.d/99-nginx.conf <<EOF
+net.ipv4.ip_forward=0
+net.ipv6.conf.all.forwarding=0
+
+###################################################################
+# Additional settings - these settings can improve the network
+# security of the host and prevent against some network attacks
+# including spoofing attacks and man in the middle attacks through
+# redirection. Some network environments, however, require that these
+# settings are disabled so review and enable them as needed.
+#
+# Do not accept ICMP redirects (prevent MITM attacks)
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv6.conf.all.accept_redirects = 0
+# _or_
+# Accept ICMP redirects only for gateways listed in our default
+# gateway list (enabled by default)
+net.ipv4.conf.all.secure_redirects = 1
+#
+# Do not send ICMP redirects (we are not a router)
+net.ipv4.conf.all.send_redirects = 0
+#
+# Do not accept IP source route packets (we are not a router)
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv6.conf.all.accept_source_route = 0
+#
+# Log Martian Packets
+#net.ipv4.conf.all.log_martians = 1
+#
+EOF
+
+sysctl --load=/etc/sysctl.d/99-nginx.conf

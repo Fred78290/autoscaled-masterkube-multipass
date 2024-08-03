@@ -48,8 +48,8 @@ function usage() {
 --internet-facing                              # Expose the cluster on internet, default ${EXPOSE_PUBLIC_CLUSTER}--public-subnet-id=<subnetid,...>                # Specify the public subnet ID for created VM, default ${VPC_PUBLIC_SUBNET_ID}
 
   # Flags to expose nodes in public AZ with public IP
---control-plane-public                         # Control plane are hosted in public subnet with public IP, default ${CONTROLPLANE_USE_PUBLICIP}
---worker-node-public                           # Worker nodes are hosted in public subnet with public IP, default ${WORKERNODE_USE_PUBLICIP}
+--control-plane-public                         # Control plane are exposed to public, default ${CONTROLPLANE_USE_PUBLICIP}
+--worker-node-public                           # Worker nodes are exposed to public, default ${WORKERNODE_USE_PUBLICIP}
 
 EOF
 }
@@ -893,8 +893,12 @@ function not_create_plateform_nlb_member() {
 
 	create_member_in_nlb "nlb-internal-${MASTERKUBE}" "${LOAD_BALANCER_PORT}" ${NAME} ${ADDR}
 
-	if [ ${EXPOSE_PUBLIC_CLUSTER} = "true" ]; then
-		create_member_in_nlb "nlb-external-${MASTERKUBE}" "80,443" ${NAME} ${ADDR}
+	if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
+		if [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ]; then
+			create_member_in_nlb "nlb-external-${MASTERKUBE}" "${LOAD_BALANCER_PORT}" ${NAME} ${ADDR}
+		else
+			create_member_in_nlb "nlb-external-${MASTERKUBE}" "${EXPOSE_PUBLIC_PORTS}" ${NAME} ${ADDR}
+		fi
 	fi
 }
 
@@ -1011,7 +1015,11 @@ function create_plateform_nlb() {
 	if [ ${EXPOSE_PUBLIC_CLUSTER} = "true" ]; then
 		echo_title "Create external NLB ${MASTERKUBE} with target: ${NLB_TARGETS} at: ${PUBLIC_VIP_ADDRESS}"
 
-		create_nlb "nlb-external-${MASTERKUBE}" true "80,443" network "${NLB_TARGETS}" "${PUBLIC_VIP_ADDRESS}" "YES"
+		if [ ${CONTROLPLANE_USE_PUBLICIP} == "true" ]; then
+			create_nlb "nlb-external-${MASTERKUBE}" true "${LOAD_BALANCER_PORT}" network "${NLB_TARGETS}" "${PUBLIC_VIP_ADDRESS}" "YES"
+		else
+			create_nlb "nlb-external-${MASTERKUBE}" true "${EXPOSE_PUBLIC_PORTS}" network "${NLB_TARGETS}" "${PUBLIC_VIP_ADDRESS}" "YES"
+		fi
 
 		LOAD_BALANCER=$(openstack loadbalancer show -f json nlb-external-${MASTERKUBE} 2>/dev/null)
 		PUBLIC_NLB_DNS=$(openstack floating ip list --fixed-ip-address ${PUBLIC_VIP_ADDRESS} -f json | jq -r '.[0]."Floating IP Address"')

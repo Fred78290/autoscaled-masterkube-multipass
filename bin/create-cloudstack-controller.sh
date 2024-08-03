@@ -5,24 +5,6 @@ mkdir -p ${ETC_DIR}
 
 KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | awk -F. '{ print $2 }')
 
-case ${KUBERNETES_MINOR_RELEASE} in
-		26)
-				AWS_CONTROLLER_VERSION=v1.26.0
-				;;
-		27)
-				AWS_CONTROLLER_VERSION=v1.27.1
-				;;
-		28)
-				AWS_CONTROLLER_VERSION=v1.28.1
-				;;
-		29)
-				AWS_CONTROLLER_VERSION=v1.29.2
-				;;
-		30)
-				AWS_CONTROLLER_VERSION=v1.30.0
-				;;
-esac
-
 cat > ${ETC_DIR}/cloud-config <<EOF
 [Global]
 api-url = ${CLOUDSTACK_API_URL}

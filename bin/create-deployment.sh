@@ -44,7 +44,7 @@ fi
 
 if [ "${DEPLOY_COMPONENTS}" == "YES" ]; then
 	# Create Pods
-	if [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ ${PLATEFORM} != "cloudstack" ]; then
+	if [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ ${PLATEFORM} != "cloudstack" ] && [ ${USE_NLB} != "keepalived" ]; then
 		echo_title "Create MetalLB"
 		create-metallb.sh
 	fi

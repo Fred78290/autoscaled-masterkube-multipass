@@ -6,10 +6,11 @@ set -e
 # This step is done by importing https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-amd64.img
 # This VM will be used to create the kubernetes template VM 
 
-PRIMARY_NETWORK_NAME="private"
+PRIMARY_NETWORK_NAME="default"
 TARGET_IMAGE=
-FLAVOR_IMAGE=ds2G
+FLAVOR_IMAGE=tiny
 SECURITY_GROUP=default
+CLOUDSTACK_TEMPLATE_TYPE=user
 
 OPTIONS=(
 	"arch:"
@@ -41,6 +42,7 @@ OPTIONS=(
 	"cloudstack-api-key:"
 	"cloudstack-api-secret:"
 	"cloudstack-keypair:"
+	"cloudstack-template-type:"
 )
 
 PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
@@ -146,6 +148,10 @@ while true ; do
 			SSH_KEYNAME=$2
 			shift 2;;
 
+		--cloudstack-template-type)
+			CLOUDSTACK_TEMPLATE_TYPE=$2
+			shift 2;;
+
 		--) shift ; break ;;
 		*) echo_red_bold "$1 - Internal error!" ; exit 1 ;;
 	esac
@@ -161,27 +167,28 @@ function cloudmonkey() {
 	local OUTPUT=
 
 	# Drop empty argument
-	for ARG in ${$@}
+	for ARG in $@
 	do
 		if [[ ${ARG} =~ "=" ]]; then
 			IFS== read ARG VALUE <<<"${ARG}"
 
 			if [ -n "${VALUE}" ]; then
-				ARGS+=("${ARG}=${VALUE}")
+				ARGS+=(${ARG}="'${VALUE}'")
 			fi
 		else
 			ARGS+=(${ARG})
 		fi
 	done
 
-	OUTPUT=$(cmk -o json ${ARGS[@]} || echo '{}')
+	OUTPUT=$(eval "cmk -o json ${ARGS[@]} || echo '{}'")
 
 	if [ -z "${OUTPUT}" ]; then
 		OUTPUT='{}'
 	fi
 
 	if [ "${VERBOSE}" == "YES" ]; then
-		echo ${OUTPUT} > /dev/stderr
+		echo_blue_bold "cmk -o json ${ARGS[@]}" > /dev/stderr
+		jq -r . <<<"${OUTPUT}" > /dev/stderr
 	fi
 
 	echo -n "${OUTPUT}"
@@ -201,7 +208,8 @@ fi
 
 TARGET_IMAGE_ID=$(cloudmonkey list templates \
 	name=${TARGET_IMAGE} \
-	templatefilter=community \
+	templatefilter=self \
+	templatetype=${CLOUDSTACK_TEMPLATE_TYPE} \
 	projectid=${CLOUDSTACK_PROJECT_ID} \
 	hypervisor=${CLOUDSTACK_HYPERVISOR} | jq -r '.template[0].id//""')
 
@@ -219,40 +227,53 @@ UBUNTU_VERSION=$(echo ${SHASUM256} | cut -d '-' -f 2)
 
 SEED_IMAGE_ID=$(cloudmonkey list templates \
 	name=${SEED_IMAGE} \
-	templatefilter=community \
+	templatefilter=self \
+	templatetype=${CLOUDSTACK_TEMPLATE_TYPE} \
 	projectid=${CLOUDSTACK_PROJECT_ID} \
 	hypervisor=${CLOUDSTACK_HYPERVISOR} | jq -r '.template[0].id//""')
 
-OSCATEGORYID=$(cloudmonkey list oscategories name=ubuntu | jq -r 'oscategory[0].id//""')
+OSCATEGORYID=$(cloudmonkey list oscategories name=ubuntu | jq -r '.oscategory[0].id//""')
 OSTYPEID=$(cloudmonkey list ostypes filter=id,name oscategoryid=${OSCATEGORYID} | jq --arg NAME "Ubuntu ${UBUNTU_VERSION}" -r '.ostype[] | select(.name | startswith($NAME)) | .id//""')
 
 if [ -z "${OSTYPEID}" ]; then
-	OSTYPEID=$(cloudmonkey list ostypes filter=id,name oscategoryid=${OSCATEGORYID} description="Ubuntu 22.04 LTS" | jq -r '.ostype[0].id//""')
+	OSTYPEID=$(cloudmonkey list ostypes filter=id,name oscategoryid=${OSCATEGORYID} | jq --arg NAME "Ubuntu 22.04 LTS" -r '.ostype[] | select(.name | startswith($NAME)) | .id//""')
 fi
 
 if [ -z "${SEED_IMAGE_ID}" ]; then
-	[ -f ${CACHE}/${SEED_IMAGE}.img ] || curl -Ls ${SEED_IMAGE_URL} -o ${CACHE}/${SEED_IMAGE}.img
+	echo_blue_bold "Import Url ${SEED_IMAGE_URL} to image named: ${SEED_IMAGE}"
 
-	echo_blue_bold "Import file ${CACHE}/${SEED_IMAGE}.img to image named: ${SEED_IMAGE}"
-
-    SEED_IMAGE_ID=$(cloudmonkey register template \
+	SEED_IMAGE_REGISTED=$(cloudmonkey register template \
 		name="${SEED_IMAGE}" \
 		displaytext="${SEED_IMAGE}" \
-		isextractable=${extractable} \
+		isextractable=false \
 		isfeatured=false \
 		ispublic=false \
 		passwordenabled=false \
+		templatetype=${CLOUDSTACK_TEMPLATE_TYPE} \
 		projectid=${CLOUDSTACK_PROJECT_ID} \
 		zoneid=${CLOUDSTACK_ZONE_ID} \
 		ostypeid=${OSTYPEID} \
 		format=QCOW2 \
 		hypervisor=${CLOUDSTACK_HYPERVISOR} \
-		url="${SEED_IMAGE_URL}" | jq -r '.id//""')
+		url="${SEED_IMAGE_URL}")
+
+    SEED_IMAGE_ID=$(jq -r '.template[0].id//""' <<< "${SEED_IMAGE_REGISTED}")
 
 	if [ -z "${SEED_IMAGE_ID}" ]; then
 		echo_red_bold "Import failed"
 		exit 1
 	fi
+
+	echo_blue_dot_title "Wait for template ${TARGET_IMAGE}, id: ${SEED_IMAGE_ID} to be ready"
+
+	while [ "$(jq -r '.template[0].isready' <<< "${SEED_IMAGE_REGISTED}")" == "false" ];
+	do
+		sleep 5
+		echo_blue_dot
+		SEED_IMAGE_REGISTED=$(cloudmonkey list templates id=${SEED_IMAGE_ID} templatefilter=self projectid=${CLOUDSTACK_PROJECT_ID})
+	done
+
+	echo $(jq -r '.template[0].isready' <<< "${SEED_IMAGE_REGISTED}")
 fi
 
 
@@ -297,27 +318,27 @@ CLOUDSTACK_BUILDER=$(cat <<EOF
 	"type": "cloudstack",
 	"api_key": "${CLOUDSTACK_API_KEY}",
 	"api_url": "${CLOUDSTACK_API_URL}",
+	"secret_key": "${CLOUDSTACK_SECRET_KEY}",
 	"network": "${CLOUDSTACK_NETWORK_ID}",
-	"secret_key": "${CLOUDSTACK_API_URL}",
 	"source_template": "${SEED_IMAGE_ID}",
 	"service_offering": "${FLAVOR_IMAGE}",
 	"ssh_username": "packer",
 	"ssh_password": "packerpassword",
 	"ssh_handshake_attempts": 10,
 	"ssl_no_verify": true,
-	"template_os": "${OSTYPEID},
+	"template_os": "${OSTYPEID}",
 	"zone": "${CLOUDSTACK_ZONE_ID}",
 	"expunge": true,
 	"communicator": "ssh",
 	"ssh_timeout": "20m",
+	"disk_size": 10,
 	"template_name": "${TARGET_IMAGE}",
 	"template_public": false,
 	"template_display_text": "${TARGET_IMAGE}",
 	"template_featured": false,
 	"template_password_enabled": false,
-	"expunge": true,
 	"hypervisor": "${CLOUDSTACK_HYPERVISOR}",
-	"keypair": "${SSH_KEYNAME}",
+	"ssh_keypair_name": "${SSH_KEYNAME}",
 	"project": "${CLOUDSTACK_PROJECT_ID}",
 	"template_requires_hvm": true,
 	"use_local_ip_address": true,

@@ -1591,7 +1591,7 @@ function prepare_image() {
 	if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then
 		echo_title "Create ${PLATEFORM} preconfigured image ${TARGET_IMAGE}"
 
-		TARGET_IMAGE_UUID=$(create_image \
+		create_image \
 			--arch="${SEED_ARCH}" \
 			--cni-version="${CNI_VERSION}" \
 			--container-runtime=${CONTAINER_ENGINE} \
@@ -1605,7 +1605,9 @@ function prepare_image() {
 			--seed="${SEED_IMAGE}-${SEED_ARCH}" \
 			--ssh-key="${SSH_KEY}" \
 			--ssh-priv-key="${SSH_PRIVATE_KEY}" \
-			--user="${KUBERNETES_USER}")
+			--user="${KUBERNETES_USER}"
+
+		TARGET_IMAGE_UUID=$(get_image_uuid ${TARGET_IMAGE})
 	fi
 
 	if [ -z "${TARGET_IMAGE_UUID}" ] || [ "${TARGET_IMAGE_UUID}" == "ERROR" ]; then

@@ -2015,8 +2015,8 @@ function prepare_networking() {
 		PRIVATE_DNS_NAMES[0]=""
 		PUBLIC_ADDR_IPS[0]=${PUBLIC_NODE_IP}
 
-		NODE_IP=$(nextip ${NODE_IP})
-		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
+		NODE_IP=$(nextip ${NODE_IP} false)
+		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP} true)
 	fi
 }
 
@@ -2029,8 +2029,8 @@ function create_extras_ip() {
 	for INDEX in 1 2
 	do
 		NODE_INDEX=$(($LASTNODE_INDEX + ${INDEX}))
-		NODE_IP=$(nextip ${NODE_IP})
-		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
+		NODE_IP=$(nextip ${NODE_IP} false)
+		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP} true)
 
 		PRIVATE_ADDR_IPS[${NODE_INDEX}]=${NODE_IP}
 		PUBLIC_ADDR_IPS[${NODE_INDEX}]=${PUBLIC_NODE_IP}
@@ -2111,8 +2111,8 @@ function create_all_vms() {
 			create_extras_ip ${INDEX}
 		fi
 
-		NODE_IP=$(nextip ${NODE_IP})
-		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
+		NODE_IP=$(nextip ${NODE_IP} false)
+		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP} true)
 	done
 
 	wait_jobs_finish

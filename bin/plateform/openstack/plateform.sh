@@ -738,7 +738,7 @@ function prepare_ssh() {
 function prepare_plateform() {
 	if [ ${USE_NLB} = "cloud" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
 		PUBLIC_VIP_ADDRESS="${NODE_IP}"
-		NODE_IP=$(nextip ${NODE_IP})
+		NODE_IP=$(nextip ${NODE_IP} false)
 	fi
 
 	prepare_node_indexes

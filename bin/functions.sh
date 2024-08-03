@@ -1645,7 +1645,7 @@ function prepare_cert() {
 	fi
 
 	if [ -z "${DOMAIN_NAME}" ]; then
-		echo_red_bold "Public domaine is not defined, unable to create auto signed cert, exit"
+		echo_red_bold "Public domain is not defined, unable to create auto signed cert, exit"
 		exit 1
 	fi
 

@@ -1,3 +1,4 @@
 # Mandatory
 VC_NETWORK_PRIVATE="private"
 VC_NETWORK_PUBLIC="public"
+PRIVATE_NET_INF=ens3

@@ -2007,7 +2007,6 @@ function prepare_networking() {
 	else
 		IFS=/ read PUBLIC_NODE_IP PUBLIC_MASK_CIDR <<< "${PUBLIC_IP}"
 		PUBLIC_NETMASK=$(cidr_to_netmask ${PUBLIC_MASK_CIDR})
-		VC_NETWORK_PUBLIC_NIC="eth0:1"
 	fi
 
 	# No external elb, use keep alived

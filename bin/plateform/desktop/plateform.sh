@@ -98,7 +98,7 @@ function plateform_create_vm() {
 			"network": {
 				"version": 2,
 				"ethernets": {
-					"eth0": {
+					"${PRIVATE_NET_INF}": {
 						"addresses": [
 							"${NODE_IP}/${PRIVATE_MASK_CIDR}"
 						],
@@ -115,7 +115,8 @@ EOF
 )
 
 		if [ ${#NETWORK_PRIVATE_ROUTES[@]} -gt 0 ]; then
-			NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PRIVATE_ROUTES_DEFS}" '.network.ethernets.eth0.routes = $ROUTES')
+#			NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --arg PRIVATE_NET_INF "${PRIVATE_NET_INF}" --argjson ROUTES "${PRIVATE_ROUTES_DEFS}" '.network.ethernets.[$PRIVATE_NET_INF].routes = $ROUTES')
+			NETWORK_DEFS=$(jq --argjson JSONPATH "[\"network\", \"ethernets\", \"$PRIVATE_NET_INF\", \"routes\"]" --argjson ROUTES "${PRIVATE_ROUTES_DEFS}" 'setpath($JSONPATH; $ROUTES)' <<< "${NETWORK_DEFS}")
 		fi
 
 		if [ ${PUBLIC_IP} != "NONE" ]; then

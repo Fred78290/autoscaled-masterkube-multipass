@@ -42,7 +42,7 @@
 				"primary": false,
 				"exists": true,
 				"network": "${VC_NETWORK_PUBLIC}",
-				"nic": "${VC_NETWORK_PUBLIC_NIC}",
+				"nic": "${PUBLIC_NET_INF}",
 				"type": "nat",
 				"dhcp": true,
 				"address": "${PUBLIC_NODE_IP}",

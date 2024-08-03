@@ -29,7 +29,7 @@
 				"enabled": true,
 				"primary": true,
 				"network": "${VC_NETWORK_PRIVATE}",
-				"nic": "eth0",
+				"nic": "${PRIVATE_NET_INF}",
 				"dhcp": ${SCALEDNODES_DHCP},
 				"address": "${FIRST_WORKER_NODE_IP}",
 				"netmask": "${PRIVATE_NETMASK}"

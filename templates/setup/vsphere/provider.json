@@ -37,7 +37,7 @@
 				"network": "${VC_NETWORK_PRIVATE}",
 				"adapter": "vmxnet3",
 				"mac-address": "generate",
-				"nic": "eth0",
+				"nic": "${PRIVATE_NET_INF}",
 				"dhcp": ${SCALEDNODES_DHCP},
 				"use-dhcp-routes": ${USE_DHCP_ROUTES_PRIVATE},
 				"address": "${FIRST_WORKER_NODE_IP}",
@@ -51,7 +51,7 @@
 				"network": "${VC_NETWORK_PUBLIC}",
 				"adapter": "vmxnet3",
 				"mac-address": "generate",
-				"nic": "eth1",
+				"nic": "${PUBLIC_NET_INF}",
 				"dhcp": true,
 				"use-dhcp-routes": ${USE_DHCP_ROUTES_PUBLIC},
 				"routes": ${PUBLIC_ROUTES_DEFS}

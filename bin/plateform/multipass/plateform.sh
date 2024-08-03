@@ -1,5 +1,6 @@
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl kubernetes-desktop-autoscaler-utility packer qemu-img"
 PRIVATE_NET_INF=eth1 # eth0 is multipass interface
+PUBLIC_NET_INF="eth0:1"
 CLOUD_PROVIDER=
 PRIVATE_GATEWAY_METRIC=250
 
@@ -92,11 +93,13 @@ EOF
 
 		if [ ${PUBLIC_IP} != "DHCP" ] && [ ${PUBLIC_IP} != "NONE" ]; then
 			NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
+				--arg PRIVATE_NET_INF "${PRIVATE_NET_INF}"
 				--arg NODE_IP "${PUBLIC_IP}/${PUBLIC_MASK_CIDR}" \
-				'.|.network.ethernets += { "eth0": { "dhcp4": true, "addresses": [{ ($NODE_IP): { "label": "eth0:1" } }]}}')
+				'.|.network.ethernets += { $PRIVATE_NET_INF: { "dhcp4": true, "addresses": [{ ($NODE_IP): { "label": "eth0:1" } }]}}')
 
 			if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
-				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PUBLIC_ROUTES_DEFS}" '.network.ethernets.eth0.routes = $ROUTES')
+#				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --arg PRIVATE_NET_INF ${PRIVATE_NET_INF} --argjson ROUTES "${PUBLIC_ROUTES_DEFS}" '.network.ethernets.[$PRIVATE_NET_INF].routes = $ROUTES')
+				NETWORK_DEFS=$(jq --argjson JSONPATH "[\"network\", \"ethernets\", \"$PRIVATE_NET_INF\", \"routes\"]" --argjson ROUTES "${PUBLIC_ROUTES_DEFS}" 'setpath($JSONPATH; $ROUTES)' <<< "${NETWORK_DEFS}")
 			fi
 		fi
 

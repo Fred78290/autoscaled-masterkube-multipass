@@ -2,6 +2,10 @@
 
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl cmk packer"
 
+export PRIVATE_GATEWAY=
+export PRIVATE_IP=
+export PRIVATE_MASK_CIDR=
+
 export CLOUDSTACK_API_URL=
 export CLOUDSTACK_API_KEY=
 export CLOUDSTACK_SECRET_KEY=
@@ -10,6 +14,8 @@ export CLOUDSTACK_POD_NAME=default
 export CLOUDSTACK_CLUSTER_NAME=default
 export CLOUDSTACK_HOST_NAME=default
 export CLOUDSTACK_PROJECT_NAME=default
+export CLOUDSTACK_TEMPLATE_TYPE=user
+export CLOUDSTACK_TRACE_CMK=NO
 
 export CLOUDSTACK_ZONE_ID=
 export CLOUDSTACK_POD_ID=
@@ -45,6 +51,7 @@ function usage() {
 --cloudstack-cluster-name=<value>              # The cloudstack cluster name, default ${CLOUDSTACK_CLUSTER_NAME}
 --cloudstack-host-name=<value>                 # The cloudstack host name, default ${CLOUDSTACK_HOST_NAME}
 --cloudstack-project-name=<value>              # The cloudstack project name, default ${CLOUDSTACK_PROJECT_NAME}
+--cloudstack-template-type=<value>             # The cloudstack template type, default ${CLOUDSTACK_TEMPLATE_TYPE}
 
   # Flags to configure nfs client provisionner
 --nfs-server-adress=<value>                    # The NFS server address, default ${NFS_SERVER_ADDRESS}
@@ -73,8 +80,8 @@ function usage() {
 --internet-facing                              # Expose the cluster on internet, default ${EXPOSE_PUBLIC_CLUSTER}--public-subnet-id=<subnetid,...>                # Specify the public subnet ID for created VM, default ${VPC_PUBLIC_SUBNET_ID}
 
   # Flags to expose nodes in public AZ with public IP
---control-plane-public                         # Control plane are hosted in public subnet with public IP, default ${CONTROLPLANE_USE_PUBLICIP}
---worker-node-public                           # Worker nodes are hosted in public subnet with public IP, default ${WORKERNODE_USE_PUBLICIP}
+--control-plane-public                         # Control plane are exposed to public, default ${CONTROLPLANE_USE_PUBLICIP}
+--worker-node-public                           # Worker nodes are exposed to public, default ${WORKERNODE_USE_PUBLICIP}
 
 EOF
 }
@@ -110,6 +117,8 @@ function parse_arguments() {
 		"cloudstack-cluster-name:"
 		"cloudstack-host-name:"
 		"cloudstack-project-name:"
+		"cloudstack-template-type:"
+		"cloudstack-trace"
 	)
 
 	PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
@@ -448,7 +457,12 @@ function parse_arguments() {
 			CLOUDSTACK_PROJECT_NAME="$2"
 			shift 2
 			;;
-
+		--cloudstack-template-type)
+			CLOUDSTACK_TEMPLATE_TYPE=$2
+			shift 2;;
+		--cloudstack-trace)
+			CLOUDSTACK_TRACE_CMK=YES
+			shift;;
 		--nfs-server-adress)
 			NFS_SERVER_ADDRESS="$2"
 			shift 2
@@ -516,11 +530,7 @@ function parse_arguments() {
 		esac
 	done
 
-	CLOUDSTACK_NETWORK_ID=$(get_network_id ${VC_NETWORK_PRIVATE})
-	CLOUDSTACK_VPC_ID=($(get_vpc_id ${CLOUDSTACK_NETWORK_ID}))
-
-	VPC_PUBLIC_SUBNET_IDS=()
-	VPC_PRIVATE_SUBNET_IDS=(${CLOUDSTACK_NETWORK_ID})
+	parsed_arguments
 }
 
 #===========================================================================================================================================
@@ -533,27 +543,33 @@ function cloudmonkey() {
 	local OUTPUT=
 
 	# Drop empty argument
-	for ARG in ${$@}
+	for ARG in $@
 	do
 		if [[ ${ARG} =~ "=" ]]; then
 			IFS== read ARG VALUE <<<"${ARG}"
 
 			if [ -n "${VALUE}" ]; then
-				ARGS+=("${ARG}=${VALUE}")
+				ARGS+=(${ARG}="'${VALUE}'")
 			fi
 		else
 			ARGS+=(${ARG})
 		fi
 	done
 
-	OUTPUT=$(cmk -o json ${ARGS[@]} || echo '{}')
+	OUTPUT=$(eval "cmk -o json ${ARGS[@]}")
 
 	if [ -z "${OUTPUT}" ]; then
 		OUTPUT='{}'
 	fi
 
-	if [ "${VERBOSE}" == "YES" ]; then
-		echo ${OUTPUT} > /dev/stderr
+	if [ -n "$(grep 'Error: (HTTP' <<< "${OUTPUT}")" ]; then
+		echo_red_bold "${OUTPUT}" > /dev/stderr
+		OUTPUT='{}'
+	fi
+
+	if [ "${CLOUDSTACK_TRACE_CMK}" == "YES" ]; then
+		echo_blue_bold "cmk -o json ${ARGS[@]}" > /dev/stderr
+		jq -r . <<<"${OUTPUT}" > /dev/stderr
 	fi
 
 	echo -n "${OUTPUT}"
@@ -576,6 +592,7 @@ function create_image_extras_args() {
 		"--cloudstack-project-id=${CLOUDSTACK_PROJECT_ID}"
 		"--cloudstack-network-id=${CLOUDSTACK_NETWORK_ID}"
 		"--cloudstack-vpc-id=${CLOUDSTACK_VPC_ID}"
+		"--cloudstack-template-type=${CLOUDSTACK_TEMPLATE_TYPE}"
 	)
 
 	echo -n ${EXTRAS[@]}
@@ -591,13 +608,25 @@ set secretkey ${CLOUDSTACK_SECRET_KEY}
 sync
 EOF
 
+	CLOUDSTACK_NETWORK_ID=$(get_network_id ${VC_NETWORK_PRIVATE})
+
+	if [ -z "${CLOUDSTACK_NETWORK_ID}" ]; then
+		echo_red_bold "Unable to find network id for network named: ${VC_NETWORK_PRIVATE}"
+		exit 1
+	fi
+	
+	CLOUDSTACK_VPC_ID=($(get_vpc_id ${CLOUDSTACK_NETWORK_ID}))
+
+	VPC_PUBLIC_SUBNET_IDS=()
+	VPC_PRIVATE_SUBNET_IDS=(${CLOUDSTACK_NETWORK_ID})
+
 	CLOUDSTACK_ZONE_ID=$(cloudmonkey list zones name=${CLOUDSTACK_ZONE_NAME} | jq -r '.zone[0].id//""')
 	if [ -z "${CLOUDSTACK_ZONE_ID}" ]; then
 		echo_red_bold "Zone: ${CLOUDSTACK_ZONE_NAME} not found, exit"
 		exit 1
 	fi
 
-	CLOUDSTACK_POD_ID=$(cloudmonkey list pods name=${CLOUDSTACK_POD_NAME} zoneid=${CLOUDSTACK_ZONE_ID} | jq -r '.pod[0].zoneid//""')
+	CLOUDSTACK_POD_ID=$(cloudmonkey list pods name=${CLOUDSTACK_POD_NAME} zoneid=${CLOUDSTACK_ZONE_ID} | jq -r '.pod[0].id//""')
 	if [ -z "${CLOUDSTACK_POD_ID}" ]; then
 		echo_red_bold "Pod: ${CLOUDSTACK_POD_NAME} not found, exit"
 		exit 1
@@ -627,6 +656,15 @@ EOF
 		exit 1
 	fi
 
+	if [ -z "${PRIVATE_IP}" ]; then
+		local NETWORK_DEFS=$(cloudmonkey list networks projectid=${CLOUDSTACK_PROJECT_ID} id=${CLOUDSTACK_NETWORK_ID})
+
+		PRIVATE_GATEWAY=$(jq -r '.network[0].gateway' <<< "${NETWORK_DEFS}")
+		CIDR=$(jq -r '.network[0].cidr' <<< "${NETWORK_DEFS}")
+		IFS=/ read PRIVATE_IP PRIVATE_MASK_CIDR <<< "${CIDR}"
+		PRIVATE_IP="${PRIVATE_IP%.*}.10"
+		PRIVATE_DNS=$(jq -r '.network[0].dns1' <<< "${NETWORK_DEFS}")
+	fi
 }
 
 #===========================================================================================================================================
@@ -639,11 +677,38 @@ function plateform_prepare_routes() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function get_security_group() {
+	local INDEX=$1
+	local SG=
+
+	if [ -z "${CLOUDSTACK_VPC_ID}" ]; then
+		SG=${INTERNAL_SECURITY_GROUP}
+
+		if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
+			if [ "${EXPOSE_PUBLIC_CLUSTER}" == "true" ]; then
+				SG=${EXTERNAL_SECURITY_GROUP}
+			fi
+		elif [ "${USE_NLB}" == "none" ]; then
+			if [ ${INDEX} -lt ${WORKERNODE_INDEX} ] && [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ]; then
+				SG=${EXTERNAL_SECURITY_GROUP}
+			elif [ ${INDEX} -ge ${WORKERNODE_INDEX} ] && [ "${WORKERNODE_USE_PUBLICIP}" == "true" ]; then
+				SG=${EXTERNAL_SECURITY_GROUP}
+			fi
+		fi
+	fi
+
+	echo -n "${SG}"
+}
+
+#===========================================================================================================================================
+#s
+#===========================================================================================================================================
 function plateform_create_vm() {
 	local INDEX=$1
 	local PUBLIC_IP=$2
 	local NODE_IP=$3
 	local FLOATING_IP=$(vm_use_floating_ip ${INDEX} ${CLOUDSTACK_EXTERNAL_NLB})
+	local SECURITY_GROUP=$(get_security_group ${INDEX})
 	local MACHINE_TYPE=$(get_machine_type ${INDEX})
 	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
 	local MASTERKUBE_NODE_UUID=$(get_vmuuid ${MASTERKUBE_NODE})
@@ -688,6 +753,7 @@ EOF
 			name=${MASTERKUBE_NODE} \
 			displayname=${MASTERKUBE_NODE} \
 			ipaddress=${IPADDRESS} \
+			securitygroupids=${SECURITY_GROUP} \
 			hypervisor=${CLOUDSTACK_HYPERVISOR} \
 			templateid=${TARGET_IMAGE_UUID} \
 			networkids=${CLOUDSTACK_NETWORK_ID} \
@@ -699,18 +765,26 @@ EOF
 			podid=${CLOUDSTACK_POD_ID} \
 			zoneid=${CLOUDSTACK_ZONE_ID})
 
+		INSTANCE_ID=$(jq -r '.virtualmachine.id//""' <<< ${INSTANCE})
+
+		if [ -z "${INSTANCE_ID}" ]; then
+			jq . <<< "${INSTANCE}"
+			echo_red_bold "Unable to create instance:${MASTERKUBE_NODE}"
+			return 1
+		fi
+
 		if [ ${FLOATING_IP} == "true" ]; then
 			if [ ${PUBLIC_IP} == "DHCP" ] || [ ${PUBLIC_IP} == NONE ]; then
 				PUBLIC_IP=
-			then
+			fi
 
-			IPADDRESS=$(cloudmonkey associate ipaddress ipaddress=${PUBLIC_IP} projectid=${CLOUDSTACK_PROJECT_ID} vpcid=${CLOUDSTACK_VPC_ID} networkid=${CLOUDSTACK_NETWORK_ID})
+			IPADDRESS=$(cloudmonkey associate ipaddress ipaddress=${PUBLIC_IP} virtualmachineid=${INSTANCE_ID} projectid=${CLOUDSTACK_PROJECT_ID} vpcid=${CLOUDSTACK_VPC_ID} networkid=${CLOUDSTACK_NETWORK_ID})
 			PUBLIC_IP=$(echo ${IPADDRESS} | jq -r '.ipaddress//""')
 
-			eval cloudmonkey enable staticnat \
+			SUCCESS=$(cloudmonkey enable staticnat \
 				ipaddressid=$(echo ${PUBLIC_IP} | jq -r '.id//""') \
-				virtualmachineid=$(echo ${INSTANCE} | jq -r '.id//""') \
-				networkid=${CLOUDSTACK_NETWORK_ID} ${SILENT}
+				virtualmachineid=${INSTANCE_ID}  \
+				networkid=${CLOUDSTACK_NETWORK_ID})
 		fi
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
@@ -777,18 +851,21 @@ function delete_vm_by_name() {
 		zoneid=${CLOUDSTACK_ZONE_ID} \
 		podid=${CLOUDSTACK_POD_ID} \
 		clusterid=${CLOUDSTACK_CLUSTER_ID} \
-		hypervisor=${CLOUDSTACK_HYPERVISOR} | jq '.virtualmachine')
+		hypervisor=${CLOUDSTACK_HYPERVISOR} | jq '.virtualmachine|first')
     local VMUUID=$(jq -r '.id//""' <<< "${INSTANCE}")
 
 	if [ -n "${VMUUID}" ]; then
+        echo_blue_bold "Delete VM: ${VMNAME}"
+		PUBLICIP=$(jq -r '.publicip//""' <<< "${INSTANCE}")
 		PUBLICIPID=$(jq -r '.publicipid//""' <<< "${INSTANCE}")
 
 		if [ -n "${PUBLICIPID}" ]; then
+			echo_blue_bold "Delete public ip: ${PUBLICIP}, id: ${PUBLICIPID}"
 			SUCCESS=$(cloudmonkey disassociate ipaddress id=${PUBLICIPID} | jq -r '.success//"false"')
 		fi
 
 		SUCCESS=$(cloudmonkey destroy virtualmachine expunge=true id=${VMUUID})
-	if
+	fi
 }
 
 #===========================================================================================================================================
@@ -796,11 +873,20 @@ function delete_vm_by_name() {
 #===========================================================================================================================================
 function delete_internal_loadbalancer() {
 	local NAME=$1
-	local LOAD_BALANCERS=$(cloudmonkey list loadbalancers networkid=${CLOUDSTACK_NETWORK_ID} projectid=${CLOUDSTACK_PROJECT_ID})
-	local PUBLICIPID=$(jq --arg NAME ${NAME} -r '.loadbalancer[]|select(.name | startswith($NAME)) | .id' <<< "${LOAD_BALANCERS}")
+	local LOADBALANCERS=$(cloudmonkey list loadbalancers networkid=${CLOUDSTACK_NETWORK_ID} projectid=${CLOUDSTACK_PROJECT_ID} tags[0].key=cluster tags[0].value=${NAME})
+	local NLBID=
+	local NLB_NAME=
+	local SUCCESS=
 
-	if [ -n "${PUBLICIPID}" ]; then
-		SUCCESS=$(cloudmonkey disassociate ipaddress id=${PUBLICIPID} | jq -r '.success//"false"')
+	if [ $(jq -r '.count//0' <<< "${LOAD_BALANCERS}") -gt 0 ]; then
+		for NLBID in $(jq -r '.loadbalancer[]|.id//""' <<< "${LOADBALANCERS}")
+		do
+			NLB_NAME=$(jq -r --arg ID ${NLBID} '.loadbalancer[]|select(.id == $ID)|.name//""' <<< "${LOADBALANCERS}")
+
+			SUCCESS=$(cloudmonkey delete loadbalancer id=${NLBID} | jq -r '.success//"false"')
+
+			echo_blue_bold "Delete internal loadbalancer: ${NLB_NAME}, ID: ${NLBID}, success: ${SUCCESS}"
+		done
 	fi
 }
 
@@ -809,24 +895,45 @@ function delete_internal_loadbalancer() {
 #===========================================================================================================================================
 function delete_public_loadbalancer() {
 	local NAME=$1
-	local LOAD_BALANCERS=$(cloudmonkey list loadbalancerrules networkid=${CLOUDSTACK_NETWORK_ID} projectid=${CLOUDSTACK_PROJECT_ID})
-	local NLB_IDS=$(jq --arg NAME http -r '.loadbalancer[]|select(.name | startswith($NAME))|.id' <<< "${LOAD_BALANCERS}")
+	local LOAD_BALANCERS=$(cloudmonkey list loadbalancerrules networkid=${CLOUDSTACK_NETWORK_ID} projectid=${CLOUDSTACK_PROJECT_ID} tags[0].key=cluster tags[0].value=${NAME})
+	local SUCCESS=
+	local PUBLIC_ADDR_IPS=
+	local PUBLIC_ADDR_IP=
+	local NLB_NAME=
 
-	for NLB_ID in $NLB_IDS
-	do
-		SUCCESS=$(cloudmonkey delete loadbalancer id=${NLB_ID} | jq -r '.success//"false"')
-	done
+	if [ $(jq -r '.count//0' <<< "${LOAD_BALANCERS}") -gt 0 ]; then
+		local NLB_IDS=$(jq -r '.loadbalancerrule[]|.id' <<< "${LOAD_BALANCERS}")
+
+		for NLB_ID in $NLB_IDS
+		do
+			local NLB_NAME=$(jq -r --arg ID ${NLB_ID} '.loadbalancerrule[]|select(.id == $ID)|.name//""' <<< "${LOAD_BALANCERS}")
+
+			SUCCESS=$(cloudmonkey delete loadbalancerrule id=${NLB_ID} | jq -r '.success//"false"')
+
+			echo_blue_bold "Delete public loadbalancer rule: ${NLB_NAME}, ID: ${NLB_ID}, success: ${SUCCESS}"
+		done
+	fi
+
+	PUBLIC_ADDR_IPS=$(cloudmonkey list publicipaddresses projectid=${CLOUDSTACK_PROJECT_ID} tags[0].key=cluster tags[0].value=${NAME})
+	
+	if [ $(jq -r '.count//0' <<< "${PUBLIC_ADDR_IPS}") -gt 0 ]; then
+		for PUBLIC_ADDR_IP in $(jq -r '.publicipaddress[]|.ipaddress//""' <<< "${PUBLIC_ADDR_IPS}")
+		do
+			SUCCESS=$(cloudmonkey disassociate ipaddress ipaddress=${PUBLIC_ADDR_IP} | jq -r '.success//"false"')
+			echo_blue_bold "Delete public ipaddress: ${PUBLIC_ADDR_IP}, success: ${SUCCESS}"
+		done
+	fi
 }
 
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
 function delete_load_balancers() {
-	if [ ${CLOUDSTACK_INTERNAL_NLB} == "cloud "]; then
+	if [ "${CLOUDSTACK_INTERNAL_NLB}" == "cloud" ]; then
 		delete_internal_loadbalancer "nlb-${MASTERKUBE}"
 	fi
 
-	if [ ${CLOUDSTACK_EXTERNAL_NLB} == "cloud "]; then
+	if [ "${CLOUDSTACK_EXTERNAL_NLB}" == "cloud" ]; then
 		delete_public_loadbalancer "nlb-${MASTERKUBE}"
 	fi
 }
@@ -890,7 +997,7 @@ function get_image_uuid() {
 
 	cloudmonkey list templates \
 		name=${TARGET_IMAGE} \
-		templatefilter=community \
+		templatefilter=self \
 		projectid=${CLOUDSTACK_PROJECT_ID} \
 		hypervisor=${CLOUDSTACK_HYPERVISOR} | jq -r '.template[0].id//""'
 }
@@ -951,23 +1058,26 @@ function get_vpc_id() {
 		zoneid=${CLOUDSTACK_ZONE_ID} \
 		podid=${CLOUDSTACK_POD_ID} \
 		clusterid=${CLOUDSTACK_CLUSTER_ID} \
-		| jq -r --arg NAME "${NAME}" '.network[0].vpcid//""'
+		| jq -r '.network[0].vpcid//""'
 }
 
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
 function prepare_ssh() {
-	KEYEXISTS=$(cloudmonkey list sshkeypairs projectid=${CLOUDSTACK_PROJECT_ID} name="${SSH_KEYNAME}" | jq -r '.sshkeypair[0].id // ""')
+	FINGER_PRINT="$(ssh-keygen -l -E md5 -f ${SSH_PUBLIC_KEY} | cut -d ' ' -f 2 | sed 's/MD5://')"
+	SSHKEY=$(cloudmonkey list sshkeypairs projectid=${CLOUDSTACK_PROJECT_ID} fingerprint=${FINGER_PRINT})
+	KEYEXISTS=$(jq -r '.sshkeypair[0].id // ""' <<<"${SSHKEY}")
 
 	if [ -z ${KEYEXISTS} ]; then
 		echo_blue_bold "SSH Public key doesn't exist"
 		eval cloudmonkey register sshkeypair \
 			name=${SSH_KEYNAME} \
 			projectid=${CLOUDSTACK_PROJECT_ID} \
-			publickey=${SSH_PUBLIC_KEY} ${SILENT}
+			publickey="$(cat ${SSH_PUBLIC_KEY})" ${SILENT}
 	else
-		echo_blue_bold "SSH Public key already exists"
+		SSH_KEYNAME=$(jq -r '.sshkeypair[0].name // ""' <<<"${SSHKEY}")
+		echo_blue_bold "SSH Public keypair already exists with fingerprint=${FINGER_PRINT} and name=${SSH_KEYNAME}"
 	fi
 }
 
@@ -1032,6 +1142,10 @@ function determine_used_loadbalancers() {
 					CLOUDSTACK_INTERNAL_NLB=cloud
 					;;
 				"Public")
+					if [ "${EXPOSE_PUBLIC_CLUSTER}" == "false" ]; then
+						echo_red_bold "The selected network: ${CLOUDSTACK_NETWORK_ID} allow to create public loadbalancer but the cluster is not exposed to public"
+						exit 1
+					fi
 					CLOUDSTACK_EXTERNAL_NLB=cloud
 					;;
 			esac
@@ -1082,6 +1196,21 @@ function prepare_plateform() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function check_ip_public_free() {
+	local IP=$1
+
+	ID=$(cloudmonkey list publicipaddresses state=free ipaddress=${IP} | jq -r '.publicipaddress[0].id')
+
+	if [ -z "${ID}" ]; then
+		IP=$(nextip ${IP} true)
+	fi
+
+	echo -n "${IP}"
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function prepare_networking() {
 	prepare_routes
 
@@ -1101,17 +1230,17 @@ function prepare_networking() {
 		PRIVATE_ADDR_IPS[0]="${NODE_IP}"
 		PRIVATE_DNS_NAMES[0]=""
 		PUBLIC_ADDR_IPS[0]=${PUBLIC_NODE_IP}
+		PRIVATE_VIP_ADDRESS=${NODE_IP}
 
-		NODE_IP=$(nextip ${NODE_IP})
-		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
+		NODE_IP=$(nextip ${NODE_IP} false)
+		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP} true)
 
 		if [ ${CLOUDSTACK_EXTERNAL_NLB} != "none" ]; then
 			PUBLIC_VIP_ADDRESS=${PUBLIC_NODE_IP}
-			PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
+			PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP} true)
 
 			if [ ${CLOUDSTACK_EXTERNAL_NLB} == "nginx" ]; then
-				PRIVATE_VIP_ADDRESS=${NODE_IP}
-				NODE_IP=$(nextip ${NODE_IP})
+				NODE_IP=$(nextip ${NODE_IP} false)
 			fi
 		fi
 
@@ -1121,8 +1250,8 @@ function prepare_networking() {
 		PUBLIC_ADDR_IPS[0]=${PUBLIC_NODE_IP}
 		PRIVATE_VIP_ADDRESS="${NODE_IP}"
 
-		NODE_IP=$(nextip ${NODE_IP})
-		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP})
+		NODE_IP=$(nextip ${NODE_IP} false)
+		PUBLIC_NODE_IP=$(nextip ${PUBLIC_NODE_IP} true)
 	fi
 }
 
@@ -1132,7 +1261,8 @@ function prepare_networking() {
 function create_internal_loadbalancer() {
 	local NLB_NAME=$1
 	local NLB_PORTS=$2
-	local NLB_VIP_ADDRESS=$3
+	local NLB_INSTANCEIDS=$3
+	local NLB_VIP_ADDRESS=$4
 	local NLB_PORT=
 	local NLB_ID=
 	local INSTANCE_ID=
@@ -1152,26 +1282,15 @@ function create_internal_loadbalancer() {
 			sourceipaddressnetworkid=${CLOUDSTACK_NETWORK_ID} \
 			scheme=internal \
 			algorithm=roundrobin \
-			| jq -r '.id//""')
+			| jq -r '.loadbalancer.id//""')
 
 		if [ -z "${NLB_ID}" ]; then
 			echo_red_bold "Unable to create internal loadbalancer: ${NLB_NAME}-${NLB_PORT}"
 			exit 1
 		fi
 
-		for INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES} - 1)))
-		do
-			SUFFIX=$(named_index_suffix $1)
-			INSTANCE_ID=$(jq -r '.InstanceId//""' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
-
-			if [ -z "${INSTANCE_IDS}" ]; then
-				INSTANCE_IDS="${INSTANCE_ID}"
-			else
-				INSTANCE_IDS="${INSTANCE_IDS},${INSTANCE_ID}"
-			fi
-		fi
-
-		eval assign toloadbalancerrule id=${NLB_ID} virtualmachineids=${INSTANCE_IDS} ${SILENT}
+		SUCCESS=$(cloudmonkey create tags resourceids=${NLB_ID} tags[0].key=cluster tags[0].value=${NLB_NAME} resourcetype=loadbalancer)
+		SUCCESS=$(cloudmonkey assign toloadbalancerrule id=${NLB_ID} virtualmachineids=${NLB_INSTANCEIDS})
 	done
 }
 
@@ -1181,38 +1300,52 @@ function create_internal_loadbalancer() {
 function create_public_loadbalancer() {
 	local NLB_NAME=$1
 	local NLB_PORTS=$2
-	local NLB_VIP_ADDRESS=$3
+	local NLB_INSTANCEIDS=$3
+	local NLB_VIP_ADDRESS=$4
 	local NLB_PORT=
 	local NLB_ID=
-	local INSTANCE_ID=
-	local INSTANCE_IDS=
-	local SUFFIX=
+	local NLB_RULE_ID=
+	local NLB_DATAS=
 
-	if [ ${PUBLIC_IP} == "DHCP" ] || [ ${PUBLIC_IP} == NONE ]; then
-		PUBLIC_IP=
-	then
+	if [ "${NLB_VIP_ADDRESS}" == "DHCP" ] || [ "${NLB_VIP_ADDRESS}" == "NONE" ]; then
+		NLB_VIP_ADDRESS=
+	fi
 
 	IFS=, read -a NLB_PORTS <<< "${NLB_PORTS}"
-	IPADDRESS=$(cloudmonkey associate ipaddress ipaddress=${PUBLIC_IP} projectid=${CLOUDSTACK_PROJECT_ID} vpcid=${CLOUDSTACK_VPC_ID} networkid=${CLOUDSTACK_NETWORK_ID})
-	NLB_ID=$(jq -r '.id//""' <<< "${IPADDRESS}")
-	PUBLIC_IP=$(echo ${IPADDRESS} | jq -r '.ipaddress//""')
+	NLB_DATAS=$(cloudmonkey associate ipaddress ipaddress=${NLB_VIP_ADDRESS} projectid=${CLOUDSTACK_PROJECT_ID} vpcid=${CLOUDSTACK_VPC_ID} networkid=${CLOUDSTACK_NETWORK_ID})
+	NLB_VIP_ID=$(jq -r '.ipaddress.id//""' <<< "${NLB_DATAS}")
+	NLB_VIP_ADDRESS=$(jq -r '.ipaddress.ipaddress//""' <<< "${NLB_DATAS}")
+
+	if [ -z "${NLB_VIP_ID}" ]; then
+		echo_red_bold "Unable to associate public address ip" > /dev/null
+		exit 1
+	fi
+
+	SUCCESS=$(cloudmonkey create tags resourceids=${NLB_VIP_ID} tags[0].key=cluster tags[0].value=${NLB_NAME} resourcetype=publicipaddress)
 
 	for NLB_PORT in ${NLB_PORTS[@]}
 	do
-		cloudmonkey create loadbalancerrule \
+		NLB_RULE_ID=$(cloudmonkey create loadbalancerrule \
 			name=${NLB_NAME}-${NLB_PORT} \
-			protocol=${NLB_PORT} \
+			publicport=${NLB_PORT} \
 			privateport=${NLB_PORT} \
-			publicipid=${NLB_ID} \
+			publicipid=${NLB_VIP_ID} \
 			networkid=${CLOUDSTACK_NETWORK_ID} \
 			zoneid=${CLOUDSTACK_ZONE_ID} \
 			algorithm=roundrobin \
-			openfirewall=true \
 			protocol=tcp \
-			cidrlist="0.0.0.0/0" 
+			cidrlist="0.0.0.0/0" | jq -r '.loadbalancer.id//""')
+
+		if [ -z "${NLB_RULE_ID}" ]; then
+			echo_red_bold "Unable to create loadbalancer rule: ${NLB_NAME}-${NLB_PORT}" > /dev/stderr
+			exit 1
+		fi
+
+		SUCCESS=$(cloudmonkey create tags  resourceids=${NLB_RULE_ID} tags[0].key=cluster tags[0].value=${NLB_NAME} resourcetype=loadbalancer)
+		SUCCESS=$(cloudmonkey assign toloadbalancerrule id=${NLB_RULE_ID} virtualmachineids=${NLB_INSTANCEIDS})
 	done
 
-	echo -n ${PUBLIC_IP}
+	echo -n ${NLB_VIP_ADDRESS}
 }
 
 #===========================================================================================================================================
@@ -1220,14 +1353,42 @@ function create_public_loadbalancer() {
 #===========================================================================================================================================
 function create_plateform_nlb() {
 	local NLB_TARGETS=${CLUSTER_NODES}
-    local PRIVATE_NLB_DNS=${PRIVATE_ADDR_IPS[0]}
-    local PUBLIC_NLB_DNS=${PUBLIC_ADDR_IPS[0]}
+	local NLB_INSTANCE_IDS=
+    local PUBLIC_NLB_DNS=${PUBLIC_ADDR_IPS[0]:=DHCP}
+    local PRIVATE_NLB_DNS=
+	local INDEX=
+	local LISTEN_PORTS=
 
-	if [ "${CLOUDSTACK_EXTERNAL_NLB}" != "none" ]; then
-		echo_title "Create external NLB ${MASTERKUBE} with target: ${NLB_TARGETS} at: ${PUBLIC_NLB_DNS}"
+	if [ "${CLOUDSTACK_INTERNAL_NLB}" != "none" ]; then
+		PRIVATE_NLB_DNS=${PRIVATE_ADDR_IPS[0]}
+	else
+		PRIVATE_NLB_DNS=${PRIVATE_ADDR_IPS[1]}
+	fi
+
+	CONTROL_PLANE_ENDPOINT=${PRIVATE_NLB_DNS}
+	LOAD_BALANCER_IP=${PRIVATE_NLB_DNS}
+
+	for INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES} - 1)))
+	do
+		local SUFFIX=$(named_index_suffix $INDEX)
+		local INSTANCE_ID=$(jq -r '.InstanceId//""' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
+
+		if [ -z "${NLB_INSTANCE_IDS}" ]; then
+			NLB_INSTANCE_IDS="${INSTANCE_ID}"
+		else
+			NLB_INSTANCE_IDS="${NLB_INSTANCE_IDS},${INSTANCE_ID}"
+		fi
+	done
+
+	if [ "${CLOUDSTACK_EXTERNAL_NLB}" != "none" ]; then		
+		echo_title "Create external NLB ${MASTERKUBE} with target: ${NLB_INSTANCE_IDS} at: ${PUBLIC_NLB_DNS}"
 
 		if [ ${CLOUDSTACK_EXTERNAL_NLB} == "cloud" ]; then
-			PUBLIC_NLB_DNS=$(create_public_loadbalancer "nlb-${MASTERKUBE}" "80,443" "${NLB_TARGETS}" "${PUBLIC_NLB_DNS}")
+			if [ ${CONTROLPLANE_USE_PUBLICIP} == "true" ]; then
+				PUBLIC_NLB_DNS=$(create_public_loadbalancer "nlb-${MASTERKUBE}" "${LOAD_BALANCER_PORT}" "${NLB_INSTANCE_IDS}" "${PUBLIC_NLB_DNS}")
+			else
+				PUBLIC_NLB_DNS=$(create_public_loadbalancer "nlb-${MASTERKUBE}" "${EXPOSE_PUBLIC_PORTS}" "${NLB_INSTANCE_IDS}" "${PUBLIC_NLB_DNS}")
+			fi
 		else
 			create_nginx_gateway
 		fi
@@ -1236,13 +1397,13 @@ function create_plateform_nlb() {
 	fi
 
 	if [ "${CLOUDSTACK_INTERNAL_NLB}" != "none" ]; then
-		echo_title "Create internal NLB ${MASTERKUBE} with target: ${NLB_TARGETS} at: ${PRIVATE_VIP_ADDRESS}"
+		echo_title "Create internal NLB ${MASTERKUBE} with target: ${NLB_INSTANCE_IDS} at: ${PRIVATE_NLB_DNS}"
 
 		CONTROL_PLANE_ENDPOINT=${PRIVATE_NLB_DNS}
 		LOAD_BALANCER_IP=${PRIVATE_NLB_DNS}
 
 		if [ "${CLOUDSTACK_INTERNAL_NLB}" == "cloud" ]; then
-			create_internal_loadbalancer "nlb-${MASTERKUBE}" "${LOAD_BALANCER_PORT}" "${NLB_TARGETS}" "${PRIVATE_NLB_DNS}"
+			create_internal_loadbalancer "nlb-${MASTERKUBE}" "${LOAD_BALANCER_PORT}" "${NLB_INSTANCE_IDS}" "${PRIVATE_NLB_DNS}"
 		else
 			create_keepalived
 		fi

@@ -7,12 +7,20 @@ pushd ${CURDIR}/../ &>/dev/null
 
 export NAMESPACE=ingress-nginx
 export ETC_DIR=${TARGET_DEPLOY_LOCATION}/ingress
+export KUBERNETES_TEMPLATE=
 
-if [[ "${USE_NLB}" == "none" && "${PLATEFORM}" != "aws" && "${PLATEFORM}" != "openstack" && && "${PLATEFORM}" != "cloudstack" ]] || [ "${USE_NLB}" == "keepalived" ]; then
-	export KUBERNETES_TEMPLATE=./templates/ingress/loadbalancer
-else
-	export KUBERNETES_TEMPLATE=./templates/ingress/nodeport
-fi
+case ${PLATEFORM} in
+	aws|openstack|cloudstack)
+		KUBERNETES_TEMPLATE=./templates/ingress/nodeport
+		;;
+	*)
+		if [ "${USE_NLB}" == "none" ]; then
+			KUBERNETES_TEMPLATE=./templates/ingress/loadbalancer
+		else
+			KUBERNETES_TEMPLATE=./templates/ingress/nodeport
+		fi
+		;;
+esac
 
 mkdir -p ${ETC_DIR}
 

@@ -1578,9 +1578,7 @@ function create_image() {
 		--ssh-key="${SSH_KEY}" \
 		--ssh-priv-key="${SSH_PRIVATE_KEY}" \
 		--user="${KUBERNETES_USER}" \
-		create_image_extras_args
-
-	get_image_uuid ${TARGET_IMAGE}
+		$(create_image_extras_args)
 }
 
 #===========================================================================================================================================

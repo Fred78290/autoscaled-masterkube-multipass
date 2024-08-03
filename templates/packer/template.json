@@ -35,15 +35,6 @@
 			"execute_command": "sudo sh -xc '{{ .Vars }} {{ .Path }}'",
 			"remote_folder": "/tmp",
 			"inline": [
-				"sed -i 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0\"/' /etc/default/grub",
-				"update-grub"
-			]
-		},
-		{
-			"type": "shell",
-			"execute_command": "sudo sh -xc '{{ .Vars }} {{ .Path }}'",
-			"remote_folder": "/tmp",
-			"inline": [
 				"{{ user `INIT_SCRIPT` }}"
 			]
 		},

@@ -14,31 +14,31 @@
     "medium": {
         "memsize": 4096,
         "vcpus": 4,
-        "cpuspeed": 4000,
+        "cpuspeed": 2000,
         "disksize": 20480
     },
     "large": {
         "memsize": 8192,
         "vcpus": 4,
-        "cpuspeed": 4000,
+        "cpuspeed": 2000,
         "disksize": 51200
     },
     "xlarge": {
         "memsize": 16384,
         "vcpus": 4,
-        "cpuspeed": 4000,
+        "cpuspeed": 2000,
         "disksize": 102400
     },
     "2xlarge": {
         "memsize": 16384,
         "vcpus": 8,
-        "cpuspeed": 4000,
+        "cpuspeed": 2000,
         "disksize": 102400
     },
     "4xlarge": {
         "memsize": 32768,
         "vcpus": 8,
-        "cpuspeed": 4000,
+        "cpuspeed": 2000,
         "disksize": 102400
     }
 }

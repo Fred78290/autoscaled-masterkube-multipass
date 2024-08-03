@@ -138,7 +138,7 @@ system_info:
   default_user:
     name: ubuntu
 runcmd:
-  - sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"/' /etc/default/grub
+  - echo 'GRUB_CMDLINE_LINUX_DEFAULT="\${GRUB_CMDLINE_LINUX_DEFAULT} net.ifnames=0 biosdevname=0"' > /etc/default/grub.d/60-biosdevname.cfg
   - update-grub
 EOF
 
@@ -289,7 +289,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 		ssh -t "${SEED_USER}@${IPADDR}" <<'EOF'
 		export DEBIAN_FRONTEND=noninteractive
 		export UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2)
-		sudo sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"/' /etc/default/grub
+		sudo sh -c 'echo "GRUB_CMDLINE_LINUX_DEFAULT=\"${GRUB_CMDLINE_LINUX_DEFAULT} net.ifnames=0 biosdevname=0\"" > /etc/default/grub.d/60-biosdevname.cfg'
 		sudo update-grub
 		sudo apt install linux-generic-hwe-${UBUNTU_VERSION_ID} jq socat conntrack net-tools traceroute nfs-common unzip -y
 		sudo snap install yq
@@ -344,7 +344,7 @@ cat > "${CACHE}/network.yaml" <<EOF
 network:
   version: 2
     ethernets:
-    eth0:
+    ${PRIVATE_NET_INF}:
       dhcp4: true
 EOF
 
@@ -414,7 +414,8 @@ ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo /usr/local/bin/prepare
 						--cni-version ${CNI_VERSION} \
 						--cni-plugin ${CNI_PLUGIN} \
 						--kube-version ${KUBERNETES_VERSION} \
-						--kube-engine ${KUBERNETES_DISTRO}
+						--kube-engine ${KUBERNETES_DISTRO} \
+						--plateform desktop
 
 vmrest_poweroff "${TARGET_IMAGE_UUID}" "soft" > /dev/null
 

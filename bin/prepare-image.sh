@@ -6,6 +6,7 @@ CONTAINER_ENGINE=
 CONTAINER_CTL=
 KUBERNETES_VERSION=
 KUBERNETES_DISTRO=
+PLATEFORM=
 ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
 
 export DEBIAN_FRONTEND=noninteractive
@@ -17,6 +18,7 @@ OPTIONS=(
 	"ecr-password:"
 	"kube-version:"
 	"kube-engine:"
+	"plateform:"
 )
 
 PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
@@ -72,6 +74,10 @@ while true ; do
 			esac
 			shift 2
 			;;
+		--plateform)
+			PLATEFORM=$2
+			shift 2
+			;;
 		--)
 			shift
 			break
@@ -83,6 +89,11 @@ while true ; do
 	esac
 done
 
+if [ ! -f /etc/default/grub.d/60-biosdevname.cfg ] && [ "${PLATEFORM}" != "openstack" ] && [ "${PLATEFORM}" != "cloudstack" ] && [ "${PLATEFORM}" != "aws" ]; then
+	echo 'GRUB_CMDLINE_LINUX_DEFAULT="\${GRUB_CMDLINE_LINUX_DEFAULT} net.ifnames=0 biosdevname=0"' > /etc/default/grub.d/60-biosdevname.cfg
+	update-grub
+fi
+
 KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | awk -F. '{ print $2 }')
 CRIO_VERSION=$(echo -n ${KUBERNETES_VERSION} | tr -d 'v' | awk -F. '{ print $1"."$2 }')
 
@@ -93,7 +104,7 @@ apt update
 apt upgrade -y
 echo
 
-if [[ $(uname -r) != *aws* ]]; then
+if [ "${PLATEFORM}" != "aws" ]; then
 	UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2)
 
 	if [ -n "$(apt search linux-generic-hwe-${UBUNTU_VERSION_ID} 2>/dev/null | grep linux-generic-hwe-${UBUNTU_VERSION_ID})" ]; then

@@ -279,7 +279,8 @@ ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo /usr/local/bin/prepare
 						--cni-plugin ${CNI_PLUGIN} \
 						--ecr-password ${ECR_PASSWORD} \
 						--kube-version ${KUBERNETES_VERSION} \
-						--kube-engine ${KUBERNETES_DISTRO}
+						--kube-engine ${KUBERNETES_DISTRO} \
+						--plateform aws
 
 aws ec2 stop-instances --profile ${AWS_PROFILE} --region ${AWS_REGION} --instance-ids "${LAUNCHED_ID}" &> /dev/null
 

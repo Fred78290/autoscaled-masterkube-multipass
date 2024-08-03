@@ -223,7 +223,7 @@ if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 		ssh -t "${SEED_USER}@${IPADDR}" <<'EOF'
 		export DEBIAN_FRONTEND=noninteractive
 		export UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2)
-		sudo sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"/' /etc/default/grub
+		sudo sh -c 'echo "GRUB_CMDLINE_LINUX_DEFAULT=\"${GRUB_CMDLINE_LINUX_DEFAULT} net.ifnames=0 biosdevname=0\"" > /etc/default/grub.d/60-biosdevname.cfg'
 		sudo update-grub
 		sudo apt update
 		sudo apt upgrade -y
@@ -341,7 +341,8 @@ ssh ${SSH_OPTIONS} -t "${KUBERNETES_USER}@${IPADDR}" sudo /usr/local/bin/prepare
 						--cni-version ${CNI_VERSION} \
 						--cni-plugin ${CNI_PLUGIN} \
 						--kube-version ${KUBERNETES_VERSION} \
-						--kube-engine ${KUBERNETES_DISTRO}
+						--kube-engine ${KUBERNETES_DISTRO} \
+						--plateform vsphere
 
 govc vm.power -persist-session=false -s=true "${TARGET_IMAGE}"
 

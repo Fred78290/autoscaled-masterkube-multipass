@@ -18,7 +18,8 @@ EOF
 kubectl create secret generic cloudstack-secret \
 	--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 	-n kube-system \
-	--dry-run=client -o yaml --from-file=cloud-config \
+	--dry-run=client -o yaml \
+	--from-file=${ETC_DIR}/cloud-config \
 	| tee cloudstack-secret.yaml \
 	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 

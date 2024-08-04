@@ -314,6 +314,11 @@ fi
 #===========================================================================================================================================
 mkdir -p ${CACHE}
 
+if [ ! -d ${CURDIR}/plateform/${PLATEFORM} ]; then
+	echo_red_bold "Unknown plateform: ${PLATEFORM}"
+	exit 1
+fi
+
 if [ -f ${CURDIR}/plateform/${PLATEFORM}/override.sh ]; then
 	source ${CURDIR}/plateform/${PLATEFORM}/override.sh
 fi

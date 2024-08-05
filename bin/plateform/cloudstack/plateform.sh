@@ -1009,7 +1009,7 @@ function get_vmuuid() {
     local VMNAME=$1
 
 	cloudmonkey list virtualmachines \
-		name=${TARGET_IMAGE} \
+		name=${VMNAME} \
 		projectid=${CLOUDSTACK_PROJECT_ID} \
 		zoneid=${CLOUDSTACK_ZONE_ID} \
 		podid=${CLOUDSTACK_POD_ID} \

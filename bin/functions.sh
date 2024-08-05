@@ -2766,7 +2766,7 @@ function create_cluster() {
 					--max-pods=${MAX_PODS} \
 					--net-if=${PRIVATE_NET_INF} \
 					--node-group=${NODEGROUP_NAME} \
-					--node-index=${INDEX} \
+					--node-index=${NODEINDEX} \
 					--plateform=${PLATEFORM} \
 					--region=${REGION} \
 					--tls-san="${CERT_SANS}" \

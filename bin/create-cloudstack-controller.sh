@@ -20,7 +20,7 @@ kubectl create secret generic cloudstack-secret \
 	-n kube-system \
 	--dry-run=client -o yaml \
 	--from-file=${ETC_DIR}/cloud-config \
-	| tee cloudstack-secret.yaml \
+	| tee ${ETC_DIR}/cloudstack-secret.yaml \
 	| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
 curl -sL https://github.com/apache/cloudstack-kubernetes-provider/releases/download/v1.1.0/deployment.yaml \

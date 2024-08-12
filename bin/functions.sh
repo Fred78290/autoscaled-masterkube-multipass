@@ -1413,7 +1413,8 @@ function delete_previous_masterkube() {
 			--plateform=${PLATEFORM} \
 			--configuration-location=${CONFIGURATION_LOCATION} \
 			--defs=${PLATEFORMDEFS} \
-			--node-group=${NODEGROUP_NAME}
+			--node-group=${NODEGROUP_NAME} \
+			--force
 
 		if [ "${DELETE_CLUSTER}" = "YES" ]; then
 			exit

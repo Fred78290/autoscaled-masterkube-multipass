@@ -1370,9 +1370,9 @@ function prepare_kubernetes_distribution() {
 		IFS=. read K8S_VERSION K8S_MAJOR K8S_MINOR <<< "${KUBERNETES_VERSION}"
 
 		if [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-			RANCHER_CHANNEL=$(curl -s https://update.rke2.io/v1-release/channels)
+			RANCHER_CHANNEL=$(curl -s -H 'Accept: application/json' https://update.rke2.io/v1-release/channels)
 		else
-			RANCHER_CHANNEL=$(curl -s https://update.k3s.io/v1-release/channels)
+			RANCHER_CHANNEL=$(curl -s -H 'Accept: application/json' https://update.k3s.io/v1-release/channels)
 		fi
 
 		KUBERNETES_VERSION=$(echo -n "${RANCHER_CHANNEL}" | jq -r --arg KUBERNETES_VERSION "${K8S_VERSION}.${K8S_MAJOR}" '.data[]|select(.id == $KUBERNETES_VERSION)|.latest//""')

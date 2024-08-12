@@ -980,7 +980,7 @@ EOF
 				--user-data "file://${TARGET_CONFIG_LOCATION}/userdata-${SUFFIX}.yaml" \
 				--block-device-mappings "file://${TARGET_CONFIG_LOCATION}/mapping-${SUFFIX}.json" \
 				--tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${MASTERKUBE_NODE}},{Key=NodeGroup,Value=${NODEGROUP_NAME}},{Key=KubernetesCluster,Value=${NODEGROUP_NAME}}]" \
-                --metadata-options "HttpEndpoint=enabled,HttpTokens=optional,HttpPutResponseHopLimit=2,InstanceMetadataTags=enabled" \
+                --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2,InstanceMetadataTags=enabled" \
 				${IAM_PROFILE_OPTIONS})
 
 			LAUNCHED_ID=$(echo ${LAUNCHED_INSTANCE} | jq -r '.Instances[0].InstanceId // ""')

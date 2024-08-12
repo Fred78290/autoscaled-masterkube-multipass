@@ -250,18 +250,19 @@ if [ -z "${NODEGROUP_NAME}" ]; then
 fi
 
 if [ ${PLATEFORM} == "aws" ]; then
-	REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
-	LOCALHOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)
-	MAC_ADDRESS="$(curl -s http://169.254.169.254/latest/meta-data/mac)"
-	INSTANCEID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+	TOKEN=$(curl -s -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -X PUT "http://169.254.169.254/latest/api/token")
+	REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
+	LOCALHOSTNAME=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-hostname)
+	MAC_ADDRESS="$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/mac)"
+	INSTANCEID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 	INSTANCENAME=$(aws ec2  describe-instances --region ${REGION} --instance-ids ${INSTANCEID} | jq -r '.Reservations[0].Instances[0].Tags[]|select(.Key == "Name")|.Value')
-	SUBNET_IPV4_CIDR_BLOCK=$(curl -s http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/subnet-ipv4-cidr-block)
-	VPC_IPV4_CIDR_BLOCK=$(curl -s http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/vpc-ipv4-cidr-block)
-	ZONEID=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
+	SUBNET_IPV4_CIDR_BLOCK=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/subnet-ipv4-cidr-block)
+	VPC_IPV4_CIDR_BLOCK=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/network/interfaces/macs/${MAC_ADDRESS}/vpc-ipv4-cidr-block)
+	ZONEID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone)
 	DNS_SERVER=$(echo ${VPC_IPV4_CIDR_BLOCK} | tr './' ' '| awk '{print $1"."$2"."$3".2"}')
 	AWS_DOMAIN=${LOCALHOSTNAME#*.*}
 	AWS_ROUTE53_PRIVATE_ZONE_ID=
-	APISERVER_ADVERTISE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+	APISERVER_ADVERTISE_ADDRESS=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
 	PROVIDERID=aws://${ZONEID}/${INSTANCEID}
 else
 	# Check if interface exists, else take inet default gateway

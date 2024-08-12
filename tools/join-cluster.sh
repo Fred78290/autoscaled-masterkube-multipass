@@ -233,12 +233,13 @@ if [ -z "${CONTROL_PLANE_ENDPOINT_ADDR}" ]; then
 fi
 
 if [ ${PLATEFORM} == "aws" ]; then
-	LOCALHOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/local-hostname)
-	INSTANCEID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-	ZONEID=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
-	REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
+	TOKEN=$(curl -s -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -X PUT "http://169.254.169.254/latest/api/token")
+	LOCALHOSTNAME=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-hostname)
+	INSTANCEID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+	ZONEID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone)
+	REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
 	INSTANCENAME=$(aws ec2  describe-instances --region ${REGION} --instance-ids ${INSTANCEID} | jq -r '.Reservations[0].Instances[0].Tags[]|select(.Key == "Name")|.Value')
-	APISERVER_ADVERTISE_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+	APISERVER_ADVERTISE_ADDRESS=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
 	PROVIDERID=aws://${ZONEID}/${INSTANCEID}
 else
 	ifconfig ${PRIVATE_NET_INF} &> /dev/null || PRIVATE_NET_INF=$(ip route get 1|awk '{print $5;exit}')
@@ -453,7 +454,7 @@ elif [ ${KUBERNETES_DISTRO} == "k3s" ]; then
 	K3S_MODE=agent
 	K3S_DISABLE_ARGS=""
 
-	if [ "${CONTROL_PLANE}" != "true" ]; then
+	if [ "${CONTROL_PLANE}" = "true" ]; then
 		K3S_ARGS="--kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --server=https://${JOIN_MASTER_IP}:${JOIN_MASTER_PORT} --token=${TOKEN}"
 	else
 		K3S_ARGS="--kubelet-arg=max-pods=${MAX_PODS} --node-name=${NODENAME} --server=https://${CONTROL_PLANE_ENDPOINT}:${JOIN_MASTER_PORT} --token=${TOKEN}"

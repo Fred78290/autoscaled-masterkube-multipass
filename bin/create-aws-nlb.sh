@@ -17,11 +17,14 @@ AWS_NLB_NAME=
 AWS_USE_PUBLICIP=false
 PUBLIC_INSTANCES_ID=
 CONTROLPLANE_INSTANCES_ID=
+CROSS_ZONE=false
+CONTROL_PLANE_PUBLIC=false
 
 OPTIONS=(
 	"cert-arn:"
 	"controlplane-instances-id:"
 	"expose-public:"
+	"cross-zone:"
 	"name:"
 	"private-subnet-id:"
 	"profile:"
@@ -48,6 +51,10 @@ while true ; do
 			;;
 		--name)
 			AWS_NLB_NAME="$2"
+			shift 2
+			;;
+		--cross-zone)
+			CROSS_ZONE=$2
 			shift 2
 			;;
 		--expose-public)
@@ -165,13 +172,11 @@ function create_nlb() {
 	local TARGET_ARN=
 	local TARGET_PORT=
 
-	if [ ${TYPE} == "network" ]; then
-		NLB_ARN=$(aws elbv2 create-load-balancer --profile=${AWS_PROFILE} --region=${AWS_REGION} --name ${NLB_NAME} \
-			--scheme ${SCHEME} --type ${TYPE} --subnets ${AWS_SUBNETID} | jq -r '.LoadBalancers[0].LoadBalancerArn')
-	else
-		NLB_ARN=$(aws elbv2 create-load-balancer --profile=${AWS_PROFILE} --region=${AWS_REGION} --name ${NLB_NAME} \
-			--security-groups ${AWS_SECURITY_GROUP} --scheme ${SCHEME} --type ${TYPE} --subnets ${AWS_SUBNETID} | jq -r '.LoadBalancers[0].LoadBalancerArn')
-	fi
+	SILENT=$(aws elbv2 modify-load-balancer-attributes --profile=${AWS_PROFILE} --region=${AWS_REGION} \
+		--load-balancer-arn=${NLB_ARN} \
+		--attributes \
+		Key=load_balancing.cross_zone.enabled,Value=${CROSS_ZONE} \
+		Key=dns_record.client_routing_policy,Value=availability_zone_affinity)
 
 	for TARGET_PORT in ${TARGET_PORTS}
 	do

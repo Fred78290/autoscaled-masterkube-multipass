@@ -204,7 +204,7 @@ function create_nlb() {
 			--health-check-interval-seconds 10 \
 			--healthy-threshold-count 2 \
 			--unhealthy-threshold-count 2 \
-			--target-type ${TARGET_TYPE} | jq -r '.TargetGroups[0].TargetGroupArn')
+			--target-type ip | jq -r '.TargetGroups[0].TargetGroupArn')
 
 		aws elbv2 create-listener ${CERTIFICAT_ARGS} \
 			--profile=${AWS_PROFILE} \

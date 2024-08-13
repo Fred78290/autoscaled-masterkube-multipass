@@ -734,6 +734,8 @@ function create_plateform_nlb() {
 		--region=${AWS_REGION} \
 		--name=${MASTERKUBE} \
 		--cert-arn=${ACM_CERTIFICATE_ARN} \
+        --cross-zone=true \
+        --control-plane-public=${CONTROLPLANE_USE_PUBLICIP} \
 		--expose-public=${EXPOSE_PUBLIC_CLUSTER} \
 		--public-subnet-id="${PUBLIC_SUBNET_NLB_TARGET}" \
 		--private-subnet-id="${PRIVATE_SUBNET_NLB_TARGET}" \
@@ -743,26 +745,34 @@ function create_plateform_nlb() {
 		--controlplane-instances-id="${CONTROLPLANE_INSTANCEID_NLB_TARGET}" \
 		--public-instances-id="${PUBLIC_INSTANCEID_NLB_TARGET}" \
 		${SILENT}
-    
-    PRIVATE_NLB_DEF=$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} \
-        | jq -r --arg NLB_NAME c-${MASTERKUBE} '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)')
+
+    if [ ${CONTROLPLANE_USE_PUBLICIP} = "false" ]; then
+        PRIVATE_NLB_DEF=$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} | jq -r --arg NLB_NAME c-${MASTERKUBE} '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)')
+    fi
+
+	if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
+        PUBLIC_NLB_DEF="$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} | jq -r --arg NLB_NAME p-${MASTERKUBE} '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)')"
+        
+        if [ ${CONTROLPLANE_USE_PUBLICIP} = "true" ]; then
+            PRIVATE_NLB_DEF=${PUBLIC_NLB_DEF}
+        fi
+	else
+		PUBLIC_NLB_DEF="${PRIVATE_NLB_DEF}"
+	fi
 
     LOAD_BALANCER_IP=$(echo ${PRIVATE_NLB_DEF} | jq -r '.LoadBalancerArn' | cut -d '/' -f 2,3,4)
     LOAD_BALANCER_IP=($(aws ec2 describe-network-interfaces --filters Name=description,Values="ELB ${LOAD_BALANCER_IP}" --query 'NetworkInterfaces[*].PrivateIpAddresses[*].PrivateIpAddress' --output text))
     LOAD_BALANCER_IP=$(echo ${LOAD_BALANCER_IP[@]} | tr ' ' ',')
 
-	if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
-        PUBLIC_NLB_DEF="$(aws elbv2 describe-load-balancers --profile=${AWS_PROFILE} --region=${AWS_REGION} | jq -r --arg NLB_NAME p-${MASTERKUBE} '.LoadBalancers[]|select(.LoadBalancerName == $NLB_NAME)')"
-	else
-		PUBLIC_NLB_DEF="${PRIVATE_NLB_DEF}"
-	fi
-
 	PRIVATE_NLB_DNS=$(echo "${PRIVATE_NLB_DEF}" | jq -r '.DNSName')
 	PUBLIC_NLB_DNS=$(echo ${PUBLIC_NLB_DEF} | jq -r '.DNSName')
 	PUBLIC_NLB_HOSTED_ZONEID=$(echo ${PUBLIC_NLB_DEF} | jq -r '.CanonicalHostedZoneId//""')
+	PRIVATE_NLB_HOSTED_ZONEID=$(echo ${PRIVATE_NLB_DEF} | jq -r '.CanonicalHostedZoneId//""')
 
 	# Record Masterkube in Route53 DNS
-	register_nlb_dns CNAME "${PRIVATE_NLB_DNS}" "${PUBLIC_NLB_DNS}" "${PUBLIC_NLB_HOSTED_ZONEID}"
+	register_nlb_dns A "${PRIVATE_NLB_DNS}" "${PUBLIC_NLB_DNS}" "${PRIVATE_NLB_HOSTED_ZONEID}" "${PUBLIC_NLB_HOSTED_ZONEID}"
+
+	CONTROL_PLANE_ENDPOINT=${PRIVATE_NLB_DNS}
 }
 
 #===========================================================================================================================================
@@ -809,7 +819,6 @@ function find_private_dns_provider() {
         fi
 
         ROUTE53_ZONE_NAME=${ROUTE53_ZONE_NAME%?}
-        USE_ETC_HOSTS=false
 
         # Grab private domain name
         if [ -z "${PRIVATE_DOMAIN_NAME}" ]; then
@@ -827,6 +836,8 @@ function find_private_dns_provider() {
             fi
         fi
     fi
+
+    USE_ETC_HOSTS=false
 }
 
 #===========================================================================================================================================
@@ -901,45 +912,29 @@ EOF
 
 		echo_title "Clone ${TARGET_IMAGE} to ${MASTERKUBE_NODE}"
 
-		if [ "${HA_CLUSTER}" = "true" ]; then
+        if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
+            # NGINX Load blancer
+            MACHINE_TYPE=${NGINX_MACHINE}
 
-			if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
-				# NGINX Load blancer
-				MACHINE_TYPE=${NGINX_MACHINE}
+            # Use subnet public for NGINX Load balancer
+            if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "nginx" ]; then
+                PUBLICIP=true
+                IAM_PROFILE_OPTIONS=
+            fi
+        elif [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
+            IAM_PROFILE_OPTIONS="--iam-instance-profile Arn=${MASTER_INSTANCE_PROFILE_ARN}"
+            MACHINE_TYPE=${CONTROL_PLANE_MACHINE}
 
-				# Use subnet public for NGINX Load balancer
-				if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "none" ]; then
-					PUBLICIP=true
-					IAM_PROFILE_OPTIONS=
-				fi
-			elif [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
-				PUBLICIP=${CONTROLPLANE_USE_PUBLICIP}
-				IAM_PROFILE_OPTIONS="--iam-instance-profile Arn=${MASTER_INSTANCE_PROFILE_ARN}"
-				MACHINE_TYPE=${CONTROL_PLANE_MACHINE}
-			else
-				PUBLICIP=${WORKERNODE_USE_PUBLICIP}
-			fi
-
-		elif [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
-
-			MACHINE_TYPE=${CONTROL_PLANE_MACHINE}
-
-			# Use subnet public for NGINX Load balancer
-			if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
-				if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "none" ]; then
-					PUBLICIP=true
-					IAM_PROFILE_OPTIONS=
-				fi
-			elif [ ${INDEX} = ${CONTROLNODE_INDEX} ]; then
-				if [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ]; then
-					PUBLICIP=true
-					IAM_PROFILE_OPTIONS="--iam-instance-profile Arn=${MASTER_INSTANCE_PROFILE_ARN}"
-				fi
-			else
-				PUBLICIP=${WORKERNODE_USE_PUBLICIP}
-			fi
-
-		fi
+            if [ "${USE_NLB}" = "cloud" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]  && [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ]; then
+                SUBNET_INDEX=$(( $((NODEINDEX - 1)) % ${#VPC_PUBLIC_SUBNET_IDS[@]} ))
+                SUBNETID="${VPC_PUBLIC_SUBNET_IDS[${SUBNET_INDEX}]}"
+                SGID="${VPC_PUBLIC_SECURITY_GROUPID}"
+            elif [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "none" ]; then
+                PUBLICIP=${CONTROLPLANE_USE_PUBLICIP}
+            fi
+        else
+            PUBLICIP=${WORKERNODE_USE_PUBLICIP}
+        fi
 		
 		if [ "${PUBLICIP}" = "true" ]; then
 			PUBLIC_IP_OPTIONS=--associate-public-ip-address
@@ -962,7 +957,7 @@ EOF
 				--user-data "file://${TARGET_CONFIG_LOCATION}/userdata-${SUFFIX}.yaml" \
 				--block-device-mappings "file://${TARGET_CONFIG_LOCATION}/mapping-${SUFFIX}.json" \
 				--tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${MASTERKUBE_NODE}},{Key=NodeGroup,Value=${NODEGROUP_NAME}},{Key=KubernetesCluster,Value=${NODEGROUP_NAME}}]" \
-                --metadata-options "HttpEndpoint=enabled,HttpTokens=optional,HttpPutResponseHopLimit=2,InstanceMetadataTags=enabled" \
+                --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2,InstanceMetadataTags=enabled" \
 				${PUBLIC_IP_OPTIONS} \
 				${IAM_PROFILE_OPTIONS})
 
@@ -1073,28 +1068,21 @@ function create_network_interfaces() {
 		ENI_NAME=${MASTERKUBE_NODE}
 	fi
 
-	if [ ${HA_CLUSTER} = "true" ]; then
-		if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
-			# Use subnet public for NGINX Load balancer if we don't use a NLB
-			if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "none" ]; then
-				PUBLICIP=true
-				SUBNET_INDEX=$(( $((NODEINDEX - 1)) % ${#VPC_PUBLIC_SUBNET_IDS[@]} ))
-				SUBNETID="${VPC_PUBLIC_SUBNET_IDS[${SUBNET_INDEX}]}"
-				SGID="${VPC_PUBLIC_SECURITY_GROUPID}"
-			fi
-		fi
+    if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
+        # Use subnet public for NGINX Load balancer if we don't use a NLB
+        if [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "nginx" ]; then
+            PUBLICIP=true
+        fi
 	elif [ ${INDEX} -lt ${WORKERNODE_INDEX} ]; then
-		if [ ${INDEX} = ${CONTROLNODE_INDEX} ] && [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ]; then
-			PUBLICIP=true
+        if [ "${USE_NLB}" = "cloud" ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]  && [ "${CONTROLPLANE_USE_PUBLICIP}" = "true" ]; then
 			SUBNET_INDEX=$(( $((NODEINDEX - 1)) % ${#VPC_PUBLIC_SUBNET_IDS[@]} ))
 			SUBNETID="${VPC_PUBLIC_SUBNET_IDS[${SUBNET_INDEX}]}"
 			SGID="${VPC_PUBLIC_SECURITY_GROUPID}"
-		elif [ ${INDEX} -lt ${CONTROLNODE_INDEX} ] && [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ]; then
-			PUBLICIP=true
-			SUBNET_INDEX=$(( $((NODEINDEX - 1)) % ${#VPC_PUBLIC_SUBNET_IDS[@]} ))
-			SUBNETID="${VPC_PUBLIC_SUBNET_IDS[${SUBNET_INDEX}]}"
-			SGID="${VPC_PUBLIC_SECURITY_GROUPID}"
-		fi
+        elif [ "${EXPOSE_PUBLIC_CLUSTER}" = "true" ] && [ "${USE_NLB}" = "none" ]; then
+            PUBLICIP=${CONTROLPLANE_USE_PUBLICIP}
+       fi
+    else
+       PUBLICIP=${WORKERNODE_USE_PUBLICIP}
 	fi
 
 	if [ ${PUBLICIP} != "true" ]; then

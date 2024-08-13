@@ -2283,7 +2283,8 @@ function register_nlb_dns() {
 	local RECORDTYPE=$1
 	local PRIVATE_NLB_DNS=$2
 	local PUBLIC_NLB_DNS=$3
-	local PUBLIC_NLB_HOSTED_ZONEID=$4
+	local PRIVATE_NLB_HOSTED_ZONEID=$4
+	local PUBLIC_NLB_HOSTED_ZONEID=$5
 	local IPADDR=
 	local RECORDSET_REGISTER=
 
@@ -2295,29 +2296,52 @@ function register_nlb_dns() {
 
 			CONTROL_PLANE_ENDPOINT=${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}
 
-		    RECORDSET_REGISTER=$(cat << EOF
-			{
-				"Comment": "${MASTERKUBE} private DNS entry",
-				"Changes": [
-					{
-						"Action": "UPSERT",
-						"ResourceRecordSet": {
-							"Name": "${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}",
-							"Type": "${RECORDTYPE}",
-							"TTL": 60,
-							"ResourceRecords": [
-							]
+			if [ ${PLATEFORM} == "aws" ]; then
+				RECORDSET_REGISTER=$(cat << EOF
+				{
+					"Comment": "${MASTERKUBE} private DNS entry",
+					"Changes": [
+						{
+							"Action": "UPSERT",
+							"ResourceRecordSet": {
+								"Name": "${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}",
+								"Type": "A",
+								"AliasTarget": {
+									"HostedZoneId": "${PRIVATE_NLB_HOSTED_ZONEID}",
+									"DNSName": "${PRIVATE_NLB_DNS[0]}",
+									"EvaluateTargetHealth": true
+								}
+							}
 						}
-					}
-				]
-			}
+					]
+				}
+EOF
+)
+			else
+				RECORDSET_REGISTER=$(cat << EOF
+				{
+					"Comment": "${MASTERKUBE} private DNS entry",
+					"Changes": [
+						{
+							"Action": "UPSERT",
+							"ResourceRecordSet": {
+								"Name": "${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}",
+								"Type": "${RECORDTYPE}",
+								"TTL": 60,
+								"ResourceRecords": [
+								]
+							}
+						}
+					]
+				}
 EOF
 )
 
-			for IPADDR in ${PRIVATE_NLB_DNS[@]}
-			do
-				RECORDSET_REGISTER=$(echo ${RECORDSET_REGISTER} | jq --arg IPADDR "${IPADDR}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
-			done
+				for IPADDR in ${PRIVATE_NLB_DNS[@]}
+				do
+					RECORDSET_REGISTER=$(echo ${RECORDSET_REGISTER} | jq --arg IPADDR "${IPADDR}" '.Changes[0].ResourceRecordSet.ResourceRecords += [ { "Value": $IPADDR } ]')
+				done
+			fi
 
 			echo "${RECORDSET_REGISTER}" > ${TARGET_CONFIG_LOCATION}/route53-nlb.json
 
@@ -2388,7 +2412,7 @@ EOF
 				"AliasTarget": {
           			"HostedZoneId": "${PUBLIC_NLB_HOSTED_ZONEID}",
 		  			"DNSName": "${PUBLIC_NLB_DNS[0]}",
-					"EvaluateTargetHealth": false
+					"EvaluateTargetHealth": true
 				}
 			}
 		}
@@ -2728,7 +2752,7 @@ EOF
 function create_cluster() {
     local MASTER_IP=
 
-	CERT_SANS=$(collect_cert_sans "${LOAD_BALANCER_IP},${CLUSTER_NODES},${MASTERKUBE}.${PRIVATE_DOMAIN_NAME},${MASTERKUBE}")
+	CERT_SANS=$(collect_cert_sans "${LOAD_BALANCER_IP},${CLUSTER_NODES},${MASTERKUBE}.${PRIVATE_DOMAIN_NAME},${MASTERKUBE},${CONTROL_PLANE_ENDPOINT}")
 
 	for INDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
 	do
@@ -2758,7 +2782,7 @@ function create_cluster() {
 					--cluster-nodes="${CLUSTER_NODES}" \
 					--cni-plugin=${CNI_PLUGIN} \
 					--container-runtime=${CONTAINER_ENGINE} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP%%,*}" \
+					--control-plane-endpoint="${CONTROL_PLANE_ENDPOINT}:${LOAD_BALANCER_IP%%,*}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--ha-cluster=${HA_CLUSTER} \
 					--kube-engine=${KUBERNETES_DISTRO} \
@@ -2797,7 +2821,7 @@ function create_cluster() {
 					--cluster-nodes="${CLUSTER_NODES}" \
 					--cni-plugin=${CNI_PLUGIN} \
 					--container-runtime=${CONTAINER_ENGINE} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP%%,*}" \
+					--control-plane-endpoint="${CONTROL_PLANE_ENDPOINT}:${LOAD_BALANCER_IP%%,*}" \
 					--control-plane=true \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--join-master="${MASTER_IP}" \
@@ -2830,7 +2854,7 @@ function create_cluster() {
 					--cluster-nodes="${CLUSTER_NODES}" \
 					--cni-plugin=${CNI_PLUGIN} \
 					--container-runtime=${CONTAINER_ENGINE} \
-					--control-plane-endpoint="${MASTERKUBE}.${PRIVATE_DOMAIN_NAME}:${LOAD_BALANCER_IP%%,*}" \
+					--control-plane-endpoint="${CONTROL_PLANE_ENDPOINT}:${LOAD_BALANCER_IP%%,*}" \
 					--etcd-endpoint="${ETCD_ENDPOINT}" \
 					--join-master="${MASTER_IP}" \
 					--kube-engine=${KUBERNETES_DISTRO} \

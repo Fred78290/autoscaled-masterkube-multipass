@@ -1365,7 +1365,6 @@ function create_plateform_nlb() {
 		PRIVATE_NLB_DNS=${PRIVATE_ADDR_IPS[1]}
 	fi
 
-	CONTROL_PLANE_ENDPOINT=${PRIVATE_NLB_DNS}
 	LOAD_BALANCER_IP=${PRIVATE_NLB_DNS}
 
 	for INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES} - 1)))
@@ -1399,7 +1398,6 @@ function create_plateform_nlb() {
 	if [ "${CLOUDSTACK_INTERNAL_NLB}" != "none" ]; then
 		echo_title "Create internal NLB ${MASTERKUBE} with target: ${NLB_INSTANCE_IDS} at: ${PRIVATE_NLB_DNS}"
 
-		CONTROL_PLANE_ENDPOINT=${PRIVATE_NLB_DNS}
 		LOAD_BALANCER_IP=${PRIVATE_NLB_DNS}
 
 		if [ "${CLOUDSTACK_INTERNAL_NLB}" == "cloud" ]; then
@@ -1409,5 +1407,5 @@ function create_plateform_nlb() {
 		fi
 	fi
 
-	register_nlb_dns A "${PRIVATE_NLB_DNS}" "${PUBLIC_NLB_DNS}" ""
+	register_nlb_dns A "${PRIVATE_NLB_DNS}" "${PUBLIC_NLB_DNS}" "" ""
 }

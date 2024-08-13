@@ -1006,9 +1006,8 @@ function create_plateform_nlb() {
 	create_nlb "nlb-internal-${MASTERKUBE}" false "${LOAD_BALANCER_PORT}" network "${NLB_TARGETS}" "${VIP_ADDRESS}" NO
 
 	LOAD_BALANCER=$(openstack loadbalancer show -f json nlb-internal-${MASTERKUBE} 2>/dev/null)
-	CONTROL_PLANE_ENDPOINT=$(echo "${LOAD_BALANCER}" | jq -r '.vip_address')
-	LOAD_BALANCER_IP=${CONTROL_PLANE_ENDPOINT}
-	PRIVATE_NLB_DNS=${CONTROL_PLANE_ENDPOINT}
+	LOAD_BALANCER_IP=${echo "${LOAD_BALANCER}" | jq -r '.vip_address'}
+	PRIVATE_NLB_DNS=${LOAD_BALANCER_IP}
 
 	if [ ${EXPOSE_PUBLIC_CLUSTER} = "true" ]; then
 		echo_title "Create external NLB ${MASTERKUBE} with target: ${NLB_TARGETS} at: ${PUBLIC_VIP_ADDRESS}"
@@ -1025,5 +1024,5 @@ function create_plateform_nlb() {
 		PUBLIC_NLB_DNS=${PRIVATE_NLB_DNS}
 	fi
 
-	register_nlb_dns A "${PRIVATE_NLB_DNS}" "${PUBLIC_NLB_DNS}" ""
+	register_nlb_dns A "${PRIVATE_NLB_DNS}" "${PUBLIC_NLB_DNS}" "" ""
 }

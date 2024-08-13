@@ -193,9 +193,13 @@ function create_nlb() {
 			--protocol ${PROTOCOL} \
 			--port ${TARGET_PORT} \
 			--vpc-id ${AWS_VPCID} \
-			--target-type ip | jq -r '.TargetGroups[0].TargetGroupArn')
-
-		aws elbv2 register-targets --profile=${AWS_PROFILE} --region=${AWS_REGION} --target-group-arn ${TARGET_ARN} --targets ${INSTANCES} > /dev/null
+			--health-check-enabled \
+			--health-check-protocol ${PROTOCOL} \
+			--health-check-port ${TARGET_PORT} \
+			--health-check-interval-seconds 10 \
+			--healthy-threshold-count 2 \
+			--unhealthy-threshold-count 2 \
+			--target-type ${TARGET_TYPE} | jq -r '.TargetGroups[0].TargetGroupArn')
 
 		aws elbv2 create-listener ${CERTIFICAT_ARGS} \
 			--profile=${AWS_PROFILE} \

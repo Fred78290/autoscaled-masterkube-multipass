@@ -22,6 +22,7 @@ CONTROL_PLANE_PUBLIC=false
 
 OPTIONS=(
 	"cert-arn:"
+	"control-plane-public:"
 	"controlplane-instances-id:"
 	"expose-public:"
 	"cross-zone:"
@@ -59,6 +60,10 @@ while true ; do
 			;;
 		--expose-public)
 			AWS_USE_PUBLICIP="$2"
+			shift 2
+			;;
+		--control-plane-public)
+			CONTROL_PLANE_PUBLIC="$2"
 			shift 2
 			;;
 		--profile)
@@ -172,6 +177,9 @@ function create_nlb() {
 	local TARGET_ARN=
 	local TARGET_PORT=
 
+	NLB_ARN=$(aws elbv2 create-load-balancer --profile=${AWS_PROFILE} --region=${AWS_REGION} --name ${NLB_NAME} \
+		--security-groups ${AWS_SECURITY_GROUP} --scheme ${SCHEME} --type ${TYPE} --subnets ${AWS_SUBNETID} | jq -r '.LoadBalancers[0].LoadBalancerArn')
+
 	SILENT=$(aws elbv2 modify-load-balancer-attributes --profile=${AWS_PROFILE} --region=${AWS_REGION} \
 		--load-balancer-arn=${NLB_ARN} \
 		--attributes \
@@ -213,16 +221,29 @@ function create_nlb() {
 			--protocol ${PROTOCOL} \
 			--port ${TARGET_PORT} \
 			--default-actions Type=forward,TargetGroupArn=${TARGET_ARN} > /dev/null
+
+		aws elbv2 register-targets --profile=${AWS_PROFILE} --region=${AWS_REGION} \
+			--target-group-arn ${TARGET_ARN} \
+			--targets ${INSTANCES} > /dev/null
 	done
 
 	echo ${NLB_ARN}
 }
 
 if [ ${AWS_USE_PUBLICIP} = "true" ]; then
-	create_nlb "p-${AWS_NLB_NAME}" internet-facing "${AWS_PUBLIC_SUBNETID[*]}" "80 443" network "${PUBLIC_INSTANCES_IP[*]}"
+	if [ ${CONTROL_PLANE_PUBLIC} == "true" ]; then
+		EXPOSED_PORTS="${LOAD_BALANCER_PORT[*]}"
+	else
+		EXPOSED_PORTS="80 443"
+	fi
+
+	NLB_ARN=$(create_nlb "p-${AWS_NLB_NAME}" internet-facing "${AWS_PUBLIC_SUBNETID[*]}" "${EXPOSED_PORTS}" network "${PUBLIC_INSTANCES_IP[*]}")
 fi
 
-NLB_ARN=$(create_nlb "c-${AWS_NLB_NAME}" internal "${AWS_PRIVATE_SUBNETID[*]}" "${LOAD_BALANCER_PORT[*]}" network "${CONTROLPLANE_INSTANCES_IP[*]}")
+if [ ${CONTROL_PLANE_PUBLIC} == "false" ]; then
+	NLB_ARN=$(create_nlb "c-${AWS_NLB_NAME}" internal "${AWS_PRIVATE_SUBNETID[*]}" "${LOAD_BALANCER_PORT[*]}" network "${CONTROLPLANE_INSTANCES_IP[*]}")
+fi
+
 NBL_DESCRIBE=
 
 echo_blue_dot_title "Wait NLB to start ${NLB_ARN}"

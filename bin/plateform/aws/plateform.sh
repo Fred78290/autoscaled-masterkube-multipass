@@ -38,31 +38,32 @@ function usage() {
 	cat <<EOF
 ### Flags ${PLATEFORM} plateform specific
   # Flags to set AWS informations
---profile | -p=<value>                           # Specify AWS profile, default ${AWS_PROFILE}
---region | -r=<value>                            # Specify AWS region, default ${AWS_REGION}
---route53-profile=<value>                        # Specify AWS profile for route53 if different, default ${AWS_ROUTE53_PROFILE}
---route53-zone-id=<value>                        # Specify Route53 for private DNS, default ${AWS_ROUTE53_PRIVATE_ZONE_ID}
+--profile | -p=<value>                           # Specify AWS profile, default: ${AWS_PROFILE}
+--region | -r=<value>                            # Specify AWS region, default: ${AWS_REGION}
+--route53-profile=<value>                        # Specify AWS profile for route53 if different, default: ${AWS_ROUTE53_PROFILE}
+--route53-zone-id=<value>                        # Specify Route53 for private DNS, default: ${AWS_ROUTE53_PRIVATE_ZONE_ID}
 
   # Flags to set the template vm
---seed-image=<value>                             # Override the seed image name used to create template, default ${SEED_IMAGE}
---kube-user=<value>                              # Override the seed user in template, default ${KUBERNETES_USER}
---arch=<value>                                   # Specify the architecture of VM (amd64|arm64), default ${SEED_ARCH}
---volume-type=<value>                            # Override the root EBS volume type, default ${VOLUME_TYPE}
---volume-size=<value>                            # Override the root EBS volume size in Gb, default ${VOLUME_SIZE}
+--seed-image=<value>                             # Override the seed image name used to create template, default: ${SEED_IMAGE}
+--kube-user=<value>                              # Override the seed user in template, default: ${KUBERNETES_USER}
+--arch=[amd64|arm64]                             # Specify the architecture of VM (amd64|arm64), default: ${SEED_ARCH}
+--volume-type=<value>                            # Override the root EBS volume type, default: ${VOLUME_TYPE}
+--volume-size=<value>                            # Override the root EBS volume size in Gb, default: ${VOLUME_SIZE}
 
   # Flags in ha mode only
 --use-nlb=[none|cloud|nginx]                     # Use AWS NLB as load balancer or create nginx gateway in public AZ 
 
   # Flags to configure network in ${PLATEFORM}
---prefer-ssh-publicip                            # Allow to SSH on publicip when available, default ${PREFER_SSH_PUBLICIP}
---internet-facing                                # Expose the cluster on internet, default ${EXPOSE_PUBLIC_CLUSTER}--public-subnet-id=<subnetid,...>                # Specify the public subnet ID for created VM, default ${VPC_PUBLIC_SUBNET_ID}
---public-sg-id=<sg-id>                           # Specify the public security group ID for VM, default ${VPC_PUBLIC_SECURITY_GROUPID}
---private-subnet-id<subnetid,...>                # Specify the private subnet ID for created VM, default ${VPC_PRIVATE_SUBNET_ID}
---private-sg-id=<sg-id>                          # Specify the private security group ID for VM, default ${VPC_PRIVATE_SECURITY_GROUPID}
+--prefer-ssh-publicip                            # Allow to SSH on publicip when available, default: ${PREFER_SSH_PUBLICIP}
+--internet-facing                                # Expose the cluster on internet, default: ${EXPOSE_PUBLIC_CLUSTER}
+--public-subnet-id=<subnetid,...>                # Specify the public subnet ID for created VM, default: ${VPC_PUBLIC_SUBNET_ID}
+--public-sg-id=<sg-id>                           # Specify the public security group ID for VM, default: ${VPC_PUBLIC_SECURITY_GROUPID}
+--private-subnet-id<subnetid,...>                # Specify the private subnet ID for created VM, default: ${VPC_PRIVATE_SUBNET_ID}
+--private-sg-id=<sg-id>                          # Specify the private security group ID for VM, default: ${VPC_PRIVATE_SECURITY_GROUPID}
 
   # Flags to expose nodes in public AZ with public IP
---control-plane-public                           # Control plane are hosted in public subnet with public IP, default ${CONTROLPLANE_USE_PUBLICIP}
---worker-node-public                             # Worker nodes are hosted in public subnet with public IP, default ${WORKERNODE_USE_PUBLICIP}
+--control-plane-public                           # Control plane are hosted in public subnet with public IP, default: ${CONTROLPLANE_USE_PUBLICIP}
+--worker-node-public                             # Worker nodes are hosted in public subnet with public IP, default: ${WORKERNODE_USE_PUBLICIP}
 EOF
 }
 

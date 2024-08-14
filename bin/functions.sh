@@ -17,53 +17,53 @@ Options are:
 
 ### Flags to set some location informations
 
---configuration-location=<path>                  # Specify where configuration will be stored, default ${CONFIGURATION_LOCATION}
---ssl-location=<path>                            # Specify where the etc/ssl dir is stored, default ${SSL_LOCATION}
---defs=<path>                                    # Specify the ${PLATEFORM} definitions, default ${PLATEFORMDEFS}
+--configuration-location=<path>                  # Specify where configuration will be stored, default: ${CONFIGURATION_LOCATION}
+--ssl-location=<path>                            # Specify where the etc/ssl dir is stored, default: ${SSL_LOCATION}
+--defs=<path>                                    # Specify the hidden ${PLATEFORM} variables, default: ${PLATEFORMDEFS}
 
 ### Design the kubernetes cluster
 
---autoscale-machine=<value>                      # Override machine type used for auto scaling, default ${AUTOSCALE_MACHINE}
+--autoscale-machine=<value>                      # Override machine type used for auto scaling, default: ${AUTOSCALE_MACHINE}
 --cni-plugin=<value>                             # Override CNI plugin, default: ${CNI_PLUGIN}
 --cni-version=<value>                            # Override CNI plugin version, default: ${CNI_VERSION}
---container-runtime=<docker|containerd|cri-o>    # Specify which OCI runtime to use, default ${CONTAINER_ENGINE}
---control-plane-machine=<value>                  # Override machine type used for control plane, default ${CONTROL_PLANE_MACHINE}
---ha-cluster | -c                                # Allow to create an HA cluster, default ${HA_CLUSTER}
---kube-engine=<kubeadm|k3s|rke2|microk8s>        # Which kubernetes distribution to use: kubeadm, k3s, rke2, default ${KUBERNETES_DISTRO}
---kube-version | -k=<value>                      # Override the kubernetes version, default ${KUBERNETES_VERSION}
---max-pods=<value>                               # Specify the max pods per created VM, default ${MAX_PODS}
---nginx-machine=<value>                          # Override machine type used for nginx as ELB, default ${NGINX_MACHINE}
---node-group=<value>                             # Override the node group name, default ${NODEGROUP_NAME}
---ssh-private-key=<path>                         # Override ssh key is used, default ${SSH_PRIVATE_KEY}
---transport=<value>                              # Override the transport to be used between autoscaler and kubernetes-cloud-autoscaler, default ${TRANSPORT}
---worker-node-machine=<value>                    # Override machine type used for worker nodes, default ${WORKER_NODE_MACHINE}
---worker-nodes=<value>                           # Specify the number of worker nodes created in HA cluster, default ${WORKERNODES}
---create-external-etcd | -e                      # Create an external HA etcd cluster, default ${EXTERNAL_ETCD}
---use-cloud-init                                 # Use cloud-init to configure autoscaled nodes instead off ssh, default ${USE_CLOUDINIT_TO_CONFIGURE}
+--container-runtime=<docker|containerd|cri-o>    # Specify which OCI runtime to use, default: ${CONTAINER_ENGINE}
+--control-plane-machine=<value>                  # Override machine type used for control plane, default: ${CONTROL_PLANE_MACHINE}
+--ha-cluster | -c                                # Allow to create an HA cluster, default: ${HA_CLUSTER}
+--kube-engine=<kubeadm|k3s|rke2|microk8s>        # Which kubernetes distribution to use: kubeadm, k3s, rke2, default: ${KUBERNETES_DISTRO}
+--kube-version | -k=<value>                      # Override the kubernetes version, default: ${KUBERNETES_VERSION}
+--max-pods=<value>                               # Specify the max pods per created VM, default: ${MAX_PODS}
+--nginx-machine=<value>                          # Override machine type used for nginx as ELB, default: ${NGINX_MACHINE}
+--node-group=<value>                             # Override the node group name, default: ${NODEGROUP_NAME}
+--ssh-private-key=<path>                         # Override ssh key is used, default: ${SSH_PRIVATE_KEY}
+--transport=<value>                              # Override the transport to be used between autoscaler and kubernetes-cloud-autoscaler, default: ${TRANSPORT}
+--worker-node-machine=<value>                    # Override machine type used for worker nodes, default: ${WORKER_NODE_MACHINE}
+--worker-nodes=<value>                           # Specify the number of worker nodes created in HA cluster, default: ${WORKERNODES}
+--create-external-etcd | -e                      # Create an external HA etcd cluster, default: ${EXTERNAL_ETCD}
+--use-cloud-init                                 # Use cloud-init to configure autoscaled nodes instead off ssh, default: ${USE_CLOUDINIT_TO_CONFIGURE}
 
 ### Design domain
 
---public-domain=<value>                          # Specify the public domain to use, default ${PUBLIC_DOMAIN_NAME}
---private-domain=<value>                         # Specify the private domain to use, default ${PRIVATE_DOMAIN_NAME}
---dashboard-hostname=<value>                     # Specify the hostname for kubernetes dashboard, default ${DASHBOARD_HOSTNAME}
+--public-domain=<value>                          # Specify the public domain to use, default: ${PUBLIC_DOMAIN_NAME}
+--private-domain=<value>                         # Specify the private domain to use, default: ${PRIVATE_DOMAIN_NAME}
+--dashboard-hostname=<value>                     # Specify the hostname for kubernetes dashboard, default: ${DASHBOARD_HOSTNAME}
 --external-dns-provider=<aws|godaddy|designate>  # Specify external dns provider.
 
 ### Cert Manager
 
---cert-email=<value>                             # Specify the mail for lets encrypt, default ${CERT_EMAIL}
---use-zerossl                                    # Specify cert-manager to use zerossl, default ${USE_ZEROSSL}
+--cert-email=<value>                             # Specify the mail for lets encrypt, default: ${CERT_EMAIL}
+--use-zerossl                                    # Specify cert-manager to use zerossl, default: ${USE_ZEROSSL}
 --use-self-signed-ca                             # Specify if use self-signed CA, default: ${USE_CERT_SELFSIGNED}
---zerossl-eab-kid=<value>                        # Specify zerossl eab kid, default ${CERT_ZEROSSL_EAB_KID}
---zerossl-eab-hmac-secret=<value>                # Specify zerossl eab hmac secret, default ${CERT_ZEROSSL_EAB_HMAC_SECRET}
+--zerossl-eab-kid=<value>                        # Specify zerossl eab kid, default: ${CERT_ZEROSSL_EAB_KID}
+--zerossl-eab-hmac-secret=<value>                # Specify zerossl eab hmac secret, default: ${CERT_ZEROSSL_EAB_HMAC_SECRET}
 
   # GoDaddy
 --godaddy-key                                    # Specify godaddy api key
 --godaddy-secret                                 # Specify godaddy api secret
 
   # Route53
---route53-zone-id                                # Specify the route53 zone id, default ${AWS_ROUTE53_PUBLIC_ZONE_ID}
---route53-access-key                             # Specify the route53 aws access key, default ${AWS_ROUTE53_ACCESSKEY}
---route53-secret-key                             # Specify the route53 aws secret key, default ${AWS_ROUTE53_SECRETKEY}
+--route53-zone-id                                # Specify the route53 zone id, default: ${AWS_ROUTE53_PUBLIC_ZONE_ID}
+--route53-access-key                             # Specify the route53 aws access key, default: ${AWS_ROUTE53_ACCESSKEY}
+--route53-secret-key                             # Specify the route53 aws secret key, default: ${AWS_ROUTE53_SECRETKEY}
 
 ### Flags for autoscaler
 --grpc-provider=<value>                          # autoscaler flag <grpc|externalgrpc>, default: ${GRPC_PROVIDER}
@@ -94,33 +94,40 @@ function usage() {
 ### Flags ${PLATEFORM} plateform specific
 
   # Flags to configure nfs client provisionner
---nfs-server-adress                            # The NFS server address, default ${NFS_SERVER_ADDRESS}
---nfs-server-mount                             # The NFS server mount path, default ${NFS_SERVER_PATH}
---nfs-storage-class                            # The storage class name to use, default ${NFS_STORAGE_CLASS}
+--nfs-server-adress                            # The NFS server address, default: ${NFS_SERVER_ADDRESS}
+--nfs-server-mount                             # The NFS server mount path, default: ${NFS_SERVER_PATH}
+--nfs-storage-class                            # The storage class name to use, default: ${NFS_STORAGE_CLASS}
 
   # Flags to set the template vm
---seed-image=<value>                           # Override the seed image name used to create template, default ${SEED_IMAGE}
---kube-user=<value>                            # Override the seed user in template, default ${KUBERNETES_USER}
+--seed-image=<value>                           # Override the seed image name used to create template, default: ${SEED_IMAGE}
+--kube-user=<value>                            # Override the seed user in template, default: ${KUBERNETES_USER}
 --kube-password | -p=<value>                   # Override the password to ssh the cluster VM, default random word
+
+  # RFC2136 space
+--use-named-server=[true|false]                # Tell if we use bind9 server for DNS registration, default: ${USE_BIND9_SERVER}
+--install-named-server                         # Tell if we install bind9 server for DNS registration, default: ${INSTALL_BIND9_SERVER}
+--named-server-host=<host address>             # Host of used bind9 server for DNS registration, default: ${BIND9_HOST}
+--named-server-port=<bind port>                # Port of used bind9 server for DNS registration, default: ${BIND9_PORT}
+--named-server-key=<path>                      # RNDC key file for used bind9 server for DNS registration, default: ${BIND9_RNDCKEY}
 
   # Flags to configure network in ${PLATEFORM}
 --use-nlb=[none|keepalived|nginx]              # Use keepalived or NGINX as load balancer
---vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
---vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default ${VC_NETWORK_PUBLIC}
---no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
---dhcp-autoscaled-node                         # Autoscaled node use DHCP, default ${SCALEDNODES_DHCP}
---private-domain=<value>                       # Override the domain name, default ${PRIVATE_DOMAIN_NAME}
---net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${PRIVATE_IP}
---net-gateway=<value>                          # Override the IP gateway, default ${PRIVATE_GATEWAY}
---net-gateway-metric=<value>                   # Override the IP gateway metric, default ${PRIVATE_GATEWAY_METRIC}
---net-dns=<value>                              # Override the IP DNS, default ${PRIVATE_DNS}
+--vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default: ${VC_NETWORK_PRIVATE}
+--vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default: ${VC_NETWORK_PUBLIC}
+--no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default: ${SCALEDNODES_DHCP}
+--dhcp-autoscaled-node                         # Autoscaled node use DHCP, default: ${SCALEDNODES_DHCP}
+--private-domain=<value>                       # Override the domain name, default: ${PRIVATE_DOMAIN_NAME}
+--net-address=<value>                          # Override the IP of the kubernetes control plane node, default: ${PRIVATE_IP}
+--net-gateway=<value>                          # Override the IP gateway, default: ${PRIVATE_GATEWAY}
+--net-gateway-metric=<value>                   # Override the IP gateway metric, default: ${PRIVATE_GATEWAY_METRIC}
+--net-dns=<value>                              # Override the IP DNS, default: ${PRIVATE_DNS}
 
---public-address=<value>                       # The public address to expose kubernetes endpoint[ipv4/cidr, DHCP, NONE], default ${PUBLIC_IP}
---metallb-ip-range                             # Override the metalb ip range, default ${METALLB_IP_RANGE}
---dont-use-dhcp-routes-private                 # Tell if we don't use DHCP routes in private network, default ${USE_DHCP_ROUTES_PRIVATE}
---dont-use-dhcp-routes-public                  # Tell if we don't use DHCP routes in public network, default ${USE_DHCP_ROUTES_PUBLIC}
---add-route-private                            # Add route to private network syntax is --add-route-private=to=X.X.X.X/YY,via=X.X.X.X,metric=100 --add-route-private=to=Y.Y.Y.Y/ZZ,via=X.X.X.X,metric=100, default ${NETWORK_PRIVATE_ROUTES[@]}
---add-route-public                             # Add route to public network syntax is --add-route-public=to=X.X.X.X/YY,via=X.X.X.X,metric=100 --add-route-public=to=Y.Y.Y.Y/ZZ,via=X.X.X.X,metric=100, default ${NETWORK_PUBLIC_ROUTES[@]}
+--public-address=<value>                       # The public address to expose kubernetes endpoint[ipv4/cidr, DHCP, NONE], default: ${PUBLIC_IP}
+--metallb-ip-range                             # Override the metalb ip range, default: ${METALLB_IP_RANGE}
+--dont-use-dhcp-routes-private                 # Tell if we don't use DHCP routes in private network, default: ${USE_DHCP_ROUTES_PRIVATE}
+--dont-use-dhcp-routes-public                  # Tell if we don't use DHCP routes in public network, default: ${USE_DHCP_ROUTES_PUBLIC}
+--add-route-private                            # Add route to private network syntax is --add-route-private=to=X.X.X.X/YY,via=X.X.X.X,metric=100 --add-route-private=to=Y.Y.Y.Y/ZZ,via=X.X.X.X,metric=100, default: ${NETWORK_PRIVATE_ROUTES[@]}
+--add-route-public                             # Add route to public network syntax is --add-route-public=to=X.X.X.X/YY,via=X.X.X.X,metric=100 --add-route-public=to=Y.Y.Y.Y/ZZ,via=X.X.X.X,metric=100, default: ${NETWORK_PUBLIC_ROUTES[@]}
 
 EOF
 }

@@ -21,35 +21,42 @@ function usage() {
 ### Flags ${PLATEFORM} plateform specific
 
   # Flags to configure nfs client provisionner
---nfs-server-adress                            # The NFS server address, default ${NFS_SERVER_ADDRESS}
---nfs-server-mount                             # The NFS server mount path, default ${NFS_SERVER_PATH}
---nfs-storage-class                            # The storage class name to use, default ${NFS_STORAGE_CLASS}
+--nfs-server-adress                            # The NFS server address, default: ${NFS_SERVER_ADDRESS}
+--nfs-server-mount                             # The NFS server mount path, default: ${NFS_SERVER_PATH}
+--nfs-storage-class                            # The storage class name to use, default: ${NFS_STORAGE_CLASS}
 
   # Flags to set the template vm
---seed-image=<value>                           # Override the seed image name used to create template, default ${SEED_IMAGE}
---kube-user=<value>                            # Override the seed user in template, default ${KUBERNETES_USER}
+--seed-image=<value>                           # Override the seed image name used to create template, default: ${SEED_IMAGE}
+--kube-user=<value>                            # Override the seed user in template, default: ${KUBERNETES_USER}
 --kube-password | -p=<value>                   # Override the password to ssh the cluster VM, default random word
+
+  # RFC2136 space
+--use-named-server=[true|false]                # Tell if we use bind9 server for DNS registration, default: ${USE_BIND9_SERVER}
+--install-named-server                         # Tell if we install bind9 server for DNS registration, default: ${INSTALL_BIND9_SERVER}
+--named-server-host=<host address>             # Host of used bind9 server for DNS registration, default: ${BIND9_HOST}
+--named-server-port=<bind port>                # Port of used bind9 server for DNS registration, default: ${BIND9_PORT}
+--named-server-key=<path>                      # RNDC key file for used bind9 server for DNS registration, default: ${BIND9_RNDCKEY}
 
   # Flags in ha mode only
 --use-nlb=[none|nginx|cloud|keepalived]        # Use plateform load balancer in public AZ
 
   # Flags to configure network in ${PLATEFORM}
---vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default ${VC_NETWORK_PRIVATE}
---vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default ${VC_NETWORK_PUBLIC}
---no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default ${SCALEDNODES_DHCP}
---dhcp-autoscaled-node                         # Autoscaled node use DHCP, default ${SCALEDNODES_DHCP}
---private-domain=<value>                       # Override the domain name, default ${PRIVATE_DOMAIN_NAME}
---net-address=<value>                          # Override the IP of the kubernetes control plane node, default ${PRIVATE_IP}
---net-dns=<value>                              # Override the IP DNS, default ${PRIVATE_DNS}
+--vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default: ${VC_NETWORK_PRIVATE}
+--vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default: ${VC_NETWORK_PUBLIC}
+--no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default: ${SCALEDNODES_DHCP}
+--dhcp-autoscaled-node                         # Autoscaled node use DHCP, default: ${SCALEDNODES_DHCP}
+--private-domain=<value>                       # Override the domain name, default: ${PRIVATE_DOMAIN_NAME}
+--net-address=<value>                          # Override the IP of the kubernetes control plane node, default: ${PRIVATE_IP}
+--net-dns=<value>                              # Override the IP DNS, default: ${PRIVATE_DNS}
 
---prefer-ssh-publicip                          # Allow to SSH on publicip when available, default ${PREFER_SSH_PUBLICIP}
---external-security-group=<name>               # Specify the public security group ID for VM, default ${EXTERNAL_SECURITY_GROUP}
---internal-security-group=<name>               # Specify the private security group ID for VM, default ${INTERNAL_SECURITY_GROUP}
---internet-facing                              # Expose the cluster on internet, default ${EXPOSE_PUBLIC_CLUSTER}--public-subnet-id=<subnetid,...>                # Specify the public subnet ID for created VM, default ${VPC_PUBLIC_SUBNET_ID}
+--prefer-ssh-publicip                          # Allow to SSH on publicip when available, default: ${PREFER_SSH_PUBLICIP}
+--external-security-group=<name>               # Specify the public security group ID for VM, default: ${EXTERNAL_SECURITY_GROUP}
+--internal-security-group=<name>               # Specify the private security group ID for VM, default: ${INTERNAL_SECURITY_GROUP}
+--internet-facing                              # Expose the cluster on internet, default: ${EXPOSE_PUBLIC_CLUSTER}--public-subnet-id=<subnetid,...>                # Specify the public subnet ID for created VM, default: ${VPC_PUBLIC_SUBNET_ID}
 
   # Flags to expose nodes in public AZ with public IP
---control-plane-public                         # Control plane are exposed to public, default ${CONTROLPLANE_USE_PUBLICIP}
---worker-node-public                           # Worker nodes are exposed to public, default ${WORKERNODE_USE_PUBLICIP}
+--control-plane-public                         # Control plane are exposed to public, default: ${CONTROLPLANE_USE_PUBLICIP}
+--worker-node-public                           # Worker nodes are exposed to public, default: ${WORKERNODE_USE_PUBLICIP}
 
 EOF
 }

@@ -93,7 +93,6 @@ time {
 			TRACE=YES
 			shift
 		elif [[ "${ARG}" = --plateform* ]] || [[ "${ARG}" = -p* ]]; then
-			export PLATEFORM=
 			IFS== read IGNORE PLATEFORM <<<"${ARG}"
 
 			if [ -z "${PLATEFORM}" ]; then

@@ -1,78 +1,125 @@
+[![Licence](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://github.com/Fred78290/autoscaled-masterkube-multipass/blob/master/LICENSE)
+
 # Introduction
 
-This directory contains everthing to create an autoscaled cluster with multipass.
+This project contains everthing to create an single plane or HA autoscaling kubernetes cluster with following supported engine on following plateform.
+
+Supported kubernetes engine are
+
+* k3s
+* rke2
+* kubeadm
+* microk8s
+
+Supported plateform are
+
+* AWS
+* CloudStack
+* Multipass
+* OpenStack
+* VMWare Fusion
+* VMWare Workstation
+* vSphere
+
+The cluster support also autoscaling by using [kubernetes-cloud-autoscaler](https://github.com/Fred78290/kubernetes-cloud-autoscaler) and [grpc autoscaler](https://github.com/Fred78290/autoscaler) or **vanilla autoscaler**
 
 ## Prerequistes
 
-Ensure that you have sudo right
+Ensure that you have sudo right and the following tools installed
 
-You must also install
+| Linux | MacOS |
+| --- | --- |
+| envsubst | envsubst |
+| helm | helm |
+| kubectl | kubectl |
+| jq | jq |
+| yq | yq |
+| cfssl | cfssl |
+|| gnu-getopt |
+|| gsed |
+|| gbase64 |
 
-Linux Plateform
-    multipass
-    libvirt
-    python
-    python-yaml
+You must also install depending target plateform
 
-Darwin Plateform
-    multipass
-    python
-    python-yaml
-    gnu-getopt
+| Multipass | OpenStack | CloudStack | VSphere | VMWare Desktop | Aws |
+| --- | --- | --- | --- | --- | --- |
+| packer | packer | packer | govc | vmware-vdiskmanager | aws |
+| packer-plugin-qemu | packer-plugin-openstack | packer-plugin-cloudstack | - | ovftool | |
+| multipass | openstack-client | cmk | - | kubernetes-desktop-autoscaler-utility  | |
+| kubernetes-desktop-autoscaler-utility | - | - | - | - | |
+| qemu-img | | | | | |
+
+Some of these tools could be installed via homebrew
 
 ## Create the masterkube
 
-The simply way to create the masterkube is to run [create-masterkube.sh](create-masterkube.sh)
+The simply way to create the masterkube is to run [./bin/create-masterkube.sh --plateform=\<aws|cloudstack|desktop|multipass|openstack\> --kube-engine=\<k3s|rke2|kubeadm|microk8s\>](./bin/create-masterkube.sh)
 
 Some needed file are located in:
 
 | Name | Description |
 | --- | --- |
 | `bin` | Essentials scripts to build the master kubernetes node  |
-| `etc/ssl`  | Your CERT for https. Autosigned will be generated if empty  |
-| `template`  | Templates files to deploy pod & service |
+| `bin/plateform` | Essentials scripts for target plateform  |
+| `etc/ssl/<choosen domain>`  | Your CERT for https. Autosigned will be generated if empty `cert.pem, chain.pem, fullchain.pem, privkey.pem` |
+| `images`  | Generated qemu-image for multipass plateform |
+| `templates`  | Templates files to deploy pod & service |
+| `tools`  | Bootstrap files installed in nodes |
 
-The first thing done by this script is to create a Ubuntu-18.04.1 image with kubernetes and docker installed. The image will be located here [images](./images)
+The first thing done by this script is to create an Ubuntu-24.04 image with choosen kubernetes engine installed with needed components. The image will be stored on the targeted plateform (template VM, AMI, qemu-img, ....)
 
-Next step will be to launch a multipass VM and create a master node. It will also deploy a dashboard at the URL https://masterkube-local-dashboard.@your-domain@/
+Next step will be to launch a VM on choosen plateform and create a master node.
 
-To connect to the dashboard, copy paste the token from file [cluster/dashboard-token](./cluster/dashboard-token)
+## Private DNS registration
 
-Next step is to deploy a replicaset helloworld. This replicaset use hostnetwork:true to enforce one pod per node.
+For easier integration the tool allows to register cluster in private Route53 zone or in an existing DNS server RFC2136 compliant. It's possible also to deploy an internal Bind9 server and use it for private domain registration. If the plateform is openstack and designate is available with your private domain, it wil be used
 
-During the process the script will create many files located in
+## Public DNS registration
+
+If you decide to expose the cluster on internet, the tool have the ability to register the cluster in public Route53 zone or in GoDaddy resolver. If the plateform is openstack and designate is available with your public domain, it wil be used.
+
+## Installation per plateform
+
+[Install on AWS](docs/aws/README.md)
+
+[Install on CloudStack](docs/cloudstack/README.md)
+
+[Install on Multipass](docs/multipass/README.md)
+
+[Install on OpenStack](docs/opestack/README.md)
+
+[Install on VMWare Workstation or VMWare Fusion](docs/desktop/README.md)
+
+[Install on vSphere](docs/vsphere/README.md)
+
+During the process many files created will be located at
 
 | Name | Description |
 | --- | --- |
-| `cluster` | Essentials file to connect to kubernetes with kubeadm join  |
-| `config`  | Configuration file generated during the build process  |
-| `kubernetes`  | Files generated by kubeadm init located in /etc/kubernetes |
+| `config/<generated nodegroup name>/cluster` | Essentials file generated by kubernetes engine needed to join node  |
+| `config/<generated nodegroup name>/config`  | Configuration file generated during the build process  |
+| `config/<generated nodegroup name>/deployment`  | Files generated by deployment process |
 
-## Command line arguments
+The nodegroup name have this pattern `NODEGROUP_NAME=${PLATEFORM}-${DEPLOY_MODE}-${KUBERNETES_DISTRO}`
 
-| Parameter | Description | Default |
-| --- | --- |--- |
-| `-c or --no-custom-image` | Use standard image  | NO |
-| `-d or --default-machine`  | Kind of machine to launch if not speficied  | medium |
-| `-i or --image`  | Alternate image  ||
-| `-k or --ssh-key`  |Alternate ssh key file |~/.ssh/id_rsa|
-| `-n or --cni-version`  |CNI version |0.71
-| `-p or--password`  |Define the kubernetes user password |randomized|
-| `-v or --kube-version`  |Which version of kubernetes to use |latest|
-| `--max-nodes-total` | Maximum number of nodes in all node groups. Cluster autoscaler will not grow the cluster beyond this number. | 5 |
-| `--cores-total` | Minimum and maximum number of cores in cluster, in the format <min>:<max>. Cluster autoscaler will not scale the cluster beyond these numbers. | 0:16 |
-| `--memory-total` | Minimum and maximum number of gigabytes of memory in cluster, in the format <min>:<max>. Cluster autoscaler will not scale the cluster beyond these numbers. | 0:24 |
-| `--max-autoprovisioned-node-group-count` | The maximum number of autoprovisioned groups in the cluster | 1 |
-| `--scale-down-enabled` | Should CA scale down the cluster | true |
-| `--scale-down-utilization-threshold` | The maximum value between the sum of cpu requests and sum of memory requests of all pods running on the node divided by node's corresponding allocatable resource, below which a node can be considered for scale down. This value is a floating point number that can range between zero and one. | 0.5 |
-| `--scale-down-gpu-utilization-threshold` | Sum of gpu requests of all pods running on the node divided by node's allocatable resource, below which a node can be considered for scale down. Utilization calculation only cares about gpu resource for accelerator node. cpu and memory utilization will be ignored. | 0.5 |
-| `--scale-down-delay-after-add` | How long after scale up that scale down evaluation resumes | 1 minutes |
-| `--scale-down-delay-after-delete` | How long after node deletion that scale down evaluation resumes, defaults to scan-interval | 1 minutes |
-| `--scale-down-delay-after-failure` | How long after scale down failure that scale down evaluation resumes | 1 minutes |
-| `--scale-down-unneeded-time` | How long a node should be unneeded before it is eligible for scale down | 1 minutes |
-| `--scale-down-unready-time` | How long an unready node should be unneeded before it is eligible for scale down | 1 minutes |
-| `--max-node-provision-time` | The default maximum time CA waits for node to be provisioned - the value can be overridden per node group | 15 minutes |
-| `--unremovable-node-recheck-timeout` | The timeout before we check again a node that couldn't be removed before | 1 minutes |
+The process install also following kubernetes components
+
+* cert manager
+* external dns
+* kubernetes dashboard and metrics scraper
+* kubeapps
+* rancher
+* nginx ingress controller
+
+The kubernetes dashboard is reachable at the URL https://dashboard-@generated-groupname@.@your-domain@/
+
+To connect to the dashboard, copy paste the token from file [config/<generated nodegroup name>cluster/dashboard-token](./cluster/dashboard-token)
+
+The kubeapps UI is reachable at the URL https://kubeapps-@generated-groupname@.@your-domain@/
+
+The Rancher UI is reachable at the URL https://rancher-@generated-groupname@.@your-domain@/
+
+It also deployed a replicaset helloworld to demonstrate the ability of autoscaling
 
 ## Raise autoscaling
 
@@ -83,3 +130,83 @@ To scale fresh masterkube `kubectl scale --replicas=2 deploy/helloworld -n kube-
 ## Delete master kube and worker nodes
 
 To delete the master kube and associated worker nodes, just run the command [delete-masterkube.sh](./bin/delete-masterkube.sh)
+
+## Common command line arguments
+
+| Parameter | Description | Default |
+| --- | --- |--- |
+| --help \| -h | Display usage | |
+| --plateform=[vsphere\|aws\|desktop\|multipass] | Where to deploy cluster | ${PLATEFORM} |
+| --verbose \| -v | Verbose | NO |
+| --trace \| -x | Trace execution | NO |
+| --resume \| -r | Allow to resume interrupted creation of cluster kubernetes | |
+| --delete \| -d | Delete cluster and exit | |
+| --distribution | Ubuntu distribution to use | ${UBUNTU_DISTRIBUTION} |
+| --create-image-only | Create image only | NO |
+| --upgrade | Upgrade existing cluster to upper version of kubernetes | |
+| | **Flags to set some location informations** | |
+| --configuration-location=\<path\> | Specify where configuration will be stored | ${CONFIGURATION_LOCATION} |
+| --ssl-location=\<path\> | Specify where the etc/ssl dir is stored | ${SSL_LOCATION} |
+| --defs=\<path\> | Specify the hidden ${PLATEFORM} variables | ./bin/plateform/${PLATEFORM}/vars.def |
+| | **Design the kubernetes cluster** | |
+| --autoscale-machine=\<value\> | Override machine type used for auto scaling | ${AUTOSCALE_MACHINE} |
+| --cni-plugin=\<value\> | Override CNI plugin | ${CNI_PLUGIN} |
+| --cni-version=\<value\> | Override CNI plugin version | ${CNI_VERSION} |
+| --container-runtime=[containerd\|cri-o] | Specify which OCI runtime to use | ${CONTAINER_ENGINE} |
+| --control-plane-machine=\<value\> | Override machine type used for control plane | ${CONTROL_PLANE_MACHINE} |
+| --ha-cluster \| -c | Allow to create an HA cluster | ${HA_CLUSTER} |
+| --kube-engine=[kubeadm\|k3s\|rke2\|microk8s] | Which kubernetes distribution to use: kubeadm, k3s, rke2 | ${KUBERNETES_DISTRO} |
+| --kube-version \| -k=\<value\> | Override the kubernetes version | ${KUBERNETES_VERSION} |
+| --max-pods=\<value\> | Specify the max pods per created VM | ${MAX_PODS} |
+| --nginx-machine=\<value\> | Override machine type used for nginx as ELB | ${NGINX_MACHINE} |
+| --node-group=\<value\> | Override the node group name | ${NODEGROUP_NAME} |
+| --ssh-private-key=\<path\> | Override ssh key is used | ${SSH_PRIVATE_KEY} |
+| --transport=[tcp\|unix] | Override the transport to be used between autoscaler and kubernetes-cloud-autoscaler | unix |
+| --worker-node-machine=\<value\> | Override machine type used for worker nodes | ${WORKER_NODE_MACHINE} |
+| --worker-nodes=\<value\> | Specify the number of worker nodes created in HA cluster | ${WORKERNODES} |
+| --create-external-etcd \| -e | Create an external HA etcd cluster | ${EXTERNAL_ETCD} |
+| --use-cloud-init | Use cloud-init to configure autoscaled nodes instead off ssh | ${USE_CLOUDINIT_TO_CONFIGURE} |
+| | **Design domain** | |
+| --public-domain=\<value\> | Specify the public domain to use | ${PUBLIC_DOMAIN_NAME} |
+| --private-domain=\<value\> | Specify the private domain to use | ${PRIVATE_DOMAIN_NAME} |
+| --dashboard-hostname=\<value\> | Specify the hostname for kubernetes dashboard | ${DASHBOARD_HOSTNAME} |
+| --external-dns-provider=[none\|aws\|godaddy\|rfc2136\|designate] | Specify external dns provider. | ${EXTERNAL_DNS_PROVIDER} |
+| | **Cert Manager** | |
+| --cert-email=\<value\> | Specify the mail for lets encrypt | ${CERT_EMAIL} |
+| --use-zerossl | Specify cert-manager to use zerossl | ${USE_ZEROSSL} |
+| --use-self-signed-ca | Specify if use self-signed CA | ${USE_CERT_SELFSIGNED} |
+| --zerossl-eab-kid=\<value\> | Specify zerossl eab kid | ${CERT_ZEROSSL_EAB_KID} |
+| --zerossl-eab-hmac-secret=\<value\> | Specify zerossl eab hmac secret | ${CERT_ZEROSSL_EAB_HMAC_SECRET} |
+| | **GoDaddy** | |
+| --godaddy-key=\<value\> | Specify godaddy api key | ${CERT_GODADDY_API_KEY:=GODADDY_API_KEY} |
+| --godaddy-secret=\<value\> | Specify godaddy api secret | ${CERT_GODADDY_API_SECRET:=GODADDY_API_SECRET} |
+| | **Route53** | |
+| --route53-zone-id=\<value\> | Specify the route53 zone id | ${AWS_ROUTE53_PUBLIC_ZONE_ID} |
+| --route53-access-key=\<value\> | Specify the route53 aws access key | ${AWS_ROUTE53_ACCESSKEY} |
+| --route53-secret-key=\<value\> | Specify the route53 aws secret key | ${AWS_ROUTE53_SECRETKEY} |
+| | **Flags for autoscaler** | |
+| --grpc-provider=[grpc\|externalgrpc] | autoscaler flag | ${GRPC_PROVIDER} |
+| --max-nodes-total=\<value\> | autoscaler flag | ${MAXTOTALNODES} |
+| --cores-total=\<value\> | autoscaler flag | ${CORESTOTAL} |
+| --memory-total=\<value\> | autoscaler flag | ${MEMORYTOTAL} |
+| --max-autoprovisioned-node-group-count=\<value\> | autoscaler flag | ${MAXAUTOPROVISIONNEDNODEGROUPCOUNT} |
+| --scale-down-enabled=\<value\> | autoscaler flag | ${SCALEDOWNENABLED} |
+| --scale-down-utilization-threshold=\<value\> | autoscaler flag | ${SCALEDOWNUTILIZATIONTHRESHOLD} |
+| --scale-down-gpu-utilization-threshold=\<value\> | autoscaler flag | ${SCALEDOWNGPUUTILIZATIONTHRESHOLD} |
+| --scale-down-delay-after-add=\<value\> | autoscaler flag | ${SCALEDOWNDELAYAFTERADD} |
+| --scale-down-delay-after-delete=\<value\> | autoscaler flag | ${SCALEDOWNDELAYAFTERDELETE} |
+| --scale-down-delay-after-failure=\<value\> | autoscaler flag | ${SCALEDOWNDELAYAFTERFAILURE} |
+| --scale-down-unneeded-time=\<value\> | autoscaler flag | ${SCALEDOWNUNEEDEDTIME} |
+| --scale-down-unready-time=\<value\> | autoscaler flag | ${SCALEDOWNUNREADYTIME} |
+| --max-node-provision-time=\<value\> | autoscaler flag | ${MAXNODEPROVISIONTIME} |
+| --unremovable-node-recheck-timeout=\<value\> | autoscaler flag | ${UNREMOVABLENODERECHECKTIMEOUT} |
+
+## Raise autoscaling
+
+To scale up or down the cluster, just play with `kubectl scale`
+
+To scale fresh masterkube `kubectl scale --replicas=2 deploy/helloworld -n kube-public`
+
+## Delete master kube and worker nodes
+
+To delete the master kube and associated worker nodes, just run the command [./bin/delete-masterkube.sh --plateform=\<plateform\> --kube-engine=\<engine\>](./bin/delete-masterkube.sh)

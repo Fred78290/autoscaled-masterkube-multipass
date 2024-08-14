@@ -4,7 +4,7 @@ REGION=${OS_REGION_NAME}
 ZONEID=${OS_ZONE_NAME}
 PUBLIC_NODE_IP=NONE
 PUBLIC_VIP_ADDRESS=
-CERT_SELFSIGNED_FORCED=YES
+USE_CERT_SELFSIGNED=YES
 SEED_ARCH=amd64
 PRIVATE_IP=$(openstack subnet show $(openstack network show ${VC_NETWORK_PRIVATE} -f json | jq -r '.subnets[0]') -f json | jq -r '.cidr' | cut -d '/' -f 1)
 PRIVATE_IP="${PRIVATE_IP::-2}.10"
@@ -756,7 +756,7 @@ function prepare_plateform() {
 					echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} handled by designate: ${OS_PUBLIC_DNS_ZONEID}"
 					echo_red_bold "Designate will be used to register public domain hosts"
 					EXTERNAL_DNS_PROVIDER=designate
-					CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
+					CERT_SELFSIGNED=${USE_CERT_SELFSIGNED}
 				fi
 			fi
 		fi

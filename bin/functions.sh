@@ -52,7 +52,7 @@ Options are:
 
 --cert-email=<value>                             # Specify the mail for lets encrypt, default ${CERT_EMAIL}
 --use-zerossl                                    # Specify cert-manager to use zerossl, default ${USE_ZEROSSL}
---use-self-signed-ca                             # Specify if use self-signed CA, default ${CERT_SELFSIGNED_FORCED}
+--use-self-signed-ca                             # Specify if use self-signed CA, default: ${USE_CERT_SELFSIGNED}
 --zerossl-eab-kid=<value>                        # Specify zerossl eab kid, default ${CERT_ZEROSSL_EAB_KID}
 --zerossl-eab-hmac-secret=<value>                # Specify zerossl eab hmac secret, default ${CERT_ZEROSSL_EAB_HMAC_SECRET}
 
@@ -227,7 +227,7 @@ function parse_arguments() {
 			shift 1
 			;;
 		--use-self-signed-ca)
-			CERT_SELFSIGNED_FORCED=YES
+			USE_CERT_SELFSIGNED=YES
 			shift 1
 			;;
 		--use-cloud-init)
@@ -1460,7 +1460,7 @@ function find_public_dns_provider() {
 				echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} AWS_ROUTE53_PUBLIC_ZONE_ID=$AWS_ROUTE53_PUBLIC_ZONE_ID"
 				echo_red_bold "Route53 will be used to register public domain hosts"
 				EXTERNAL_DNS_PROVIDER=aws
-				CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
+				CERT_SELFSIGNED=${USE_CERT_SELFSIGNED}
 
 				return
 			fi
@@ -1476,7 +1476,7 @@ function find_public_dns_provider() {
     			echo_blue_bold "Found PUBLIC_DOMAIN_NAME=${PUBLIC_DOMAIN_NAME} from godaddy"
     			echo_red_bold "Godaddy will be used to register public domain hosts"
                 EXTERNAL_DNS_PROVIDER=godaddy
-				CERT_SELFSIGNED=${CERT_SELFSIGNED_FORCED}
+				CERT_SELFSIGNED=${USE_CERT_SELFSIGNED}
 
 				return
             fi
@@ -1760,7 +1760,7 @@ export AWS_ROUTE53_SECRETKEY=${AWS_ROUTE53_SECRETKEY}
 export AWS_SECRETKEY=${AWS_SECRETKEY}
 export CERT_GODADDY_API_KEY=${CERT_GODADDY_API_KEY}
 export CERT_GODADDY_API_SECRET=${CERT_GODADDY_API_SECRET}
-export CERT_SELFSIGNED_FORCED=${CERT_SELFSIGNED_FORCED}
+export USE_CERT_SELFSIGNED=${USE_CERT_SELFSIGNED}
 export CERT_SELFSIGNED=${CERT_SELFSIGNED}
 export CERT_ZEROSSL_EAB_HMAC_SECRET=${CERT_ZEROSSL_EAB_HMAC_SECRET}
 export CERT_ZEROSSL_EAB_KID=${CERT_ZEROSSL_EAB_KID}

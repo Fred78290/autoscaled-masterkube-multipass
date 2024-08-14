@@ -3,7 +3,7 @@
 set -e
 
 # This script will create a VM used as template
-# This step is done by importing https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-amd64.img
+# This step is done by importing https://cloud-images.ubuntu.com/${UBUNTU_DISTRIBUTION}/current/${UBUNTU_DISTRIBUTION}-server-cloudimg-amd64.img
 # This VM will be used to create the kubernetes template VM 
 
 PRIMARY_NETWORK_NAME="default"
@@ -55,8 +55,8 @@ while true ; do
 	#echo "1:$1"
 	case "$1" in
 		-d|--distribution)
-			DISTRO="$2"
-			SEED_IMAGE=${DISTRO}-server-cloudimg-seed
+			UBUNTU_DISTRIBUTION="$2"
+			SEED_IMAGE=${UBUNTU_DISTRIBUTION}-server-cloudimg-seed
 			shift 2
 			;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
@@ -203,7 +203,7 @@ if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
 fi
 
 if [ -z "${TARGET_IMAGE}" ]; then
-	TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
+	TARGET_IMAGE=${UBUNTU_DISTRIBUTION}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
 fi
 
 TARGET_IMAGE_ID=$(cloudmonkey list templates \
@@ -220,9 +220,9 @@ fi
 
 echo_blue_bold "Ubuntu password:${KUBERNETES_PASSWORD}"
 
-SEED_IMAGE=${DISTRO}-server-cloudimg-${SEED_ARCH}
-SEED_IMAGE_URL="https://cloud-images.ubuntu.com/${DISTRO}/current/${SEED_IMAGE}.img"
-SHASUM256=$(curl -sL https://cloud-images.ubuntu.com/releases/${DISTRO}/release/SHA256SUMS | grep server-cloudimg-amd64.img)
+SEED_IMAGE=${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}
+SEED_IMAGE_URL="https://cloud-images.ubuntu.com/${UBUNTU_DISTRIBUTION}/current/${SEED_IMAGE}.img"
+SHASUM256=$(curl -sL https://cloud-images.ubuntu.com/releases/${UBUNTU_DISTRIBUTION}/release/SHA256SUMS | grep server-cloudimg-amd64.img)
 UBUNTU_VERSION=$(echo ${SHASUM256} | cut -d '-' -f 2)
 
 SEED_IMAGE_ID=$(cloudmonkey list templates \

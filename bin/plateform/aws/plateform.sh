@@ -102,8 +102,8 @@ function parse_arguments() {
             exit 0
             ;;
         --distribution)
-            DISTRO=$2
-            SEED_IMAGE="${DISTRO}-server-cloudimg-seed"
+            UBUNTU_DISTRIBUTION=$2
+            SEED_IMAGE="${UBUNTU_DISTRIBUTION}-server-cloudimg-seed"
             shift 2
             ;;
         --upgrade)

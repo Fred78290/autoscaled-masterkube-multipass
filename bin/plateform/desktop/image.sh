@@ -4,7 +4,7 @@
 
 # This script will create 2 VM used as template
 # The first one is the seed VM customized to use vmware guestinfos cloud-init datasource instead ovf datasource.
-# This step is done by importing https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-amd64.ova
+# This step is done by importing https://cloud-images.ubuntu.com/${UBUNTU_DISTRIBUTION}/current/${UBUNTU_DISTRIBUTION}-server-cloudimg-amd64.ova
 # Jump to Prepare seed VM comment.
 # Very important, shutdown the seed VM by using shutdown guest or shutdown -P now. Never use PowerOff vmware desktop command
 # This VM will be used to create the kubernetes template VM 
@@ -42,8 +42,8 @@ while true ; do
 	#echo "1:$1"
 	case "$1" in
 		-d|--distribution)
-			DISTRO="$2"
-			SEED_IMAGE=${DISTRO}-server-cloudimg-seed
+			UBUNTU_DISTRIBUTION="$2"
+			SEED_IMAGE=${UBUNTU_DISTRIBUTION}-server-cloudimg-seed
 			shift 2
 			;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
@@ -97,7 +97,7 @@ SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 
 if [ -z "${TARGET_IMAGE}" ]; then
-	TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
+	TARGET_IMAGE=${UBUNTU_DISTRIBUTION}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
 fi
 
 TARGET_IMAGE_UUID=$(vmrest_get_vmuuid ${TARGET_IMAGE})
@@ -153,7 +153,7 @@ METADATA=$(gzip -c9 < "${CACHE}/meta-data" | base64 -w 0)
 USERDATA=$(gzip -c9 < "${CACHE}/user-data" | base64 -w 0)
 VENDORDATA=$(gzip -c9 < "${CACHE}/vendor-data" | base64 -w 0)
 
-# If your seed image isn't present create one by import ${DISTRO} cloud ova.
+# If your seed image isn't present create one by import ${UBUNTU_DISTRIBUTION} cloud ova.
 SEEDIMAGE_UUID=$(vmrest_get_vmuuid "${SEED_IMAGE}")
 
 function update_vmx() {
@@ -193,14 +193,14 @@ EOF
 }
 
 if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
-	CLOUDIMG_NAME=${DISTRO}-server-cloudimg-${SEED_ARCH}
+	CLOUDIMG_NAME=${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}
 
 	if [ ! -f ${CACHE}/${CLOUDIMG_NAME}.ova ]; then
 
 		if [ ${SEED_ARCH} = "arm64" ]; then
 			if [ ! -f "${CACHE}/${CLOUDIMG_NAME}.img" ]; then
-				echo_blue_bold "Download https://${CLOUD_IMAGES_UBUNTU}/${DISTRO}/current/${CLOUDIMG_NAME}.img"
-				curl -Ls "https://${CLOUD_IMAGES_UBUNTU}/${DISTRO}/current/${CLOUDIMG_NAME}.img" -o "${CACHE}/${CLOUDIMG_NAME}.img"
+				echo_blue_bold "Download https://${CLOUD_IMAGES_UBUNTU}/${UBUNTU_DISTRIBUTION}/current/${CLOUDIMG_NAME}.img"
+				curl -Ls "https://${CLOUD_IMAGES_UBUNTU}/${UBUNTU_DISTRIBUTION}/current/${CLOUDIMG_NAME}.img" -o "${CACHE}/${CLOUDIMG_NAME}.img"
 			else
 				echo_blue_bold "Img already exists ${CACHE}/${CLOUDIMG_NAME}.img"
 			fi
@@ -214,7 +214,7 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 
 			SIZE_VMDK=$(stat "${CACHE}/${CLOUDIMG_NAME}.vmdk" | cut -d ' ' -f 8)
 
-			sed s/ovf:size=.*\ /ovf:size=\"${SIZE_VMDK}\"\ / "${CURDIR}/../templates/ubuntu-ovf/ubuntu-${DISTRO}-cloudimg.ovf" > "${CACHE}/${CLOUDIMG_NAME}.ovf"
+			sed s/ovf:size=.*\ /ovf:size=\"${SIZE_VMDK}\"\ / "${CURDIR}/../templates/ubuntu-ovf/ubuntu-${UBUNTU_DISTRIBUTION}-cloudimg.ovf" > "${CACHE}/${CLOUDIMG_NAME}.ovf"
 			
 			SHA_OVF=$(sha256sum "${CACHE}/${CLOUDIMG_NAME}.ovf" | cut -d ' ' -f 1)
 			SHA_VMDK=$(sha256sum "${CACHE}/${CLOUDIMG_NAME}.vmdk" | cut -d ' ' -f 1)
@@ -226,8 +226,8 @@ if [ -z "${SEEDIMAGE_UUID}" ] || [ "${SEEDIMAGE_UUID}" == "ERROR" ]; then
 
 			ovftool --overwrite --allowExtraConfig --allowAllExtraConfig "${CACHE}/${CLOUDIMG_NAME}.ovf" "${CACHE}/${CLOUDIMG_NAME}.ova"
 		else
-			echo_blue_bold "Download https://${CLOUD_IMAGES_UBUNTU}/${DISTRO}/current/${CLOUDIMG_NAME}.ova"
-			curl -Ls "https://${CLOUD_IMAGES_UBUNTU}/${DISTRO}/current/${CLOUDIMG_NAME}.ova" -o "${CACHE}/${CLOUDIMG_NAME}.ova"
+			echo_blue_bold "Download https://${CLOUD_IMAGES_UBUNTU}/${UBUNTU_DISTRIBUTION}/current/${CLOUDIMG_NAME}.ova"
+			curl -Ls "https://${CLOUD_IMAGES_UBUNTU}/${UBUNTU_DISTRIBUTION}/current/${CLOUDIMG_NAME}.ova" -o "${CACHE}/${CLOUDIMG_NAME}.ova"
 		fi
 
 	fi

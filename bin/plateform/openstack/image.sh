@@ -3,7 +3,7 @@
 set -e
 
 # This script will create a VM used as template
-# This step is done by importing https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-amd64.img
+# This step is done by importing https://cloud-images.ubuntu.com/${UBUNTU_DISTRIBUTION}/current/${UBUNTU_DISTRIBUTION}-server-cloudimg-amd64.img
 # This VM will be used to create the kubernetes template VM 
 
 PRIMARY_NETWORK_NAME="private"
@@ -41,8 +41,8 @@ while true ; do
 	#echo "1:$1"
 	case "$1" in
 		-d|--distribution)
-			DISTRO="$2"
-			SEED_IMAGE=${DISTRO}-server-cloudimg-seed
+			UBUNTU_DISTRIBUTION="$2"
+			SEED_IMAGE=${UBUNTU_DISTRIBUTION}-server-cloudimg-seed
 			shift 2
 			;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
@@ -95,7 +95,7 @@ if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
 fi
 
 if [ -z "${TARGET_IMAGE}" ]; then
-	TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
+	TARGET_IMAGE=${UBUNTU_DISTRIBUTION}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
 fi
 
 TARGET_IMAGE_ID=$(openstack image list --all -f json | jq -r --arg TARGET_IMAGE ${TARGET_IMAGE} '.[]|select(.Name == $TARGET_IMAGE)|.ID')
@@ -108,8 +108,8 @@ fi
 echo_blue_bold "Ubuntu password:${KUBERNETES_PASSWORD}"
 
 NETWORK_ID=$(openstack network list --name ${PRIMARY_NETWORK_NAME} -f json | jq -r '.[]|.ID // ""')
-SEED_IMAGE=${DISTRO}-server-cloudimg-${SEED_ARCH}
-SEED_IMAGE_URL="https://cloud-images.ubuntu.com/${DISTRO}/current/${SEED_IMAGE}.img"
+SEED_IMAGE=${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}
+SEED_IMAGE_URL="https://cloud-images.ubuntu.com/${UBUNTU_DISTRIBUTION}/current/${SEED_IMAGE}.img"
 SEED_IMAGE_ID=$(openstack image list --all -f json | jq -r --arg SEED_IMAGE ${SEED_IMAGE} '.[]|select(.Name == $SEED_IMAGE)|.ID')
 
 if [ -z "${NETWORK_ID}" ]; then

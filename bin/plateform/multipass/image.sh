@@ -3,7 +3,7 @@
 set -e
 
 # This script will create a VM used as template
-# This step is done by importing https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-amd64.img
+# This step is done by importing https://cloud-images.ubuntu.com/${UBUNTU_DISTRIBUTION}/current/${UBUNTU_DISTRIBUTION}-server-cloudimg-amd64.img
 # This VM will be used to create the kubernetes template VM 
 
 PRIMARY_NETWORK_NAME="mpbr0"
@@ -39,8 +39,8 @@ while true ; do
 	#echo "1:$1"
 	case "$1" in
 		-d|--distribution)
-			DISTRO="$2"
-			SEED_IMAGE=${DISTRO}-server-cloudimg-seed
+			UBUNTU_DISTRIBUTION="$2"
+			SEED_IMAGE=${UBUNTU_DISTRIBUTION}-server-cloudimg-seed
 			shift 2
 			;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
@@ -92,7 +92,7 @@ if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
 fi
 
 if [ -z "${TARGET_IMAGE}" ]; then
-	TARGET_IMAGE=${CURDIR}/../images/${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
+	TARGET_IMAGE=${CURDIR}/../images/${UBUNTU_DISTRIBUTION}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}.img
 fi
 
 if [ -f "${TARGET_IMAGE}" ]; then
@@ -144,7 +144,7 @@ KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | tr '.' ' ' | awk '{ p
 CRIO_VERSION=$(echo -n ${KUBERNETES_VERSION} | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
 
 echo_blue_bold "Prepare ${TARGET_IMAGE} image with cri-o version: ${CRIO_VERSION} and kubernetes: ${KUBERNETES_VERSION}"
-read ISO_CHECKSUM ISO_FILE <<< "$(curl -s http://cloud-images.ubuntu.com/${DISTRO}/current/SHA256SUMS | grep server-cloudimg-${SEED_ARCH}.img | tr -d '*')" 
+read ISO_CHECKSUM ISO_FILE <<< "$(curl -s http://cloud-images.ubuntu.com/${UBUNTU_DISTRIBUTION}/current/SHA256SUMS | grep server-cloudimg-${SEED_ARCH}.img | tr -d '*')" 
 
 ACCEL=kvm
 CPU_HOST=host
@@ -188,7 +188,7 @@ packer build \
 	-var CDROM=${CACHE}/packer/cidata.iso \
 	-var CPU_HOST="${CPU_HOST}" \
 	-var MACHINE_TYPE="${MACHINE_TYPE}" \
-	-var DISTRO=${DISTRO} \
+	-var UBUNTU_DISTRIBUTION=${UBUNTU_DISTRIBUTION} \
 	-var ACCEL=${ACCEL} \
 	-var SSH_PRIVATE_KEY="${SSH_PRIVATE_KEY}" \
 	-var ISO_CHECKSUM="sha256:${ISO_CHECKSUM}" \

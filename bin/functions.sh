@@ -11,7 +11,7 @@ Options are:
 --trace | -x                                     # Trace execution
 --resume | -r                                    # Allow to resume interrupted creation of cluster kubernetes
 --delete | -d                                    # Delete cluster and exit
---distribution                                   # Ubuntu distribution to use ${DISTRO}
+--distribution                                   # Ubuntu distribution to use ${UBUNTU_DISTRIBUTION}
 --create-image-only                              # Create image only
 --upgrade                                        # Upgrade existing cluster to upper version of kubernetes
 
@@ -176,8 +176,8 @@ function parse_arguments() {
 			exit 0
 			;;
 		--distribution)
-			DISTRO=$2
-			SEED_IMAGE="${DISTRO}-server-cloudimg-seed"
+			UBUNTU_DISTRIBUTION=$2
+			SEED_IMAGE="${UBUNTU_DISTRIBUTION}-server-cloudimg-seed"
 			shift 2
 			;;
 		--upgrade)
@@ -1253,9 +1253,9 @@ function prepare_environment() {
 	fi
 
 	if [ "${KUBERNETES_DISTRO}" == "kubeadm" ]; then
-		TARGET_IMAGE="${DISTRO}-kubernetes-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
+		TARGET_IMAGE="${UBUNTU_DISTRIBUTION}-kubernetes-${CNI_PLUGIN}-${KUBERNETES_VERSION}-${CONTAINER_ENGINE}-${SEED_ARCH}"
 	else
-		TARGET_IMAGE="${DISTRO}-kubernetes-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}"
+		TARGET_IMAGE="${UBUNTU_DISTRIBUTION}-kubernetes-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}"
 	fi
 
 	if [ ${PLATEFORM} == "multipass" ]; then
@@ -1569,7 +1569,7 @@ function create_image() {
 		--cni-version="${CNI_VERSION}" \
 		--container-runtime=${CONTAINER_ENGINE} \
 		--custom-image="${TARGET_IMAGE}" \
-		--distribution="${DISTRO}" \
+		--distribution="${UBUNTU_DISTRIBUTION}" \
 		--kube-engine=${KUBERNETES_DISTRO} \
 		--kube-version="${KUBERNETES_VERSION}" \
 		--password="${KUBERNETES_PASSWORD}" \
@@ -1597,7 +1597,7 @@ function prepare_image() {
 			--cni-version="${CNI_VERSION}" \
 			--container-runtime=${CONTAINER_ENGINE} \
 			--custom-image="${TARGET_IMAGE}" \
-			--distribution="${DISTRO}" \
+			--distribution="${UBUNTU_DISTRIBUTION}" \
 			--kube-engine=${KUBERNETES_DISTRO} \
 			--kube-version="${KUBERNETES_VERSION}" \
 			--password="${KUBERNETES_PASSWORD}" \

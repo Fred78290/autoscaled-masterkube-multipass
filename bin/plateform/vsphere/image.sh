@@ -4,7 +4,7 @@
 
 # This script will create 2 VM used as template
 # The first one is the seed VM customized to use vmware guestinfos cloud-init datasource instead ovf datasource.
-# This step is done by importing https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-amd64.ova
+# This step is done by importing https://cloud-images.ubuntu.com/${UBUNTU_DISTRIBUTION}/current/${UBUNTU_DISTRIBUTION}-server-cloudimg-amd64.ova
 # If don't have the right to import OVA with govc to your vpshere you can try with ovftool import method else you must build manually this seed
 # Jump to Prepare seed VM comment.
 # Very important, shutdown the seed VM by using shutdown guest or shutdown -P now. Never use PowerOff vsphere command
@@ -48,8 +48,8 @@ while true ; do
 	#echo "1:$1"
 	case "$1" in
 		-d|--distribution)
-			DISTRO="$2"
-			SEED_IMAGE=${DISTRO}-server-cloudimg-seed
+			UBUNTU_DISTRIBUTION="$2"
+			SEED_IMAGE=${UBUNTU_DISTRIBUTION}-server-cloudimg-seed
 			shift 2
 			;;
 		-i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
@@ -106,7 +106,7 @@ SSH_OPTIONS="${SSH_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 SCP_OPTIONS="${SCP_OPTIONS} -i ${SSH_PRIVATE_KEY}"
 
 if [ -z "${TARGET_IMAGE}" ]; then
-	TARGET_IMAGE=${DISTRO}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
+	TARGET_IMAGE=${UBUNTU_DISTRIBUTION}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
 fi
 
 if [ -n "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
@@ -133,21 +133,21 @@ chpasswd:
 EOF
 )
 
-# If your seed image isn't present create one by import ${DISTRO} cloud ova.
+# If your seed image isn't present create one by import ${UBUNTU_DISTRIBUTION} cloud ova.
 # If you don't have the access right to import with govc (firewall rules blocking https traffic to esxi),
 # you can try with ovftool to import the ova.
 # If you have the bug "unsupported server", you must do it manually!
 if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
-	[ -f ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova ] || curl -Ls https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova -o ${CACHE}/${DISTRO}-server-cloudimg-amd64.ova
+	[ -f ${CACHE}/${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.ova ] || curl -Ls https://cloud-images.ubuntu.com/${UBUNTU_DISTRIBUTION}/current/${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.ova -o ${CACHE}/${UBUNTU_DISTRIBUTION}-server-cloudimg-amd64.ova
 
 	if [ "${IMPORTMODE}" == "govc" ]; then
-		govc import.spec ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova \
+		govc import.spec ${CACHE}/${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.ova \
 			| jq \
 				--arg GOVC_NETWORK "${PRIMARY_NETWORK_NAME}" \
 				'.NetworkMapping = [ { Name: "VM Network", Network: $GOVC_NETWORK } ]' \
-			> ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.spec
+			> ${CACHE}/${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.spec
 		
-		cat ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.spec \
+		cat ${CACHE}/${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.spec \
 			| jq --arg SSH_KEY "${SSH_KEY}" \
 				--arg SSH_KEY "${SSH_KEY}" \
 				--arg USERDATA "${USERDATA}" \
@@ -156,22 +156,22 @@ if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 				--arg INSTANCEID $(uuidgen) \
 				--arg TARGET_IMAGE "${TARGET_IMAGE}" \
 				'.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $BOOTSTRAP_PASSWORD } ]' \
-				> ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.txt
+				> ${CACHE}/${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.txt
 
 		DATASTORE="/${GOVC_DATACENTER}/datastore/${GOVC_DATASTORE}"
 		FOLDER="/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
 
-		echo_blue_bold "Import ${DISTRO}-server-cloudimg-${SEED_ARCH}.ova to ${SEED_IMAGE} with govc"
+		echo_blue_bold "Import ${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.ova to ${SEED_IMAGE} with govc"
 		govc import.ova \
-			-options=${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.txt \
+			-options=${CACHE}/${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.txt \
 			-folder="${FOLDER}" \
 			-ds="${DATASTORE}" \
 			-name="${SEED_IMAGE}" \
-			${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova
+			${CACHE}/${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.ova
 	else
-		echo_blue_bold "Import ${DISTRO}-server-cloudimg-${SEED_ARCH}.ova to ${SEED_IMAGE} with ovftool"
+		echo_blue_bold "Import ${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.ova to ${SEED_IMAGE} with ovftool"
 
-		MAPPED_NETWORK=$(govc import.spec ${CACHE}/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova | jq -r '.NetworkMapping[0].Name//""')
+		MAPPED_NETWORK=$(govc import.spec ${CACHE}/${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.ova | jq -r '.NetworkMapping[0].Name//""')
 
 		ovftool \
 			--acceptAllEulas \
@@ -185,7 +185,7 @@ if [ -z "$(govc vm.info ${SEED_IMAGE} 2>&1)" ]; then
 			--prop:user-data="${USERDATA}" \
 			--prop:password="${BOOTSTRAP_PASSWORD}" \
 			--net:"${MAPPED_NETWORK}"="${PRIMARY_NETWORK_NAME}" \
-			https://cloud-images.ubuntu.com/${DISTRO}/current/${DISTRO}-server-cloudimg-${SEED_ARCH}.ova \
+			https://cloud-images.ubuntu.com/${UBUNTU_DISTRIBUTION}/current/${UBUNTU_DISTRIBUTION}-server-cloudimg-${SEED_ARCH}.ova \
 			"vi://${GOVC_USERNAME}:${GOVC_PASSWORD}@${VCENTER}/${GOVC_RESOURCE_POOL}/"
 	fi
 

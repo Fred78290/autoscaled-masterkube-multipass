@@ -5,6 +5,7 @@ export OUTPUT=${CURDIR}/../config/deploy.log
 export TIMEFORMAT='It takes %R seconds to complete this task...'
 export TRACE=${TRACE:=NO}
 export ARGS=()
+export PLATEFORM=${PLATEFORM:=multipass}
 
 OPTIONS=(
 	"arch:"

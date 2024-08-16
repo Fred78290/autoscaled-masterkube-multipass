@@ -32,6 +32,49 @@ source ${PLATEFORMDEFS}
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function usage() {
+	common_usage
+	cat <<EOF
+### Flags ${PLATEFORM} plateform specific
+
+  # Flags to configure nfs client provisionner
+--nfs-server-adress                            # The NFS server address, default: ${NFS_SERVER_ADDRESS}
+--nfs-server-mount                             # The NFS server mount path, default: ${NFS_SERVER_PATH}
+--nfs-storage-class                            # The storage class name to use, default: ${NFS_STORAGE_CLASS}
+
+  # Flags to set the template vm
+--seed-image=<value>                           # Override the seed image name used to create template, default: ${SEED_IMAGE}
+--kube-user=<value>                            # Override the seed user in template, default: ${KUBERNETES_USER}
+--kube-password | -p=<value>                   # Override the password to ssh the cluster VM, default random word
+
+  # RFC2136 space
+--use-named-server=[true|false]                # Tell if we use bind9 server for DNS registration, default: ${USE_BIND9_SERVER}
+--install-named-server                         # Tell if we install bind9 server for DNS registration, default: ${INSTALL_BIND9_SERVER}
+--named-server-host=<host address>             # Host of used bind9 server for DNS registration, default: ${BIND9_HOST}
+--named-server-port=<bind port>                # Port of used bind9 server for DNS registration, default: ${BIND9_PORT}
+--named-server-key=<path>                      # RNDC key file for used bind9 server for DNS registration, default: ${BIND9_RNDCKEY}
+
+  # Flags to configure network in ${PLATEFORM}
+--use-nlb=[none|keepalived|nginx]              # Use keepalived or NGINX as load balancer
+--vm-private-network=<value>                   # Override the name of the private network in ${PLATEFORM}, default: ${VC_NETWORK_PRIVATE}
+--vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default: ${VC_NETWORK_PUBLIC}
+--no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default: ${SCALEDNODES_DHCP}
+--dhcp-autoscaled-node                         # Autoscaled node use DHCP, default: ${SCALEDNODES_DHCP}
+--private-domain=<value>                       # Override the domain name, default: ${PRIVATE_DOMAIN_NAME}
+
+--public-address=<value>                       # The public address to expose kubernetes endpoint[ipv4/cidr, DHCP, NONE], default: ${PUBLIC_IP}
+--metallb-ip-range                             # Override the metalb ip range, default: ${METALLB_IP_RANGE}
+--dont-use-dhcp-routes-private                 # Tell if we don't use DHCP routes in private network, default: ${USE_DHCP_ROUTES_PRIVATE}
+--dont-use-dhcp-routes-public                  # Tell if we don't use DHCP routes in public network, default: ${USE_DHCP_ROUTES_PUBLIC}
+--add-route-private                            # Add route to private network syntax is --add-route-private=to=X.X.X.X/YY,via=X.X.X.X,metric=100 --add-route-private=to=Y.Y.Y.Y/ZZ,via=X.X.X.X,metric=100, default: ${NETWORK_PRIVATE_ROUTES[@]}
+--add-route-public                             # Add route to public network syntax is --add-route-public=to=X.X.X.X/YY,via=X.X.X.X,metric=100 --add-route-public=to=Y.Y.Y.Y/ZZ,via=X.X.X.X,metric=100, default: ${NETWORK_PUBLIC_ROUTES[@]}
+
+EOF
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function parsed_arguments() {
 	VPC_PUBLIC_SUBNET_IDS=(${VC_NETWORK_PUBLIC})
 	VPC_PRIVATE_SUBNET_IDS=(${VC_NETWORK_PRIVATE})
@@ -67,6 +110,7 @@ function parsed_arguments() {
 		fi
 
 		PRIVATE_GATEWAY=${VNET_HOSTONLY_SUBNET}.2
+		PRIVATE_DNS=${VNET_HOSTONLY_SUBNET}.1
 		PRIVATE_IP=${VNET_HOSTONLY_SUBNET}.${PRIVATE_IP_START}
 	fi
 }

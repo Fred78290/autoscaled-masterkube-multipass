@@ -117,7 +117,7 @@ function usage() {
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default: ${SCALEDNODES_DHCP}
 --dhcp-autoscaled-node                         # Autoscaled node use DHCP, default: ${SCALEDNODES_DHCP}
 --private-domain=<value>                       # Override the domain name, default: ${PRIVATE_DOMAIN_NAME}
---net-address=<value>                          # Override the IP of the kubernetes control plane node, default: ${PRIVATE_IP}
+--net-address=<ipv4/cidr>                      # Override the IP of the kubernetes control plane node, default: ${PRIVATE_IP}/${PRIVATE_MASK_CIDR}
 --net-gateway=<value>                          # Override the IP gateway, default: ${PRIVATE_GATEWAY}
 --net-gateway-metric=<value>                   # Override the IP gateway metric, default: ${PRIVATE_GATEWAY_METRIC}
 --net-dns=<value>                              # Override the IP DNS, default: ${PRIVATE_DNS}
@@ -511,7 +511,7 @@ function parse_arguments() {
 			shift 2
 			;;
 		--net-address)
-			PRIVATE_IP="$2"
+			IFS=/ read PRIVATE_IP PRIVATE_MASK_CIDR <<< "$2"
 			shift 2
 			;;
 		--net-gateway)

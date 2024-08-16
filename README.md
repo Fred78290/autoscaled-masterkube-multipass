@@ -111,13 +111,13 @@ The process install also following kubernetes components
 * rancher
 * nginx ingress controller
 
-The kubernetes dashboard is reachable at the URL https://dashboard-@generated-groupname@.@your-domain@/
+The kubernetes dashboard is reachable at the URL **https://dashboard-\<generated-groupname\>.\<your-domain\>/**
 
 To connect to the dashboard, copy paste the token from file [config/<generated nodegroup name>cluster/dashboard-token](./cluster/dashboard-token)
 
-The kubeapps UI is reachable at the URL https://kubeapps-@generated-groupname@.@your-domain@/
+The kubeapps UI is reachable at the URL **https://kubeapps-\<generated-groupname\>.\<your-domain\>/**
 
-The Rancher UI is reachable at the URL https://rancher-@generated-groupname@.@your-domain@/
+The Rancher UI is reachable at the URL **https://rancher-\<generated-groupname\>.\<your-domain\>/**
 
 It also deployed a replicaset helloworld to demonstrate the ability of autoscaling
 
@@ -133,6 +133,10 @@ To delete the master kube and associated worker nodes, just run the command [del
 
 ## Common command line arguments
 
+Variable definitions are located in the file [common.sh](./bin/common.sh).
+
+Variables could be overrided in file located ./bin/plateform/\<plateform\>/override.sh
+
 | Parameter | Description | Default |
 | --- | --- |--- |
 | --help \| -h | Display usage | |
@@ -147,7 +151,7 @@ To delete the master kube and associated worker nodes, just run the command [del
 | | **Flags to set some location informations** | |
 | --configuration-location=\<path\> | Specify where configuration will be stored | ${CONFIGURATION_LOCATION} |
 | --ssl-location=\<path\> | Specify where the etc/ssl dir is stored | ${SSL_LOCATION} |
-| --defs=\<path\> | Specify the hidden ${PLATEFORM} variables | ./bin/plateform/${PLATEFORM}/vars.def |
+| --defs=\<path\> | Specify the hidden plateform variables | ./bin/plateform/${PLATEFORM}/vars.def |
 | | **Design the kubernetes cluster** | |
 | --autoscale-machine=\<value\> | Override machine type used for auto scaling | ${AUTOSCALE_MACHINE} |
 | --cni-plugin=\<value\> | Override CNI plugin | ${CNI_PLUGIN} |

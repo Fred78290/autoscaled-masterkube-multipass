@@ -15,7 +15,7 @@ The process install also following kubernetes components
 * nginx ingress controller
 * metallb
 
-**The cluster will use metallb as load balancer for services declared LoadBalancer.**
+**The cluster will use metallb as load balancer for services declared LoadBalancer if keepalived is not used as NLB.**
 
 ## Prepare the cluster
 
@@ -44,6 +44,11 @@ AWS_SECRETKEY=
 # GODADDY account
 GODADDY_API_KEY=
 GODADDY_API_SECRET=
+
+# If your public domain is hosted on route53 for cert-manager
+AWS_ROUTE53_PUBLIC_ZONE_ID=
+AWS_ROUTE53_ACCESSKEY=
+AWS_ROUTE53_SECRETKEY=
 
 # ZeroSSL account
 ZEROSSL_API_KEY=
@@ -76,7 +81,7 @@ ZEROSSL_EAB_HMAC_SECRET=
 | --no-dhcp-autoscaled-node | Autoscaled node don't use DHCP | ${SCALEDNODES_DHCP} |
 | --dhcp-autoscaled-node | Autoscaled node use DHCP | ${SCALEDNODES_DHCP} |
 | --private-domain=\<value\> | Override the domain name | ${PRIVATE_DOMAIN_NAME} |
-| --net-address=\<value\> | Override the IP of the kubernetes control plane node | ${PRIVATE_IP} |
+| --net-address=\<ipv4/cidr\> | Override the IP of the kubernetes control plane node | ${PRIVATE_IP}/\${PRIVATE_MASK_CIDR} |
 | --net-gateway=\<value\> | Override the IP gateway | ${PRIVATE_GATEWAY} |
 | --net-gateway-metric=\<value\> | Override the IP gateway metric | ${PRIVATE_GATEWAY_METRIC} |
 | --net-dns=\<value\> | Override the IP DNS | ${PRIVATE_DNS} |
@@ -92,13 +97,16 @@ ZEROSSL_EAB_HMAC_SECRET=
     --plateform=desktop \
     --verbose \
     --ha-cluster \
-    --kube-user=<My custom user> \
+    --kube-user=kubernetes \
     --kube-engine=rke2 \
-    --vm-private-network=<My private network> \
-    --vm-public-network=<My public network> \
-    --net-address="10.0.4.200" \
+    --vm-private-network=vmnet8 \
+    --vm-public-network=vmnet0 \
+    --net-address="10.0.4.200/24" \
     --net-gateway="10.0.4.1" \
     --net-dns="10.0.4.1" \
-    --net-domain="acme.com"
+    --public-address="10.0.0.20/24" \
+    --metallb-ip-range=10.0.0.100-10.0.0.110 \
+    --public-domain="acme.com" \
+    --private-domain="acme.private"
 ```
 

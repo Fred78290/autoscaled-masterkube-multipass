@@ -456,6 +456,13 @@ function parse_arguments() {
         esac
     done
 
+	parsed_arguments
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function parsed_arguments() {
     if [ ${SEED_ARCH} == "amd64" ]; then
         AUTOSCALE_MACHINE="${OVERRIDE_AUTOSCALE_MACHINE:=t3a.medium}"
         CONTROL_PLANE_MACHINE="${OVERRIDE_CONTROL_PLANE_MACHINE:=t3a.medium}"

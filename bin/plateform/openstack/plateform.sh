@@ -50,7 +50,7 @@ function usage() {
 --prefer-ssh-publicip                          # Allow to SSH on publicip when available, default: ${PREFER_SSH_PUBLICIP}
 --external-security-group=<name>               # Specify the public security group ID for VM, default: ${EXTERNAL_SECURITY_GROUP}
 --internal-security-group=<name>               # Specify the private security group ID for VM, default: ${INTERNAL_SECURITY_GROUP}
---internet-facing                              # Expose the cluster on internet, default: ${EXPOSE_PUBLIC_CLUSTER}--public-subnet-id=<subnetid,...>                # Specify the public subnet ID for created VM, default: ${VPC_PUBLIC_SUBNET_ID}
+--internet-facing                              # Expose the cluster on internet, default: ${EXPOSE_PUBLIC_CLUSTER}
 
   # Flags to expose nodes in public AZ with public IP
 --control-plane-public                         # Control plane are exposed to public, default: ${CONTROLPLANE_USE_PUBLICIP}

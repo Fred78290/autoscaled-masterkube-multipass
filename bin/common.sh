@@ -332,7 +332,6 @@ if [ -f ${CURDIR}/plateform/${PLATEFORM}/override.sh ]; then
 fi
 
 source ${CURDIR}/plateform/${PLATEFORM}/plateform.sh
-source ${PLATEFORMDEFS}
 
 #===========================================================================================================================================
 #

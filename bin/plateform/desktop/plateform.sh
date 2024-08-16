@@ -27,6 +27,8 @@ if [ "${OSDISTRO}" == "Darwin" ] && [ -z "$(command -v vmware-vdiskmanager)" ]; 
 	sudo ln -s /Applications/VMware\ Fusion.app/Contents/Library/vmware-vdiskmanager /usr/local/bin/vmware-vdiskmanager
 fi
 
+source ${PLATEFORMDEFS}
+
 #===========================================================================================================================================
 #
 #===========================================================================================================================================

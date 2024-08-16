@@ -1,8 +1,8 @@
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl govc"
-#VC_NETWORK_PRIVATE="VM Private"
-#VC_NETWORK_PUBLIC="VM Network"
 SEED_ARCH=amd64
 FOLDER_OPTIONS=
+
+source ${PLATEFORMDEFS}
 
 export VSPHERE_START_DELAY=10
 export VSPHERE_STOP_DELAY=10

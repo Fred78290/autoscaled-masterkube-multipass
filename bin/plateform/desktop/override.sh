@@ -1,6 +1,7 @@
 # Mandatory
 VC_NETWORK_PRIVATE="vmnet8"
 VC_NETWORK_PUBLIC="vmnet0"
+PRIVATE_IP_START=70
 
 # Optional
 PUBLIC_IP=

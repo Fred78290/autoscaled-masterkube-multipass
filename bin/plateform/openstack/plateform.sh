@@ -6,8 +6,6 @@ PUBLIC_NODE_IP=NONE
 PUBLIC_VIP_ADDRESS=
 USE_CERT_SELFSIGNED=YES
 SEED_ARCH=amd64
-PRIVATE_IP=$(openstack subnet show $(openstack network show ${VC_NETWORK_PRIVATE} -f json | jq -r '.subnets[0]') -f json | jq -r '.cidr' | cut -d '/' -f 1)
-PRIVATE_IP="${PRIVATE_IP::-2}.10"
 NLB_POOLS=()
 NLB_LISTENERS=()
 NLB_ID=
@@ -48,8 +46,6 @@ function usage() {
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default: ${SCALEDNODES_DHCP}
 --dhcp-autoscaled-node                         # Autoscaled node use DHCP, default: ${SCALEDNODES_DHCP}
 --private-domain=<value>                       # Override the domain name, default: ${PRIVATE_DOMAIN_NAME}
---net-address=<value>                          # Override the IP of the kubernetes control plane node, default: ${PRIVATE_IP}
---net-dns=<value>                              # Override the IP DNS, default: ${PRIVATE_DNS}
 
 --prefer-ssh-publicip                          # Allow to SSH on publicip when available, default: ${PREFER_SSH_PUBLICIP}
 --external-security-group=<name>               # Specify the public security group ID for VM, default: ${EXTERNAL_SECURITY_GROUP}
@@ -462,9 +458,25 @@ function parse_arguments() {
 			;;
 		esac
 	done
+}
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function parsed_arguments() {
 	VPC_PUBLIC_SUBNET_IDS=(${VC_NETWORK_PUBLIC})
 	VPC_PRIVATE_SUBNET_IDS=(${VC_NETWORK_PRIVATE})
+
+	if [ -z "${PRIVATE_IP}" ]; then
+		local SUBNET=$(openstack subnet show -f json $(openstack network show ${VC_NETWORK_PRIVATE} -f json | jq -r '.subnets[0]//""'))
+		local CIDR=$(echo ${SUBNET} | jq -r '.cidr' | cut -d '/' -f 1)
+
+		PRIVATE_IP=$(cut -d '/' -f 1 <<< "${CIDR}")
+		PRIVATE_IP="${PRIVATE_IP%.*}.${PRIVATE_IP_START}"
+		PRIVATE_DNS=$(echo ${SUBNET} | jq -r '.dns_nameservers|first//""' | cut -d '/' -f 1)
+
+		PRIVATE_MASK_CIDR=$(cut -d '/' -f 2 <<< "${CIDR}")
+	fi
 }
 
 #===========================================================================================================================================

@@ -2,10 +2,6 @@
 
 CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl cmk packer"
 
-export PRIVATE_GATEWAY=
-export PRIVATE_IP=
-export PRIVATE_MASK_CIDR=
-
 export CLOUDSTACK_API_URL=
 export CLOUDSTACK_API_KEY=
 export CLOUDSTACK_SECRET_KEY=
@@ -78,8 +74,6 @@ function usage() {
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default: ${SCALEDNODES_DHCP}
 --dhcp-autoscaled-node                         # Autoscaled node use DHCP, default: ${SCALEDNODES_DHCP}
 --private-domain=<value>                       # Override the domain name, default: ${PRIVATE_DOMAIN_NAME}
---net-address=<value>                          # Override the IP of the kubernetes control plane node, default: ${PRIVATE_IP}
---net-dns=<value>                              # Override the IP DNS, default: ${PRIVATE_DNS}
 
 --prefer-ssh-publicip                          # Allow to SSH on publicip when available, default: ${PREFER_SSH_PUBLICIP}
 --external-security-group=<name>               # Specify the public security group ID for VM, default: ${EXTERNAL_SECURITY_GROUP}
@@ -671,7 +665,7 @@ EOF
 		PRIVATE_GATEWAY=$(jq -r '.network[0].gateway' <<< "${NETWORK_DEFS}")
 		CIDR=$(jq -r '.network[0].cidr' <<< "${NETWORK_DEFS}")
 		IFS=/ read PRIVATE_IP PRIVATE_MASK_CIDR <<< "${CIDR}"
-		PRIVATE_IP="${PRIVATE_IP%.*}.10"
+		PRIVATE_IP="${PRIVATE_IP%.*}.${PRIVATE_IP_START}"
 		PRIVATE_DNS=$(jq -r '.network[0].dns1' <<< "${NETWORK_DEFS}")
 	fi
 }

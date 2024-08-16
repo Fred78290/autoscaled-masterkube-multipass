@@ -1977,7 +1977,7 @@ write_files:
 EOF
 	fi
 
-	gzip -c9 <${TARGET_CONFIG_LOCATION}/vendordata.yaml | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/vendordata.base64
+	VENDORDATA=$(cat ${TARGET_CONFIG_LOCATION}/vendordata.yaml | gzip -c9 | base64 -w 0 | tee > ${TARGET_CONFIG_LOCATION}/vendordata.base64)
 }
 
 #===========================================================================================================================================
@@ -1985,6 +1985,10 @@ EOF
 #===========================================================================================================================================
 function prepare_routes() {
 	plateform_prepare_routes
+
+	if [ ${OSDISTRO} == Darwin ]; then
+		set +u
+	fi
 
 	# Add default gateway
 	if [ -n "${PRIVATE_GATEWAY}" ] && [ "${PRIVATE_GATEWAY}" != "NONE" ] && [ "${PRIVATE_GATEWAY}" != "DHCP" ]; then
@@ -2006,6 +2010,10 @@ function prepare_routes() {
 		PRIVATE_ROUTES_DEFS=$(build_routes ${NETWORK_PRIVATE_ROUTES[@]})
 	else
 		PRIVATE_ROUTES_DEFS='[]'
+	fi
+
+	if [ ${OSDISTRO} == Darwin ]; then
+		set -u
 	fi
 }
 

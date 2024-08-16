@@ -175,7 +175,7 @@ fi
 
 popd
 
-INIT_SCRIPT="/usr/local/bin/prepare-image.sh --container-runtime ${CONTAINER_ENGINE} --cni-version ${CNI_VERSION} --cni-plugin ${CNI_PLUGIN} --kube-version ${KUBERNETES_VERSION} --kube-engine ${KUBERNETES_DISTRO}" --plateform multipass
+INIT_SCRIPT="/usr/local/bin/prepare-image.sh --container-runtime ${CONTAINER_ENGINE} --cni-version ${CNI_VERSION} --cni-plugin ${CNI_PLUGIN} --kube-version ${KUBERNETES_VERSION} --kube-engine ${KUBERNETES_DISTRO} --plateform multipass"
 
 pushd ${CACHE}/packer
 

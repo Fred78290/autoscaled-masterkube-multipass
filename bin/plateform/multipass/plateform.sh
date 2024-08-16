@@ -1,4 +1,4 @@
-CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl kubernetes-desktop-autoscaler-utility packer qemu-img"
+CMD_MANDATORIES="envsubst helm kubectl jq yq cfssl kubernetes-desktop-autoscaler-utility packer qemu-img mkisofs"
 PRIVATE_NET_INF=eth1 # eth0 is multipass interface
 PUBLIC_NET_INF="eth0:1"
 CLOUD_PROVIDER=

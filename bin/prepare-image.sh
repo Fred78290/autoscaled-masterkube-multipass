@@ -157,11 +157,8 @@ echo "net.bridge.bridge-nf-call-arptables = 1" >> /etc/sysctl.conf
 echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.conf
 echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
 
-echo "overlay" >> /etc/modules
-echo "br_netfilter" >> /etc/modules
-
-modprobe overlay
-modprobe br_netfilter
+modprobe overlay && echo "overlay" >> /etc/modules || :
+modprobe br_netfilter && echo "br_netfilter" >> /etc/modules || :
 
 echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
 

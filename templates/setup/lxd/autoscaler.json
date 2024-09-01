@@ -1,0 +1,83 @@
+{
+	"use-external-etcd": ${EXTERNAL_ETCD},
+	"src-etcd-ssl-dir": "/etc/etcd/ssl",
+	"dst-etcd-ssl-dir": "${ETCD_DST_DIR}",
+	"distribution": "${KUBERNETES_DISTRO}",
+	"plateform": "${PLATEFORM}",
+	"kubernetes-pki-srcdir": "/etc/kubernetes/pki",
+	"kubernetes-pki-dstdir": "/etc/kubernetes/pki",
+	"image-credential-provider-bin-dir": "${IMAGE_CREDENTIALS_BIN}",
+	"image-credential-provider-config": "${IMAGE_CREDENTIALS_CONFIG}",
+	"listen": "${LISTEN}",
+	"secret": "${PLATEFORM}",
+	"minNode": ${MINNODES},
+	"maxNode": ${MAXNODES},
+	"maxPods": ${MAX_PODS},
+	"maxNode-per-cycle": 2,
+	"nodegroup": "${NODEGROUP_NAME}",
+	"node-name-prefix": "autoscaled",
+	"managed-name-prefix": "managed",
+	"controlplane-name-prefix": "master",
+	"nodePrice": 0.0,
+	"podPrice": 0.0,
+	"use-etc-hosts": ${USE_ETC_HOSTS},
+	"use-cloudinit-config": ${USE_CLOUDINIT_TO_CONFIGURE},
+	"cloudinit-file-owner": "root:adm",
+	"cloudinit-file-mode": 420,
+	"allow-upgrade": ${UPDATE_PACKAGE},
+	"optionals": {
+		"pricing": false,
+		"getAvailableMachineTypes": false,
+		"newNodeGroup": false,
+		"templateNodeInfo": false,
+		"createNodeGroup": false,
+		"deleteNodeGroup": false
+	},
+	"${KUBERNETES_DISTRO}": {
+		"address": "${SERVER_ADDRESS}",
+		"token": "${TOKEN}",
+		"datastore-endpoint": "${ETCD_ENDPOINT}",
+		"ca": "sha256:${CACERT}",
+		"extras-args": [
+			"--ignore-preflight-errors=All"
+		],
+		"use-nlb": ${USE_LOADBALANCER},
+		"nlb-addresses": ${NLB_IPS},
+		"channel": "${MICROK8S_CHANNEL}",
+		"extras-commands": [],
+		"join-command": "/usr/local/bin/join-cluster.sh",
+		"delete-command": "/usr/local/bin/leave-cluster.sh",
+		"config-path": "/etc/external-cluster/config.yaml",
+		"extra-config": {
+			"ball": "same player"
+		}
+	},
+	"default-machine": "${AUTOSCALE_MACHINE}",
+	"cloud-init": {
+		"package_update": false,
+		"package_upgrade": false,
+		"growpart": {
+			"ignore_growroot_disabled": false,
+			"mode": "auto",
+			"devices": [
+				"/"
+			]
+		},
+		"runcmd": [
+		]
+	},
+	"ssh-infos": {
+		"wait-ssh-ready-seconds": 180,
+		"user": "${KUBERNETES_USER}",
+		"ssh-private-key": "${SSH_PRIVATE_KEY_LOCAL}"
+	},
+	"autoscaling-options": {
+		"scaleDownUtilizationThreshold": ${SCALEDOWNUTILIZATIONTHRESHOLD},
+		"scaleDownGpuUtilizationThreshold": ${SCALEDOWNGPUUTILIZATIONTHRESHOLD},
+		"scaleDownUnneededTime": "${SCALEDOWNUNEEDEDTIME}",
+		"scaleDownUnreadyTime": "${SCALEDOWNUNREADYTIME}",
+		"maxNodeProvisionTime": "${MAXNODEPROVISIONTIME}",
+		"zeroOrMaxNodeScaling": false,
+		"ignoreDaemonSetsUtilization": true
+	}
+}

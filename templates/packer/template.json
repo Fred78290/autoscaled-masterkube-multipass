@@ -59,7 +59,7 @@
 				"for i in group gshadow passwd shadow subuid subgid; do rm -f /etc/$i-; sed -i '/packer/d' /etc/$i; done",
 				"rm -rf /home/packer",
 				"/bin/sync",
-				"/sbin/fstrim -v /"
+				"/sbin/fstrim -v / || :"
 			]
 		}
 	]

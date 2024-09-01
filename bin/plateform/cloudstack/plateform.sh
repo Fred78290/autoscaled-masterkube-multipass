@@ -666,6 +666,7 @@ EOF
 		CIDR=$(jq -r '.network[0].cidr' <<< "${NETWORK_DEFS}")
 		IFS=/ read PRIVATE_IP PRIVATE_MASK_CIDR <<< "${CIDR}"
 		PRIVATE_IP="${PRIVATE_IP%.*}.${PRIVATE_IP_START}"
+		PRIVATE_NETMASK=$(cidr_to_netmask ${PRIVATE_MASK_CIDR})
 		PRIVATE_DNS=$(jq -r '.network[0].dns1' <<< "${NETWORK_DEFS}")
 	fi
 }
@@ -1224,8 +1225,10 @@ function prepare_networking() {
 	elif [ "${PUBLIC_IP}" == "DHCP" ]; then
 		PUBLIC_NODE_IP=${PUBLIC_IP}
 	else
-		IFS=/ read PUBLIC_NODE_IP PUBLIC_MASK_CIDR <<< "${PUBLIC_IP}"
-		PUBLIC_NETMASK=$(cidr_to_netmask ${PUBLIC_MASK_CIDR})
+		IFS=/ read PUBLIC_IP PUBLIC_MASK_CIDR <<< "${PUBLIC_IP}"
+		if [ -n ${PUBLIC_MASK_CIDR} ]; then
+			PUBLIC_NETMASK=$(cidr_to_netmask ${PUBLIC_MASK_CIDR})
+		fi
 	fi
 
 	# No external elb, use keep alived
@@ -1274,6 +1277,8 @@ function create_internal_loadbalancer() {
 
 	IFS=, read -a NLB_PORTS <<< "${NLB_PORTS}"
 
+	NLB_INSTANCEIDS=$(tr ' ' ',' <<< "${NLB_INSTANCEIDS[@]}") 
+
 	for NLB_PORT in ${NLB_PORTS[@]}
 	do
 		NLB_ID=$(cloudmonkey create loadbalancer \
@@ -1303,8 +1308,8 @@ function create_internal_loadbalancer() {
 function create_public_loadbalancer() {
 	local NLB_NAME=$1
 	local NLB_PORTS=$2
-	local NLB_INSTANCEIDS=$3
-	local NLB_VIP_ADDRESS=$4
+	local NLB_INSTANCEIDS="$3"
+	local NLB_VIP_ADDRESS="$4"
 	local NLB_PORT=
 	local NLB_ID=
 	local NLB_RULE_ID=
@@ -1315,6 +1320,7 @@ function create_public_loadbalancer() {
 	fi
 
 	IFS=, read -a NLB_PORTS <<< "${NLB_PORTS}"
+	NLB_INSTANCEIDS=$(tr ' ' ',' <<< "${NLB_INSTANCEIDS[@]}") 
 	NLB_DATAS=$(cloudmonkey associate ipaddress ipaddress=${NLB_VIP_ADDRESS} projectid=${CLOUDSTACK_PROJECT_ID} vpcid=${CLOUDSTACK_VPC_ID} networkid=${CLOUDSTACK_NETWORK_ID})
 	NLB_VIP_ID=$(jq -r '.ipaddress.id//""' <<< "${NLB_DATAS}")
 	NLB_VIP_ADDRESS=$(jq -r '.ipaddress.ipaddress//""' <<< "${NLB_DATAS}")
@@ -1355,12 +1361,12 @@ function create_public_loadbalancer() {
 #
 #===========================================================================================================================================
 function create_plateform_nlb() {
-	local NLB_TARGETS=${CLUSTER_NODES}
-	local NLB_INSTANCE_IDS=
+	local NLB_INSTANCE_IDS=()
     local PUBLIC_NLB_DNS=${PUBLIC_ADDR_IPS[0]:=DHCP}
     local PRIVATE_NLB_DNS=
 	local INDEX=
 	local LISTEN_PORTS=
+	local SUFFIX=
 
 	if [ "${CLOUDSTACK_INTERNAL_NLB}" != "none" ]; then
 		PRIVATE_NLB_DNS=${PRIVATE_ADDR_IPS[0]}
@@ -1372,14 +1378,8 @@ function create_plateform_nlb() {
 
 	for INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES} - 1)))
 	do
-		local SUFFIX=$(named_index_suffix $INDEX)
-		local INSTANCE_ID=$(jq -r '.InstanceId//""' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
-
-		if [ -z "${NLB_INSTANCE_IDS}" ]; then
-			NLB_INSTANCE_IDS="${INSTANCE_ID}"
-		else
-			NLB_INSTANCE_IDS="${NLB_INSTANCE_IDS},${INSTANCE_ID}"
-		fi
+		SUFFIX=$(named_index_suffix $INDEX)
+		NLB_INSTANCE_IDS+=($(jq -r '.InstanceId//""' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json))
 	done
 
 	if [ "${CLOUDSTACK_EXTERNAL_NLB}" != "none" ]; then		

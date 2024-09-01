@@ -478,6 +478,7 @@ function parsed_arguments() {
 		PRIVATE_DNS=$(echo ${SUBNET} | jq -r '.dns_nameservers|first//""' | cut -d '/' -f 1)
 
 		PRIVATE_MASK_CIDR=$(cut -d '/' -f 2 <<< "${CIDR}")
+		PRIVATE_NETMASK=$(cidr_to_netmask ${PRIVATE_MASK_CIDR})
 	fi
 }
 

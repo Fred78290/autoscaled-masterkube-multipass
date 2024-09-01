@@ -539,7 +539,8 @@ function parse_arguments() {
 			shift 1
 			;;
 		--public-address)
-			PUBLIC_IP="$2"
+			IFS=/ read PUBLIC_IP PUBLIC_MASK_CIDR <<< "$2"
+			PUBLIC_NETMASK=$(cidr_to_netmask ${PUBLIC_MASK_CIDR})
 			shift 2
 			;;
 		--metallb-ip-range)
@@ -1161,7 +1162,7 @@ function prepare_environment() {
 		fi
 	fi
 
-	if [ "${USE_NLB}" = "cloud" ] && [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ ${PLATEFORM} != "cloudstack" ]; then
+	if [ "${USE_NLB}" = "cloud" ] && [ ${PLATEFORM} != "aws" ] && [ ${PLATEFORM} != "openstack" ] && [ ${PLATEFORM} != "cloudstack" ] && [ ${PLATEFORM} != "lxd" ]; then
 		echo_red_bold "NLB cloud is not supported on plateform: ${PLATEFORM}"
 		exit 1
 	fi
@@ -1269,6 +1270,8 @@ function prepare_environment() {
 		TARGET_IMAGE="${PWD}/images/${TARGET_IMAGE}.img"
 	elif [ ${PLATEFORM} == "aws" ]; then
 		TARGET_IMAGE="$(echo -n ${TARGET_IMAGE} | tr '+' '_')"
+	elif [ ${PLATEFORM} == "lxd" ]; then
+		TARGET_IMAGE="$(echo -n ${TARGET_IMAGE} | tr '+.' '-')"
 	fi
 
 	if [ ${WORKERNODES} -eq 0 ]; then
@@ -2027,11 +2030,8 @@ function prepare_networking() {
 		PUBLIC_IP=NONE
 		PUBLIC_NODE_IP=NONE
 		VC_NETWORK_PUBLIC_ENABLED=false
-	elif [ "${PUBLIC_IP}" == "DHCP" ]; then
-		PUBLIC_NODE_IP=${PUBLIC_IP}
 	else
-		IFS=/ read PUBLIC_NODE_IP PUBLIC_MASK_CIDR <<< "${PUBLIC_IP}"
-		PUBLIC_NETMASK=$(cidr_to_netmask ${PUBLIC_MASK_CIDR})
+		PUBLIC_NODE_IP=${PUBLIC_IP}
 	fi
 
 	# No external elb, use keep alived

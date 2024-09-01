@@ -123,6 +123,26 @@ else
 		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 fi
 
+echo "---" >> ${ETC_DIR}/autoscaler.yaml
+
+if [ "${PLATEFORM}" == "lxd" ]; then
+	kubectl create configmap lxd-cloud-config -n kube-system --dry-run=client -o yaml \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		--from-file ${LXD_TLS_SERVER_CERT} \
+		--from-file ${LXD_TLS_CLIENT_CERT} \
+		--from-file ${LXD_TLS_CLIENT_KEY} \
+		--from-file ${LXD_TLS_CA} \
+		| tee -a ${ETC_DIR}/autoscaler.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+else
+	kubectl create configmap lxd-cloud-config -n kube-system --dry-run=client -o yaml \
+		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
+		| tee -a ${ETC_DIR}/autoscaler.yaml \
+		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
+fi
+
+echo "---" >> ${ETC_DIR}/autoscaler.yaml
+
 if [ "${PLATEFORM}" != "openstack" ]; then
 	echo "---" >> ${ETC_DIR}/autoscaler.yaml
 	# Empty configmap for autoscaler deployment

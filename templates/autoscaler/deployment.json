@@ -142,6 +142,11 @@
 								"name": "openstack-cloud-config",
 								"mountPath": "/etc/openstack",
 								"readOnly": true
+							},
+							{
+								"name": "lxd-cloud-config",
+								"mountPath": "/etc/lxd",
+								"readOnly": true
 							}
 						]
 					},
@@ -250,6 +255,12 @@
 						"name": "openstack-cloud-config",
 						"configMap": {
 							"name": "openstack-cloud-config"
+						}
+					},
+					{
+						"name": "lxd-cloud-config",
+						"configMap": {
+							"name": "lxd-cloud-config"
 						}
 					}
 				]

@@ -175,17 +175,19 @@ EOF
 		if [ ${PUBLIC_IP} != "NONE" ]; then
 			if [ "${PUBLIC_IP}" = "DHCP" ]; then
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
+					--arg PUBLIC_NET_INF "${PUBLIC_NET_INF}" \
 					--arg USE_DHCP_ROUTES_PUBLIC "${USE_DHCP_ROUTES_PUBLIC}" \
-					'.|.network.ethernets += { "eth1": { "dhcp4": true, "dhcp4-overrides": { "use-routes": $USE_DHCP_ROUTES_PUBLIC } } }')
+					'.|.network.ethernets += { $PUBLIC_NET_INF: { "dhcp4": true, "dhcp4-overrides": { "use-routes": $USE_DHCP_ROUTES_PUBLIC } } }')
 			else
 				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq \
+					--arg PUBLIC_NET_INF "${PUBLIC_NET_INF}"
 					--arg NODE_IP "${PUBLIC_IP}/${PUBLIC_MASK_CIDR}" \
 					--arg PRIVATE_DNS ${PRIVATE_DNS} \
-					'.|.network.ethernets += { "eth1": { "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $PRIVATE_DNS ] } }}')
+					'.|.network.ethernets += { $PUBLIC_NET_INF: { "addresses": [ $NODE_IP ], "nameservers": { "addresses": [ $PRIVATE_DNS ] } }}')
 			fi
 
 			if [ ${#NETWORK_PUBLIC_ROUTES[@]} -gt 0 ]; then
-				NETWORK_DEFS=$(echo ${NETWORK_DEFS} | jq --argjson ROUTES "${PUBLIC_ROUTES_DEFS}" '.network.ethernets.eth1.routes = $ROUTES')
+				NETWORK_DEFS=$(jq --argjson JSONPATH "[\"network\", \"ethernets\", \"$PUBLIC_NET_INF\", \"routes\"]" --argjson ROUTES "${PUBLIC_ROUTES_DEFS}" 'setpath($JSONPATH; $ROUTES)' <<< "${NETWORK_DEFS}")
 			fi
 		fi
 
@@ -384,7 +386,9 @@ function get_vmnet_subnet() {
 	$(grep VNET "${NETWORKING_CONF}" | sed -e 's/ /=/g' -e 's/answer=/export /g')
 
 	VNET_HOSTONLY_SUBNET=VNET_${VMNETNUM}_HOSTONLY_SUBNET
+	VNET_HOSTONLY_NETMASK=VNET_${VMNETNUM}_HOSTONLY_NETMASK
 	eval VNET_HOSTONLY_SUBNET=\$$VNET_HOSTONLY_SUBNET
+	eval VNET_HOSTONLY_NETMASK=\$$VNET_HOSTONLY_NETMASK
 
 	VNET_DHCP=VNET_${VMNETNUM}_DHCP
 	eval VNET_DHCP=\$$VNET_DHCP

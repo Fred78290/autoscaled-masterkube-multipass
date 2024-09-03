@@ -883,9 +883,6 @@ function update_build_env() {
 #
 #===========================================================================================================================================
 function update_provider_config() {
-    PROVIDER_AUTOSCALER_CONFIG=$(cat ${TARGET_CONFIG_LOCATION}/provider.json)
-
-	echo -n ${PROVIDER_AUTOSCALER_CONFIG} | jq --arg TARGET_IMAGE ${TARGET_IMAGE_UUID} "template = $TARGET_IMAGE_UUID" > ${TARGET_CONFIG_LOCATION}/provider.json
 }
 
 #===========================================================================================================================================

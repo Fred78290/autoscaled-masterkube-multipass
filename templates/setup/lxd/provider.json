@@ -19,7 +19,54 @@
 	"use-bind9": ${USE_BIND9_SERVER},
 	"bind9-host": "${BIND9_HOST}:${BIND9_PORT}",
 	"rndc-key-file": "/etc/cluster/rndc.key",
-	"network": {
+	"remotes": {
+		"images": {
+		  "Addr": "https://images.lxd.canonical.com",
+		  "AuthType": "",
+		  "Project": "",
+		  "Protocol": "simplestreams",
+		  "Public": true,
+		  "Global": false,
+		  "Static": false
+		},
+		"ubuntu": {
+		  "Addr": "https://cloud-images.ubuntu.com/releases",
+		  "AuthType": "",
+		  "Project": "",
+		  "Protocol": "simplestreams",
+		  "Public": true,
+		  "Global": false,
+		  "Static": true
+		},
+		"ubuntu-daily": {
+		  "Addr": "https://cloud-images.ubuntu.com/daily",
+		  "AuthType": "",
+		  "Project": "",
+		  "Protocol": "simplestreams",
+		  "Public": true,
+		  "Global": false,
+		  "Static": true
+		},
+		"ubuntu-minimal": {
+		  "Addr": "https://cloud-images.ubuntu.com/minimal/releases/",
+		  "AuthType": "",
+		  "Project": "",
+		  "Protocol": "simplestreams",
+		  "Public": true,
+		  "Global": false,
+		  "Static": true
+		},
+		"ubuntu-minimal-daily": {
+		  "Addr": "https://cloud-images.ubuntu.com/minimal/daily/",
+		  "AuthType": "",
+		  "Project": "",
+		  "Protocol": "simplestreams",
+		  "Public": true,
+		  "Global": false,
+		  "Static": true
+		}
+	  },
+	  "network": {
 		"domain": "${PRIVATE_DOMAIN_NAME}",
 		"interfaces": [
 			{

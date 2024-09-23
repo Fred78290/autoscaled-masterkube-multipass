@@ -15,18 +15,19 @@ function usage() {
 ### Flags ${PLATEFORM} plateform specific
 
   # Flags to connect lxd client
---lxd-remote                                   # The remote lxd server, default: ${LXD_REMOTE}
---lxd-profile                                  # The lxd profile, default: ${LXD_KUBERNETES_PROFILE}
---lxd-project                                  # The lxd project, default: ${LXD_PROJECT}
+--lxd-remote=<remote>                          # The remote lxd server, default: ${LXD_REMOTE}
+--lxd-profile=<profile>                        # The lxd profile, default: ${LXD_KUBERNETES_PROFILE}
+--lxd-project=<project>                        # The lxd project, default: ${LXD_PROJECT}
 
---lxd-tls-client-cert                          # TLS certificate to use for client authentication, default: ${LXD_TLS_CLIENT_CERT}
---lxd-tls-client-key                           # TLS key to use for client authentication: ${LXD_TLS_CLIENT_KEY}
---lxd-tls-server-cert                          # TLS certificate of the remote server. If not specified, the system CA is used, default: ${LXD_TLS_SERVER_CERT}
---lxd-tls-ca                                   # TLS CA to validate against when in PKI mode, default: ${LXD_TLS_CA}
+--lxd-tls-client-cert=<path>                   # TLS certificate to use for client authentication, default: ${LXD_TLS_CLIENT_CERT}
+--lxd-tls-client-key=<path>                    # TLS key to use for client authentication: ${LXD_TLS_CLIENT_KEY}
+--lxd-tls-server-cert=<path>                   # TLS certificate of the remote server. If not specified, the system CA is used, default: ${LXD_TLS_SERVER_CERT}
+--lxd-tls-ca=<path>                            # TLS CA to validate against when in PKI mode, default: ${LXD_TLS_CA}
+
   # Flags to configure nfs client provisionner
---nfs-server-adress                            # The NFS server address, default: ${NFS_SERVER_ADDRESS}
---nfs-server-mount                             # The NFS server mount path, default: ${NFS_SERVER_PATH}
---nfs-storage-class                            # The storage class name to use, default: ${NFS_STORAGE_CLASS}
+--nfs-server-adress=<value>                    # The NFS server address, default: ${NFS_SERVER_ADDRESS}
+--nfs-server-mount=<value>                     # The NFS server mount path, default: ${NFS_SERVER_PATH}
+--nfs-storage-class=<value>                    # The storage class name to use, default: ${NFS_STORAGE_CLASS}
 
   # Flags to set the template vm
 --seed-image=<value>                           # Override the seed image name used to create template, default: ${SEED_IMAGE}

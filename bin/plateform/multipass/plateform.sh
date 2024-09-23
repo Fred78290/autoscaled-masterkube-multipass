@@ -56,9 +56,9 @@ function usage() {
 ### Flags ${PLATEFORM} plateform specific
 
   # Flags to configure nfs client provisionner
---nfs-server-adress                            # The NFS server address, default: ${NFS_SERVER_ADDRESS}
---nfs-server-mount                             # The NFS server mount path, default: ${NFS_SERVER_PATH}
---nfs-storage-class                            # The storage class name to use, default: ${NFS_STORAGE_CLASS}
+--nfs-server-adress=<value>                    # The NFS server address, default: ${NFS_SERVER_ADDRESS}
+--nfs-server-mount=<value>                     # The NFS server mount path, default: ${NFS_SERVER_PATH}
+--nfs-storage-class=<value>                    # The storage class name to use, default: ${NFS_STORAGE_CLASS}
 
   # Flags to set the template vm
 --seed-image=<value>                           # Override the seed image name used to create template, default: ${SEED_IMAGE}

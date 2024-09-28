@@ -96,7 +96,6 @@ ZEROSSL_EAB_HMAC_SECRET=
 | --vm-public-network=\<value\> | Override the name of the public network in desktop, empty for none second interface | ${VC_NETWORK_PUBLIC} |
 | --no-dhcp-autoscaled-node | Autoscaled node don't use DHCP | ${SCALEDNODES_DHCP} |
 | --dhcp-autoscaled-node | Autoscaled node use DHCP | ${SCALEDNODES_DHCP} |
-| --private-domain=\<value\> | Override the domain name | ${PRIVATE_DOMAIN_NAME} |
 | --net-address=\<ipv4/cidr\> | Override the IP of the kubernetes control plane node | ${PRIVATE_IP}/${PRIVATE_MASK_CIDR} |
 | --net-gateway=\<value\> | Override the IP gateway | ${PRIVATE_GATEWAY} |
 | --net-gateway-metric=\<value\> | Override the IP gateway metric | ${PRIVATE_GATEWAY_METRIC} |

@@ -100,7 +100,6 @@ ZEROSSL_EAB_HMAC_SECRET=
 | --vm-public-network=\<value\> | Override the name of the public network in openstack, empty for none second interface | ${VC_NETWORK_PUBLIC} |
 | --no-dhcp-autoscaled-node | Autoscaled node don't use DHCP | ${SCALEDNODES_DHCP} |
 | --dhcp-autoscaled-node | Autoscaled node use DHCP | ${SCALEDNODES_DHCP} |
-| --private-domain=\<value\> | Override the domain name | ${PRIVATE_DOMAIN_NAME} |
 | --net-address=\<ipv4/cidr\> | Override the IP of the kubernetes control plane node | ${PRIVATE_IP}/\${PRIVATE_MASK_CIDR} |
 | --net-dns=\<value\> | Override the IP DNS | ${PRIVATE_DNS} |
 | --prefer-ssh-publicip | Allow to SSH on publicip when available | ${PREFER_SSH_PUBLICIP} |

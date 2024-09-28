@@ -78,16 +78,6 @@
 				"address": "${FIRST_WORKER_NODE_IP}",
 				"netmask": "${PRIVATE_NETMASK}",
 				"routes": ${PRIVATE_ROUTES_DEFS}
-			},
-			{
-				"enabled": ${VC_NETWORK_PUBLIC_ENABLED},
-				"primary": false,
-				"network": "${VC_NETWORK_PUBLIC}",
-				"nic": "${PUBLIC_NET_INF}",
-				"dhcp": ${SCALEDNODES_DHCP},
-				"address": "${PUBLIC_NODE_IP}",
-				"netmask": "${PUBLIC_NETMASK}",
-				"routes": ${PUBLIC_ROUTES_DEFS}
 			}
 		]
 	}

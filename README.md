@@ -20,6 +20,7 @@ Supported plateform are
 * VMWare Fusion
 * VMWare Workstation
 * vSphere
+* LXD
 
 The cluster support also autoscaling by using [kubernetes-cloud-autoscaler](https://github.com/Fred78290/kubernetes-cloud-autoscaler) and [grpc autoscaler](https://github.com/Fred78290/autoscaler) or **vanilla autoscaler**
 
@@ -91,6 +92,8 @@ If you decide to expose the cluster on internet, the tool have the ability to re
 [Install on VMWare Workstation or VMWare Fusion](docs/desktop/README.md)
 
 [Install on vSphere](docs/vsphere/README.md)
+
+[Install on LXD](docs/lxd/README.md)
 
 During the process many files created will be located at
 

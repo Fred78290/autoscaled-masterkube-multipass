@@ -2594,7 +2594,7 @@ function create_nlb_member() {
 		local NAME=$(get_vm_name ${NODEINDEX})
 		local ADDR=${PRIVATE_ADDR_IPS[${INDEX}]}
 
-		create_plateform_nlb_member ${NAME} ${ADDR}
+		create_plateform_nlb_member ${NODEINDEX} ${NAME} ${ADDR}
 	fi
 }
 #===========================================================================================================================================

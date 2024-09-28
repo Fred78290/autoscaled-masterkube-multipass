@@ -909,8 +909,9 @@ function create_member_in_nlb() {
 #
 #===========================================================================================================================================
 function not_create_plateform_nlb_member() {
-	local NAME=$1
-	local ADDR=$2
+	local NODEINDEX=$1
+	local NAME=$2
+	local ADDR=$3
 
 	create_member_in_nlb "nlb-internal-${MASTERKUBE}" "${LOAD_BALANCER_PORT}" ${NAME} ${ADDR}
 

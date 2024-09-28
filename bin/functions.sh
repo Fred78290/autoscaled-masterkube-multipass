@@ -1139,6 +1139,11 @@ function prepare_environment() {
 		exit -1
 	fi
 
+	if [ "${EXPOSE_PUBLIC_CLUSTER}" = "false" ] && [ -n "${VC_NETWORK_PUBLIC}" ]; then
+		echo_red "The cluster is not exposed to public but declare public network, disable it"
+		VC_NETWORK_PUBLIC=""
+	fi
+
 	if [ "${UPGRADE_CLUSTER}" == "YES" ] && [ "${DELETE_CLUSTER}" = "YES" ]; then
 		echo_red_bold "Can't upgrade deleted cluster, exit"
 		exit
@@ -1194,7 +1199,7 @@ function prepare_environment() {
 
 	if [ ${PLATEFORM} != "cloudstack" ]; then
 		if [ ${USE_NLB} == "nginx" ] || [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ] || [ ${WORKERNODE_USE_PUBLICIP} == "true" ]; then
-			if [ "${VC_NETWORK_PUBLIC}" == "NONE" ] || [ -z "${VC_NETWORK_PUBLIC}" ]; then
+			if [ -z "${VC_NETWORK_PUBLIC}" ]; then
 				echo_red_bold "nodes exposed to public require public network"
 				exit 1
 			fi

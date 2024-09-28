@@ -62,7 +62,7 @@ while true ; do
 		--lxd-profile) LXD_KUBERNETES_PROFILE="$2" ; shift 2;;
 		--lxd-project) LXD_PROJECT="$2" ; shift 2;;
 		--lxd-remote) LXD_REMOTE="$2" ; shift 2;;
-		--lxd-container-type) LXD_CONTAINER_TYPE="$2" ; shift 1;;
+		--lxd-container-type) LXD_CONTAINER_TYPE="$2" ; shift 2;;
 
 		--kube-engine) 
 			case "$2" in

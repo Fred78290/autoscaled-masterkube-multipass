@@ -3,11 +3,11 @@ set -e
 
 UBUNTU_DISTRIBUTION=noble
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
-VMNAME="lxd-microovn-${UBUNTU_DISTRIBUTION}-${RANDOM}"
+VMNAME="lxd-ovn-${UBUNTU_DISTRIBUTION}-${RANDOM}"
 VMNETWORK=
 VMCPU=4
 VMMEMORY=8
-VMDISK=120
+VMDISK=40
 
 OPTIONS=(
     "cpu:"
@@ -28,7 +28,7 @@ while true ; do
 	case "$1" in
 		-u|--ubuntu)
 			UBUNTU_DISTRIBUTION="$2"
-      VMNAME="lxd-microovn-${UBUNTU_DISTRIBUTION}-${RANDOM}"
+            VMNAME="lxd-ovn-${UBUNTU_DISTRIBUTION}-${RANDOM}"
 			shift 2
 			;;
 		-d|--disk)
@@ -62,7 +62,7 @@ while true ; do
     esac
 done
 
-for PREVIOUS in $(multipass ls | grep '\-microovn-' | cut -d ' ' -f 1)
+for PREVIOUS in $(multipass ls | grep '\-ovn-' | cut -d ' ' -f 1)
 do
     multipass delete ${PREVIOUS} -p
 done
@@ -176,73 +176,29 @@ sudo snap install yq
 #===========================================================================================================================================
 # CONFIGURE OVN
 #===========================================================================================================================================
-sudo snap install microovn --channel=24.03/beta
-sudo microovn cluster bootstrap
-
-for CMD in /snap/bin/microovn.*
-do
-    LONGNAME=$(basename ${CMD})
-    SHORTNAME=$(cut -d '.' -f 2 <<<${LONGNAME})
-
-    sudo bash -c "echo '#!/bin/sh' > /usr/local/bin/${SHORTNAME}"
-    sudo bash -c "echo '${LONGNAME} $@' >> /usr/local/bin/${SHORTNAME}"
-    sudo chmod +x /usr/local/bin/${SHORTNAME}
-done
-
+sudo apt install ovn-host ovn-central -y
+sudo ovs-vsctl set open_vswitch . \
+   external_ids:ovn-remote=unix:/var/run/ovn/ovnsb_db.sock \
+   external_ids:ovn-encap-type=geneve \
+   external_ids:ovn-encap-ip=127.0.0.1
 
 cat > restore-bridge.sh <<-LXDINIT
 #!/bin/bash
 ip route add 10.68.223.0/24 via 192.168.48.192
 LXDINIT
 
-#===========================================================================================================================================
-# INSTALL BR-EX IF REQUIRED
-#===========================================================================================================================================
-if [ "${INSTALL_BR_EX}" == YES ]; then
-    PUBLIC_BRIDGE=br-ex
-
-    echo_blue_bold "Declare bridge ${PUBLIC_BRIDGE} with IP: ${LISTEN_CIDR}"
-
-    sudo ovs-vsctl --no-wait -- --may-exist add-br ${PUBLIC_BRIDGE} -- set bridge ${PUBLIC_BRIDGE} protocols=OpenFlow13,OpenFlow15
-    sudo ovs-vsctl --no-wait br-set-external-id ${PUBLIC_BRIDGE} bridge-id ${PUBLIC_BRIDGE}
-    sudo ovs-vsctl set open . external-ids:ovn-bridge-mappings=public:${PUBLIC_BRIDGE}
-    sudo ovs-vsctl --may-exist add-br ${PUBLIC_BRIDGE} -- set bridge ${PUBLIC_BRIDGE} protocols=OpenFlow13,OpenFlow15
-    sudo ovs-vsctl set open . external-ids:ovn-bridge-mappings=public:${PUBLIC_BRIDGE}
-    sudo ovs-vsctl --may-exist add-port ${PUBLIC_BRIDGE} ${LISTEN_INF}
-    sudo ovs-vsctl set Bridge ${PUBLIC_BRIDGE} other_config:disable-in-band=true
-
-    echo_blue_bold "Set bridge ${PUBLIC_BRIDGE} to IP: ${LISTEN_CIDR}"
-
-    sudo ip addr add ${LISTEN_CIDR} dev ${PUBLIC_BRIDGE}
-    sudo ip link set ${PUBLIC_BRIDGE} up
-    sudo ip addr flush dev ${LISTEN_INF}
-
-    cat > restore-bridge.sh <<-LXDINIT
-#!/bin/bash
-
-ovs-vsctl --may-exist add-br ${PUBLIC_BRIDGE} -- set bridge ${PUBLIC_BRIDGE} protocols=OpenFlow13,OpenFlow15
-ovs-vsctl set open . external-ids:ovn-bridge-mappings=public:${PUBLIC_BRIDGE}
-
-ip addr add ${LISTEN_CIDR} dev ${PUBLIC_BRIDGE}
-ip link set ${PUBLIC_BRIDGE} up
-ip addr flush dev ${LISTEN_INF}
-ip route add 10.68.223.0/24 via 192.168.48.192
-
-LXDINIT
-fi
-
 sudo cp restore-bridge.sh /usr/local/bin
 sudo chmod +x /usr/local/bin/restore-bridge.sh
 
 #===========================================================================================================================================
-# INSTALL SERVICE RESTORE BRIDGE
+# INSTALL SERVICE RESTORE ROUTE
 #===========================================================================================================================================
 cat > restore-bridge.service <<-LXDINIT
 [Install]
 WantedBy = multi-user.target
 
 [Unit]
-After = microovn.ovn-northd.service snap.lxd.daemon.service
+After = ovn-northd.service snap.lxd.daemon.service
 Description = Service for adding physical ip to ovn bridge
 
 [Service]
@@ -303,15 +259,9 @@ cluster: null
 LXDINIT
 )
 
-lxc config set network.ovn.ca_cert="$(sudo cat /var/snap/microovn/common/data/pki/cacert.pem)"
-lxc config set network.ovn.client_cert="$(sudo cat /var/snap/microovn/common/data/pki/ovn-northd-cert.pem)"
-lxc config set network.ovn.client_key="$(sudo cat /var/snap/microovn/common/data/pki/ovn-northd-privkey.pem)"
-lxc config set network.ovn.northbound_connection=ssl:${LISTEN_IP}:6641
-
 #===========================================================================================================================================
 # CREATE OVN NETWORK
 #===========================================================================================================================================
-
 echo_blue_bold "Create ovntest"
 
 lxc network create ovntest --type=ovn network=lxdbr0 ipv4.address=10.68.223.1/24 ipv4.nat=true volatile.network.ipv4.address=192.168.48.192
@@ -321,7 +271,6 @@ sudo ip route add 10.68.223.0/24 via 192.168.48.192
 #===========================================================================================================================================
 # CREATE CONTAINERS
 #===========================================================================================================================================
-
 launch_container u1
 launch_container u2
 
@@ -331,10 +280,11 @@ U2_IP=$(container_ip u2)
 echo_blue_bold "Create instance u3"
 lxc launch ubuntu:noble u3 --network=lxdbr0
 
+lxc ls
+
 #===========================================================================================================================================
 # CREATE OVN LOAD BALANCER
 #===========================================================================================================================================
-
 NLB_VIP_ADDRESS=$(lxc network load-balancer create ovntest --allocate=ipv4 | cut -d ' ' -f 4)
 
 echo_blue_bold "NLB_VIP_ADDRESS=${NLB_VIP_ADDRESS}"
@@ -343,9 +293,27 @@ lxc network load-balancer backend add ovntest ${NLB_VIP_ADDRESS} u1 ${U1_IP} 80,
 lxc network load-balancer backend add ovntest ${NLB_VIP_ADDRESS} u2 ${U2_IP} 80,443
 lxc network load-balancer port add ovntest ${NLB_VIP_ADDRESS} tcp 80,443 u1,u2
 
-lxc ls
+#===========================================================================================================================================
+# PATCH OVN LOAD BALANCER
+#===========================================================================================================================================
+OVN_CHASSIS_UUID=$(sudo ovn-sbctl show | grep Chassis | cut -d ' ' -f 2 | tr -d '"')
+OVN_NLB_NAME=$(sudo ovn-nbctl find load_balancer | grep "lb-${NLB_VIP_ADDRESS}-tcp" | awk '{print $3}')
+OVN_ROUTER_NAME="${OVN_NLB_NAME%-lb*}-lr"
 
+sudo ovn-nbctl --wait=hv set logical_router ${OVN_ROUTER_NAME} options:chassis=${OVN_CHASSIS_UUID}
+sleep 2
+
+#===========================================================================================================================================
+# TEST OVN LOAD BALANCER
+#===========================================================================================================================================
+#echo_blue_bold "Check load balancer on host"
 curl http://${NLB_VIP_ADDRESS}
+
+echo_blue_bold "Check load balancer on u3"
+lxc exec u3 -- curl http://${NLB_VIP_ADDRESS}
+
+echo_blue_bold "Check load balancer on u1"
+lxc exec u1 -- curl http://${NLB_VIP_ADDRESS}
 
 SHELL
 
@@ -355,3 +323,5 @@ exit 0
 EOF
 
 multipass exec ${VMNAME} -- ./create-lxd.sh
+
+echo "multipass shell ${VMNAME}"

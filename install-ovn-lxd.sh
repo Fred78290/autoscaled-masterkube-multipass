@@ -1,12 +1,13 @@
 #!/bin/bash
-UBUNTU_DISTRIBUTION=$1
-UBUNTU_DISTRIBUTION=jammy
+set -e
+
+UBUNTU_DISTRIBUTION=noble
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 VMNAME="lxd-ovn-${UBUNTU_DISTRIBUTION}-${RANDOM}"
-VMNETWORK=mpbr1
+VMNETWORK=
 VMCPU=4
 VMMEMORY=8
-VMDISK=40
+VMDISK=120
 
 OPTIONS=(
     "cpu:"
@@ -27,7 +28,7 @@ while true ; do
 	case "$1" in
 		-u|--ubuntu)
 			UBUNTU_DISTRIBUTION="$2"
-            VMNAME="lxd-microovn-${UBUNTU_DISTRIBUTION}-${RANDOM}"
+            VMNAME="lxd-ovn-${UBUNTU_DISTRIBUTION}-${RANDOM}"
 			shift 2
 			;;
 		-d|--disk)
@@ -61,27 +62,36 @@ while true ; do
     esac
 done
 
-multipass launch -n ${VMNAME} -c ${VMCPU} -m ${VMMEMORY}G -d ${VMDISK}G --network name=${VMNETWORK} ${UBUNTU_DISTRIBUTION}
+for PREVIOUS in $(multipass ls | grep '\-ovn-' | cut -d ' ' -f 1)
+do
+    multipass delete ${PREVIOUS} -p
+done
+
+if [ -n "${VMNETWORK}" ]; then
+    VMNETWORK="--network name=${VMNETWORK}"
+fi
+
+multipass launch -n ${VMNAME} -c ${VMCPU} -m ${VMMEMORY}G -d ${VMDISK}G ${VMNETWORK} ${UBUNTU_DISTRIBUTION}
 multipass exec ${VMNAME} -- bash -c "echo '${SSH_KEY}' >> ~/.ssh/authorized_keys"
+multipass exec ${VMNAME} -- sudo bash -c "apt update"
+multipass exec ${VMNAME} -- sudo bash -c "DEBIAN_FRONTEND=noninteractive apt upgrade -y"
+multipass restart ${VMNAME}
 
-ADDRESS=$(multipass info ${VMNAME} --format=json | jq -r --arg VMNAME ${VMNAME}  '.info|.[$VMNAME].ipv4|last')
-
-echo "SSH address used: ${ADDRESS}"
+sleep 2
 
 multipass shell ${VMNAME} << 'EOF'
 
 cat > create-lxd.sh <<'SHELL'
 #!/bin/bash
-NET_INF=${NET_INF:=$(ip route show default 0.0.0.0/0 | sed -n '1 p' | cut -d ' ' -f 5)}
-NET_CIDR=$(ip addr show ${NET_INF} | grep "inet\s" | awk '{print $2}')
-NET_IP=$(echo ${NET_CIDR} | cut -d '/' -f 1)
-INSTALL_BR_EX=NO
+set -e
+
+export INSTALL_BR_EX=NO
+export DEBIAN_FRONTEND=noninteractive
 
 LISTEN_INF=${LISTEN_INF:=$(ip route show default 0.0.0.0/0 | sed -n '2 p' |cut -d ' ' -f 5)}
 LISTEN_CIDR=$(ip addr show ${LISTEN_INF} | grep "inet\s" | awk '{print $2}')
 LISTEN_IP=$(echo ${LISTEN_CIDR} | cut -d '/' -f 1)
 
-PUBLIC_BRIDGE=br-ex
 DATA_DIR=${DATA_DIR:=~/etc/lxd/ssl}
 LXD_HOSTNAME=$(hostname -f)
 LXD_CERT_NAME=${LXD_CERT_NAME:=lxd-cert}
@@ -95,7 +105,82 @@ INT_CA_DIR=${INT_CA_DIR:-${DATA_DIR}/CA/int-ca}
 ORG_NAME="Aldune"
 ORG_UNIT_NAME="lxd"
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function echo_blue_bold() {
+	# echo message in blue and bold
+	echo -e "\x1B[90m= $(date '+%Y-%m-%d %T') \x1B[39m\x1B[1m\x1B[34m$@\x1B[0m\x1B[39m"
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function echo_blue_dot_title() {
+	# echo message in blue and bold
+	echo -n -e "\x1B[90m= $(date '+%Y-%m-%d %T') \x1B[39m\x1B[1m\x1B[34m$@\x1B[0m\x1B[39m"
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function echo_blue_dot() {
+	echo -n -e "\x1B[90m\x1B[39m\x1B[1m\x1B[34m.\x1B[0m\x1B[39m"
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function start_console_green_italic() {
+    echo -e "\x1B[3m\x1B[32m"
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function stop_console_green_italic() {
+    echo -e "\x1B[23m\x1B[39m"
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function launch_container() {
+    local NAME=$1
+    local CONTAINER_IP=
+
+    echo_blue_bold "Create instance ${NAME}"
+
+    lxc launch ubuntu:noble ${NAME} --network=ovntest
+
+    start_console_green_italic
+    lxc exec ${NAME} -- apt update
+    lxc exec ${NAME} -- bash -c 'DEBIAN_FRONTEND=noninteractive apt upgrade -y'
+    lxc exec ${NAME} -- apt install nginx -y
+    stop_console_green_italic
+
+    echo_blue_dot_title "Wait ip instance ${NAME}"
+
+    while [ -z "${CONTAINER_IP}" ]; do
+        CONTAINER_IP=$(lxc list name=${NAME} --format=json | jq -r '.[0].state.network|.eth0.addresses[]|select(.family == "inet")|.address')
+        sleep 1
+        echo_blue_dot
+    done
+    echo
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function container_ip() {
+    local NAME=$1
+
+    lxc list name=${NAME} --format=json | jq -r '.[0].state.network|.eth0.addresses[]|select(.family == "inet")|.address'
+}
+
+#===========================================================================================================================================
 # Check if this is a valid ipv4 address string
+#===========================================================================================================================================
 function is_ipv4_address {
     local address=$1
     local regex='([0-9]{1,3}\.){3}[0-9]{1,3}'
@@ -107,11 +192,10 @@ function is_ipv4_address {
     fi
 }
 
-# CA Functions
-# ============
-
+#===========================================================================================================================================
 # Creates a new CA directory structure
 # create_CA_base ca-dir
+#===========================================================================================================================================
 function create_CA_base {
     local ca_dir=$1
 
@@ -238,8 +322,10 @@ subjectAltName          = \$ENV::SUBJECT_ALT_NAME
 " >${ca_dir}/signing.conf
 }
 
+#===========================================================================================================================================
 # Create root and intermediate CAs
 # init_CA
+#===========================================================================================================================================
 function init_CA {
     # Ensure CAs are built
     make_root_CA ${ROOT_CA_DIR}
@@ -254,8 +340,10 @@ function init_CA {
     sudo update-ca-certificates
 }
 
+#===========================================================================================================================================
 # Create an initial server cert
 # init_cert
+#===========================================================================================================================================
 function init_cert {
     if [[ ! -r ${LXD_CERT} ]]; then
         make_cert ${INT_CA_DIR} ${LXD_CERT_NAME} ${LXD_HOSTNAME} "${LISTEN_IP}"
@@ -265,8 +353,10 @@ function init_cert {
     fi
 }
 
+#===========================================================================================================================================
 # make_cert creates and signs a new certificate with the given commonName and CA
 # make_cert ca-dir cert-name "common-name" ["alt-name" ...]
+#===========================================================================================================================================
 function make_cert {
     local ca_dir=$1
     local cert_name=$2
@@ -315,8 +405,10 @@ function make_cert {
     fi
 }
 
+#===========================================================================================================================================
 # Make an intermediate CA to sign everything else
 # make_int_CA ca-dir signing-ca-dir
+#===========================================================================================================================================
 function make_int_CA {
     local ca_dir=$1
     local signing_ca_dir=$2
@@ -347,8 +439,10 @@ function make_int_CA {
     fi
 }
 
+#===========================================================================================================================================
 # Make a root CA to sign other CAs
 # make_root_CA ca-dir
+#===========================================================================================================================================
 function make_root_CA {
     local ca_dir=$1
 
@@ -369,8 +463,9 @@ function make_root_CA {
     fi
 }
 
-# Deploy the service cert & key to a service specific
-# location
+#===========================================================================================================================================
+# Deploy the service cert & key to a service specific location
+#===========================================================================================================================================
 function deploy_int_cert {
     local cert_target_file=$1
     local key_target_file=$2
@@ -379,17 +474,18 @@ function deploy_int_cert {
     sudo cp "${INT_CA_DIR}/private/${LXD_CERT_NAME}.key" "${key_target_file}"
 }
 
-# Deploy the intermediate CA cert bundle file to a service
-# specific location
+#===========================================================================================================================================
+# Deploy the intermediate CA cert bundle file to a service specific location
+#===========================================================================================================================================
 function deploy_int_CA {
     local ca_target_file=$1
 
     sudo cp "${INT_CA_DIR}/ca-chain.pem" "${ca_target_file}"
 }
 
+#===========================================================================================================================================
 # Certificate Input Configuration
-# ===============================
-
+#===========================================================================================================================================
 # Ensure that the certificates for a service are in place. This function does
 # not check that a service is SSL enabled, this should already have been
 # completed.
@@ -431,8 +527,10 @@ function ensure_certificates {
     cat ${ca} >> ${SSL_BUNDLE_FILE}
 }
 
+#===========================================================================================================================================
 # Clean up the CA files
 # cleanup_CA
+#===========================================================================================================================================
 function cleanup_CA {
     sudo rm -f /usr/local/share/ca-certificates/lxd-int.crt
     sudo rm -f /usr/local/share/ca-certificates/lxd-root.crt
@@ -442,11 +540,18 @@ function cleanup_CA {
     rm -rf "${INT_CA_DIR}" "${ROOT_CA_DIR}" "${LXD_CERT}"
 }
 
-export DEBIAN_FRONTEND=noninteractive
-
+#===========================================================================================================================================
+# INSTALL PACKAGES
+#===========================================================================================================================================
 sudo apt update
 sudo apt upgrade -y
+sudo apt install jq socat conntrack net-tools traceroute nfs-common unzip -y
+sudo snap install yq
 
+#===========================================================================================================================================
+# CONFIGURE OVN
+#===========================================================================================================================================
+sudo apt install ovn-host ovn-central -y
 init_CA
 
 # Create the server cert
@@ -460,34 +565,6 @@ sudo mkdir -p /etc/ovn
 cat ${INT_CA_DIR}/private/${LXD_CERT_NAME}.key | sudo tee /etc/ovn/key_host
 cat ${INT_CA_DIR}/${LXD_CERT_NAME}.crt | sudo tee /etc/ovn/cert_host
 cat ${INT_CA_DIR}/ca-chain.pem | sudo tee /etc/ovn/ovn-central.crt
-
-echo "Enter to configure OVN"
-
-read -p "Enter to configure OVN"  TOTO
-
-if [ $(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2 | cut -d '.' -f 1) -lt 24 ]; then
-    ARCH=$([[ "$(uname -m)" =~ arm64|aarch64 ]] && echo -n arm64 || echo -n amd64)
-push /tmp
-    #wget https://launchpad.net/ubuntu/+source/ovn/24.03.2-0ubuntu0.24.04.1/+build/28559446/+files/ovn-central_24.03.2-0ubuntu0.24.04.1_amd64.deb -O ovn-central.deb
-    #wget https://launchpad.net/ubuntu/+source/ovn/24.03.2-0ubuntu0.24.04.1/+build/28559446/+files/ovn-common_24.03.2-0ubuntu0.24.04.1_amd64.deb -O  ovn-common.deb
-    #wget https://launchpad.net/ubuntu/+source/ovn/24.03.2-0ubuntu0.24.04.1/+build/28559446/+files/ovn-controller-vtep_24.03.2-0ubuntu0.24.04.1_amd64.deb -O  ovn-controller-vtep.deb
-    #wget https://launchpad.net/ubuntu/+source/ovn/24.03.2-0ubuntu0.24.04.1/+build/28559446/+files/ovn-host_24.03.2-0ubuntu0.24.04.1_amd64.deb -O  ovn-host.deb
-
-openvswitch-switch_3.3.0-1ubuntu3_amd64.deb
-
-    wget http://10.81.38.166/debian/python3-openvswitch_3.3.0-1ubuntu3_amd64.deb -O python3-openvswitch.deb
-    wget http://10.81.38.166/debian/openvswitch-switch_3.3.0-1ubuntu3_amd64.deb -O openvswitch-switch.deb
-    wget http://10.81.38.166/debian/openvswitch-common_3.3.0-1ubuntu3_amd64.deb -O openvswitch-common.deb
-    wget http://10.81.38.166/debian/ovn-central_24.03.1-2ubuntu3_amd64.deb -O ovn-central.deb
-    wget http://10.81.38.166/debian/ovn-common_24.03.1-2ubuntu3_amd64.deb -O  ovn-common.deb
-    wget http://10.81.38.166/debian/ovn-controller-vtep_24.03.1-2ubuntu3_amd64.deb -O  ovn-controller-vtep.deb
-    wget http://10.81.38.166/debian/ovn-host_24.03.1-2ubuntu3_amd64.deb -O  ovn-host.deb
-
-    sudo apt install ./python3-openvswitch.deb ./openvswitch-switch.deb ./openvswitch-common.deb ./ovn-common.deb ./ovn-controller-vtep.deb ./ovn-central.deb ./ovn-host.deb
-popd
-else
-    sudo apt install ovn-host ovn-central -y
-fi
 
 sudo ovs-vsctl --no-wait set-ssl /etc/ovn/key_host /etc/ovn/cert_host /etc/ovn/ovn-central.crt
 
@@ -510,25 +587,32 @@ sudo ovn-sbctl --db=unix:/var/run/ovn/ovnsb_db.sock set-connection pssl:6642:0.0
 sudo ovs-appctl -t /var/run/ovn/ovnnb_db.ctl vlog/set console:off syslog:info file:info
 sudo ovs-appctl -t /var/run/ovn/ovnsb_db.ctl vlog/set console:off syslog:info file:info
 
-if [ "${INSTALL_BR_EX}" == YES ]; then
-    echo "Declare bridge ${PUBLIC_BRIDGE} with IP: ${NET_CIDR}"
+cat > restore-bridge.sh <<-LXDINIT
+#!/bin/bash
+ip route add 10.68.223.0/24 via 192.168.48.192
+LXDINIT
 
-    read -p "Declare bridge ${PUBLIC_BRIDGE} with IP: ${NET_CIDR}" TOTO
+#===========================================================================================================================================
+# INSTALL BR-EX IF REQUIRED
+#===========================================================================================================================================
+if [ "${INSTALL_BR_EX}" == YES ]; then
+    PUBLIC_BRIDGE=br-ex
+
+    echo_blue_bold "Declare bridge ${PUBLIC_BRIDGE} with IP: ${LISTEN_CIDR}"
 
     sudo ovs-vsctl --no-wait -- --may-exist add-br ${PUBLIC_BRIDGE} -- set bridge ${PUBLIC_BRIDGE} protocols=OpenFlow13,OpenFlow15
     sudo ovs-vsctl --no-wait br-set-external-id ${PUBLIC_BRIDGE} bridge-id ${PUBLIC_BRIDGE}
     sudo ovs-vsctl set open . external-ids:ovn-bridge-mappings=public:${PUBLIC_BRIDGE}
     sudo ovs-vsctl --may-exist add-br ${PUBLIC_BRIDGE} -- set bridge ${PUBLIC_BRIDGE} protocols=OpenFlow13,OpenFlow15
     sudo ovs-vsctl set open . external-ids:ovn-bridge-mappings=public:${PUBLIC_BRIDGE}
-    sudo ovs-vsctl --may-exist add-port ${PUBLIC_BRIDGE} ${NET_INF}
+    sudo ovs-vsctl --may-exist add-port ${PUBLIC_BRIDGE} ${LISTEN_INF}
     sudo ovs-vsctl set Bridge ${PUBLIC_BRIDGE} other_config:disable-in-band=true
 
-    echo "Set bridge ${PUBLIC_BRIDGE} to IP: ${NET_CIDR}"
-    read -p "Set bridge ${PUBLIC_BRIDGE} to IP: ${NET_CIDR}"  TOTO
+    echo_blue_bold "Set bridge ${PUBLIC_BRIDGE} to IP: ${LISTEN_CIDR}"
 
-    sudo ip addr add ${NET_CIDR} dev ${PUBLIC_BRIDGE}
+    sudo ip addr add ${LISTEN_CIDR} dev ${PUBLIC_BRIDGE}
     sudo ip link set ${PUBLIC_BRIDGE} up
-    sudo ip addr flush dev ${NET_INF}
+    sudo ip addr flush dev ${LISTEN_INF}
 
     cat > restore-bridge.sh <<-LXDINIT
 #!/bin/bash
@@ -536,31 +620,26 @@ if [ "${INSTALL_BR_EX}" == YES ]; then
 ovs-vsctl --may-exist add-br ${PUBLIC_BRIDGE} -- set bridge ${PUBLIC_BRIDGE} protocols=OpenFlow13,OpenFlow15
 ovs-vsctl set open . external-ids:ovn-bridge-mappings=public:${PUBLIC_BRIDGE}
 
-ip addr add ${NET_CIDR} dev ${PUBLIC_BRIDGE}
+ip addr add ${LISTEN_CIDR} dev ${PUBLIC_BRIDGE}
 ip link set ${PUBLIC_BRIDGE} up
-ip addr flush dev ${NET_INF}
+ip addr flush dev ${LISTEN_INF}
 ip route add 10.68.223.0/24 via 192.168.48.192
 
 LXDINIT
-
-else
-
-    cat > restore-bridge.sh <<-LXDINIT
-#!/bin/bash
-ip route add 10.68.223.0/24 via 192.168.48.192
-LXDINIT
-
 fi
 
 sudo cp restore-bridge.sh /usr/local/bin
 sudo chmod +x /usr/local/bin/restore-bridge.sh
 
+#===========================================================================================================================================
+# INSTALL SERVICE RESTORE BRIDGE
+#===========================================================================================================================================
 cat > restore-bridge.service <<-LXDINIT
 [Install]
 WantedBy = multi-user.target
 
 [Unit]
-After = ovn-northd.service lxd-agent.service
+After = ovn-northd.service snap.lxd.daemon.service
 Description = Service for adding physical ip to ovn bridge
 
 [Service]
@@ -574,12 +653,9 @@ LXDINIT
 sudo cp restore-bridge.service /etc/systemd/system 
 sudo systemctl enable restore-bridge.service
 
-ip a
-
-echo "Enter to configure LXD"
-
-read -p "Enter to configure LXD"  TOTO
-
+#===========================================================================================================================================
+# INSTALL LXD
+#===========================================================================================================================================
 if [ -z "$(snap list | grep lxd)" ]; then
     sudo snap install lxd --channel=6.1/stable
 elif [[ "$(snap list | grep lxd)" != *6.1* ]]; then
@@ -595,6 +671,7 @@ networks:
     ipv4.dhcp.ranges: 192.168.48.128-192.168.48.159
     ipv4.ovn.ranges: 192.168.48.192-192.168.48.253
     ipv4.routes: 192.168.50.0/24
+    ipv4.nat: true
   description: ""
   name: lxdbr0
   type: ""
@@ -628,14 +705,54 @@ lxc config set network.ovn.client_cert="$(cat ${INT_CA_DIR}/${LXD_CERT_NAME}.crt
 lxc config set network.ovn.client_key="$(cat ${INT_CA_DIR}/private/${LXD_CERT_NAME}.key)"
 lxc config set network.ovn.northbound_connection=ssl:${LISTEN_IP}:6641
 
-echo "Create ovntest"
+#===========================================================================================================================================
+# CREATE OVN NETWORK
+#===========================================================================================================================================
+echo_blue_bold "Create ovntest"
 
 lxc network create ovntest --type=ovn network=lxdbr0 ipv4.address=10.68.223.1/24 ipv4.nat=true volatile.network.ipv4.address=192.168.48.192
 
 sudo ip route add 10.68.223.0/24 via 192.168.48.192
 
-#echo "Create instance u1"
-#lxc launch ubuntu:noble u1 --network=ovntest
+#===========================================================================================================================================
+# CREATE CONTAINERS
+#===========================================================================================================================================
+launch_container u1
+launch_container u2
+
+U1_IP=$(container_ip u1)
+U2_IP=$(container_ip u2)
+
+echo_blue_bold "Create instance u3"
+lxc launch ubuntu:noble u3 --network=lxdbr0
+
+lxc ls
+
+#===========================================================================================================================================
+# CREATE OVN LOAD BALANCER
+#===========================================================================================================================================
+NLB_VIP_ADDRESS=$(lxc network load-balancer create ovntest --allocate=ipv4 | cut -d ' ' -f 4)
+
+echo_blue_bold "NLB_VIP_ADDRESS=${NLB_VIP_ADDRESS}"
+
+lxc network load-balancer backend add ovntest ${NLB_VIP_ADDRESS} u1 ${U1_IP} 80,443
+lxc network load-balancer backend add ovntest ${NLB_VIP_ADDRESS} u2 ${U2_IP} 80,443
+lxc network load-balancer port add ovntest ${NLB_VIP_ADDRESS} tcp 80,443 u1,u2
+
+#===========================================================================================================================================
+# PATCH OVN LOAD BALANCER
+#===========================================================================================================================================
+OVN_CHASSIS_UUID=$(sudo ovn-sbctl show | grep Chassis | cut -d ' ' -f 2 | tr -d '"')
+OVN_NLB_NAME=$(sudo ovn-nbctl find load_balancer | grep "lb-${NLB_VIP_ADDRESS}-tcp" | awk '{print $3}')
+OVN_ROUTER_NAME="${OVN_NLB_NAME%-lb*}-lr"
+
+echo_blue_bold "sudo ovn-nbctl --wait=hv set logical_router ${OVN_ROUTER_NAME} options:chassis=${OVN_CHASSIS_UUID}"
+sleep 2
+
+#===========================================================================================================================================
+# TEST OVN LOAD BALANCER
+#===========================================================================================================================================
+curl http://${NLB_VIP_ADDRESS}
 
 SHELL
 
@@ -644,4 +761,4 @@ exit 0
 
 EOF
 
-ssh -o "StrictHostKeyChecking no" ubuntu@${ADDRESS} ./create-lxd.sh
+multipass exec ${VMNAME} -- ./create-lxd.sh

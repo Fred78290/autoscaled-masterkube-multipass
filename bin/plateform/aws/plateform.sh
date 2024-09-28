@@ -79,7 +79,7 @@ function parse_arguments() {
         "public-sg-id:"
         "private-subnet-id:"
         "private-sg-id:"
-        "create-nginx-apigatewa"y
+        "create-nginx-apigateway"
         "prefer-ssh-publicip"
         "private-domain:"
         "use-nlb:"

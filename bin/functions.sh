@@ -2029,7 +2029,6 @@ function prepare_networking() {
 	if [ -z "${VC_NETWORK_PUBLIC}" ] || [ "${PUBLIC_IP}" == "NONE" ]; then
 		PUBLIC_IP=NONE
 		PUBLIC_NODE_IP=NONE
-		VC_NETWORK_PUBLIC_ENABLED=false
 	else
 		PUBLIC_NODE_IP=${PUBLIC_IP}
 	fi

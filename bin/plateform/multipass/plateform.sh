@@ -78,7 +78,6 @@ function usage() {
 --vm-public-network=<value>                    # Override the name of the public network in ${PLATEFORM}, empty for none second interface, default: ${VC_NETWORK_PUBLIC}
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default: ${SCALEDNODES_DHCP}
 --dhcp-autoscaled-node                         # Autoscaled node use DHCP, default: ${SCALEDNODES_DHCP}
---private-domain=<value>                       # Override the domain name, default: ${PRIVATE_DOMAIN_NAME}
 
 --public-address=<value>                       # The public address to expose kubernetes endpoint[ipv4/cidr, DHCP, NONE], default: ${PUBLIC_IP}
 --metallb-ip-range                             # Override the metalb ip range, default: ${METALLB_IP_RANGE}

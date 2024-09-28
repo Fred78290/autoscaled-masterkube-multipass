@@ -81,7 +81,6 @@ function parse_arguments() {
         "private-sg-id:"
         "create-nginx-apigateway"
         "prefer-ssh-publicip"
-        "private-domain:"
         "use-nlb:"
         "volume-size:"
         "volume-type:"

@@ -73,7 +73,6 @@ function usage() {
 --vm-network=<value>                           # Override the name of the private network in ${PLATEFORM}, default: ${VC_NETWORK_PRIVATE}
 --no-dhcp-autoscaled-node                      # Autoscaled node don't use DHCP, default: ${SCALEDNODES_DHCP}
 --dhcp-autoscaled-node                         # Autoscaled node use DHCP, default: ${SCALEDNODES_DHCP}
---private-domain=<value>                       # Override the domain name, default: ${PRIVATE_DOMAIN_NAME}
 
 --prefer-ssh-publicip                          # Allow to SSH on publicip when available, default: ${PREFER_SSH_PUBLICIP}
 --external-security-group=<name>               # Specify the public security group ID for VM, default: ${EXTERNAL_SECURITY_GROUP}
@@ -103,7 +102,6 @@ function parse_arguments() {
 		"nfs-server-mount:"
 		"nfs-storage-class:"
 		"prefer-ssh-publicip"
-		"private-domain:"
 		"use-nlb:"
 		"vm-network:"
 		"worker-node-public"
@@ -225,10 +223,6 @@ function parse_arguments() {
 			;;
 		--dashboard-hostname)
 			DASHBOARD_HOSTNAME=$2
-			shift 2
-			;;
-		--public-domain)
-			PUBLIC_DOMAIN_NAME=$2
 			shift 2
 			;;
 		--external-dns-provider)
@@ -488,6 +482,10 @@ function parse_arguments() {
 			;;
 		--private-domain)
 			PRIVATE_DOMAIN_NAME="$2"
+			shift 2
+			;;
+		--public-domain)
+			PUBLIC_DOMAIN_NAME=$2
 			shift 2
 			;;
 		--use-nlb)

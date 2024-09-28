@@ -41,6 +41,7 @@ OPTIONS=(
 	"memory-total:"
 	"nginx-machine:"
 	"node-group:"
+	"private-domain:"
 	"public-domain:"
 	"resume"
 	"route53-access-key:"

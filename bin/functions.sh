@@ -1144,6 +1144,12 @@ function prepare_environment() {
 		VC_NETWORK_PUBLIC=""
 	fi
 
+	if [ -n ${VC_NETWORK_PUBLIC} ]; then
+		VC_NETWORK_PUBLIC_ENABLED=true
+	else
+		VC_NETWORK_PUBLIC_ENABLED=false
+	fi
+
 	if [ "${UPGRADE_CLUSTER}" == "YES" ] && [ "${DELETE_CLUSTER}" = "YES" ]; then
 		echo_red_bold "Can't upgrade deleted cluster, exit"
 		exit

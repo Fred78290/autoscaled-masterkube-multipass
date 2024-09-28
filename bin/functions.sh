@@ -2178,7 +2178,23 @@ function create_all_vms() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function create_keepalived_with_dns() {
+	create_keepalived YES
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function create_keepalived_without_dns() {
+	create_keepalived NO
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function create_keepalived() {
+	local REGISTER_DNS=$1
+
 	echo_title "Created keepalived cluster: ${CLUSTER_NODES}"
 
 	LOAD_BALANCER_IP=${PRIVATE_ADDR_IPS[0]}
@@ -2224,7 +2240,9 @@ function create_keepalived() {
 		fi
 	done
 
-	register_nlb_dns A "${LOAD_BALANCER_IP}" "" ""
+	if [ "${REGISTER_DNS}" == "YES" ]; then
+		register_nlb_dns A "${LOAD_BALANCER_IP}" "" "" ""
+	fi
 }
 
 #===========================================================================================================================================
@@ -2249,7 +2267,22 @@ function create_nameserver() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function create_nginx_gateway_with_dns() {
+	create_nginx_gateway YES
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function create_nginx_gateway_without_dns() {
+	create_nginx_gateway NO
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 function create_nginx_gateway() {
+	local REGISTER_DNS=$1
 	local PUBLIC_NLB_DNS=${PUBLIC_ADDR_IPS[${FIRSTNODE}]}
 
 	for INDEX in $(seq ${FIRSTNODE} $((CONTROLNODE_INDEX - 1)) )
@@ -2290,7 +2323,9 @@ function create_nginx_gateway() {
 		fi
 	done
 
-	register_nlb_dns A "${LOAD_BALANCER_IP}" "${PUBLIC_NLB_DNS}" ""
+	if [ "${REGISTER_DNS}" == "YES" ]; then
+		register_nlb_dns A "${LOAD_BALANCER_IP}" "${PUBLIC_NLB_DNS}" "" ""
+	fi
 
 	echo_red_bold LOAD_BALANCER_IP=$LOAD_BALANCER_IP
 }
@@ -2539,7 +2574,7 @@ EOF
 #
 #===========================================================================================================================================
 function create_plateform_nlb() {
-	create_nginx_gateway
+	create_nginx_gateway_with_dns
 }
 
 #===========================================================================================================================================
@@ -2577,10 +2612,10 @@ function create_load_balancer() {
 			create_dns_entries
 			;;
 		nginx)
-			create_nginx_gateway
+			create_nginx_gateway_with_dns
 			;;
 		keepalived)
-			create_keepalived
+			create_keepalived_with_dns
 			;;
 		cloud)
 			create_plateform_nlb
@@ -2787,7 +2822,7 @@ function create_cluster() {
 			echo_title "Prepare VM ${MASTERKUBE_NODE}, index=${INDEX}, UUID=${VMUUID} with IP:${IPADDR}"
 
 			if [ ${INDEX} -lt ${CONTROLNODE_INDEX} ]; then
-				create_nginx_gateway
+				create_nginx_gateway_with_dns
 			elif [ ${INDEX} = ${CONTROLNODE_INDEX} ]; then
 				# Start create first master node
 				echo_blue_bold "Start control plane ${MASTERKUBE_NODE} index=${INDEX}, kubernetes version=${KUBERNETES_VERSION}"

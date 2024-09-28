@@ -1390,7 +1390,7 @@ function create_plateform_nlb() {
 				PUBLIC_NLB_DNS=$(create_public_loadbalancer "nlb-${MASTERKUBE}" "${EXPOSE_PUBLIC_PORTS}" "${NLB_INSTANCE_IDS}" "${PUBLIC_NLB_DNS}")
 			fi
 		else
-			create_nginx_gateway
+			create_nginx_gateway_without_dns
 		fi
 	else
 		PUBLIC_NLB_DNS=${PRIVATE_NLB_DNS}
@@ -1404,7 +1404,7 @@ function create_plateform_nlb() {
 		if [ "${CLOUDSTACK_INTERNAL_NLB}" == "cloud" ]; then
 			create_internal_loadbalancer "nlb-${MASTERKUBE}" "${LOAD_BALANCER_PORT}" "${NLB_INSTANCE_IDS}" "${PRIVATE_NLB_DNS}"
 		else
-			create_keepalived
+			create_keepalived_without_dns
 		fi
 	fi
 

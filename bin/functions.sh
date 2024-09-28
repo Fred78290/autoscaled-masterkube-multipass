@@ -813,6 +813,7 @@ function plateform_info_vm() {
 cat > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json <<EOF
 {
 	"Index": ${INDEX},
+	"InstanceName": "${NAME}",
 	"InstanceId": "$(get_vmuuid ${NAME})",
 	"PrivateIpAddress": "${PRIVATE_IP}",
 	"PrivateDnsName": "${NAME}.${PRIVATE_DOMAIN_NAME}",

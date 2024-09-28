@@ -248,6 +248,7 @@ function plateform_info_vm() {
 	cat > ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json <<EOF
 {
 	"Index": ${INDEX},
+	"InstanceName": "${MASTERKUBE_NODE}",
 	"InstanceId": "${MASTERKUBE_NODE_UUID}",
 	"PrivateIpAddress": "${PRIVATE_IP}",
 	"PrivateDnsName": "${MASTERKUBE_NODE}.${PRIVATE_DOMAIN_NAME}",

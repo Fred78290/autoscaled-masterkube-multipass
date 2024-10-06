@@ -32,17 +32,9 @@ if [ "${GRPC_PROVIDER}" = "externalgrpc" ]; then
 fi
 
 case ${KUBERNETES_MINOR_RELEASE} in
-	28)
-		CLUSTER_AUTOSCALER_VERSION=v1.28.4
-		CLOUD_AUTOSCALER_VERSION=v1.30.0
-		;;
-	29)
-		CLUSTER_AUTOSCALER_VERSION=v1.29.2
-		CLOUD_AUTOSCALER_VERSION=v1.30.0
-		;;
-	30|31)
+	29|30|31)
 		CLUSTER_AUTOSCALER_VERSION=v1.30.0
-		CLOUD_AUTOSCALER_VERSION=v1.30.0
+		CLOUD_AUTOSCALER_VERSION=v1.31.0
 		;;
 	*)
 		echo "Former version aren't supported by cloud autoscaler"
@@ -126,12 +118,18 @@ fi
 echo "---" >> ${ETC_DIR}/autoscaler.yaml
 
 if [ "${PLATEFORM}" == "lxd" ]; then
+	if [ -n "${LXD_TLS_CA}" ]; then
+		FROM_LXD_TLS_CA="--from-file ${LXD_TLS_CA}"
+	else
+		FROM_LXD_TLS_CA=
+	fi
+
 	kubectl create configmap lxd-cloud-config -n kube-system --dry-run=client -o yaml \
 		--kubeconfig=${TARGET_CLUSTER_LOCATION}/config \
 		--from-file ${LXD_TLS_SERVER_CERT} \
 		--from-file ${LXD_TLS_CLIENT_CERT} \
 		--from-file ${LXD_TLS_CLIENT_KEY} \
-		--from-file ${LXD_TLS_CA} \
+		${FROM_LXD_TLS_CA} \
 		| tee -a ${ETC_DIR}/autoscaler.yaml \
 		| kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 else

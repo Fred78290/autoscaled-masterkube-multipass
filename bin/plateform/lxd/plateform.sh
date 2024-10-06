@@ -961,11 +961,11 @@ function append_ovn_nlb_member() {
 		lxc network load-balancer port add ${LXD_REMOTE}${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} tcp ${NLB_TARGET_PORTS} "${NLB_BACKEND}" --project ${LXD_PROJECT}
 
 		if [ ${LXD_PATCH_OVN_NLB} == "YES" ]; then
-			OVN_CHASSIS_UUID=$(sudo ovn-sbctl show | grep Chassis | cut -d ' ' -f 2 | tr -d '"')
 			OVN_NLB_NAME=$(sudo ovn-nbctl find load_balancer | grep "lb-${NLB_VIP_ADDRESS}-tcp" | awk '{print $3}')
-			OVN_ROUTER_NAME="${OVN_NLB_NAME%-lb*}-lr"
 
-			sudo ovn-nbctl --wait=hv set logical_router ${OVN_ROUTER_NAME} options:chassis=${OVN_CHASSIS_UUID}
+			sudo ovn-nbctl ls-lb-add "${OVN_NLB_NAME%-lb*}-ls-int" ${OVN_NLB_NAME}
+			# OVN_CHASSIS_UUID=$(sudo ovn-sbctl show | grep Chassis | cut -d ' ' -f 2 | tr -d '"')
+			# sudo ovn-nbctl --wait=hv set logical_router "${OVN_NLB_NAME%-lb*}-lr" options:chassis=${OVN_CHASSIS_UUID}
 			sleep 2
 		fi
 	else

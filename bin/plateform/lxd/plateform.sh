@@ -655,51 +655,6 @@ function create_image_extras_args() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-function build_routes_lxd() {
-	local OUTPUT=$1
-	local ROUTES="[]"
-	local ROUTE=
-
-	shift
-
-	for ROUTE in $@
-	do
-		local TO=
-		local VIA=
-		local METRIC=500
-
-		IFS=, read -a DEFS <<< "${ROUTE}"
-
-		for DEF in ${DEFS[@]}
-		do
-			IFS== read KEY VALUE <<< "${DEF}"
-			case ${KEY} in
-				to)
-					TO=${VALUE:=}
-					;;
-				via)
-					VIA=${VALUE:=}
-					;;
-				metric)
-					METRIC=${VALUE:=500}
-					;;
-			esac
-		done
-
-		if [ -n "${TO}" ] && [ -n "${VIA}" ]; then
-cat >> ${OUTPUT} <<EOF
-      - type: route
-        destination: '${TO}'
-        gateway: '${VIA}'
-        metric: ${METRIC}
-EOF
-		fi
-	done
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
 function plateform_create_vm() {
 	local INDEX=$1
 	local PUBLIC_IP=$2
@@ -733,6 +688,7 @@ function plateform_create_vm() {
 
 		cat > ${TARGET_CONFIG_LOCATION}/config-${INDEX}.yaml << EOF
 type: ${LXD_CONTAINER_TYPE}
+description: ${MASTERKUBE_NODE}
 profiles:
   - ${LXD_KUBERNETES_PROFILE}
 devices:

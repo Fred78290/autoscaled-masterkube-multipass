@@ -469,13 +469,13 @@ function parsed_arguments() {
 
 	if [ -z "${PRIVATE_IP}" ]; then
 		local SUBNET=$(openstack subnet show -f json $(openstack network show ${VC_NETWORK_PRIVATE} -f json | jq -r '.subnets[0]//""'))
-		local CIDR=$(echo ${SUBNET} | jq -r '.cidr' | cut -d '/' -f 1)
+		local CIDR=$(echo ${SUBNET} | jq -r '.cidr')
 
-		PRIVATE_IP=$(cut -d '/' -f 1 <<< "${CIDR}")
+		PRIVATE_IP=${CIDR%/*}
 		PRIVATE_IP="${PRIVATE_IP%.*}.${PRIVATE_IP_START}"
 		PRIVATE_DNS=$(echo ${SUBNET} | jq -r '.dns_nameservers|first//""' | cut -d '/' -f 1)
 
-		PRIVATE_MASK_CIDR=$(cut -d '/' -f 2 <<< "${CIDR}")
+		PRIVATE_MASK_CIDR=${CIDR#*/}
 		PRIVATE_NETMASK=$(cidr_to_netmask ${PRIVATE_MASK_CIDR})
 	fi
 }

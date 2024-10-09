@@ -4,7 +4,7 @@ CLOUD_PROVIDER=
 export LXD_INTERNAL_NLB=none
 export LXD_EXTERNAL_NLB=none
 export LXD_NLB_VIP_ADDR=
-export LXD_PATCH_OVN_NLB=YES
+export LXD_PATCH_OVN_NLB=chassis # none|chassis|switch
 
 source ${PLATEFORMDEFS}
 
@@ -51,6 +51,8 @@ function usage() {
 --dhcp-autoscaled-node                         # Autoscaled node use DHCP, default: ${SCALEDNODES_DHCP}
 
 --metallb-ip-range                             # Override the metalb ip range, default: ${METALLB_IP_RANGE}
+
+--patch-ovn-nlb=[none|chassis|switch]          # Temporary hack to support ovn load balancer, default: ${LXD_PATCH_OVN_NLB}
 EOF
 }
 
@@ -81,6 +83,7 @@ function parse_arguments() {
 		"use-named-server"
 		"use-nlb:"
 		"vm-network:"
+		"patch-ovn-nlb:"
 	)
 
 	PARAMS=$(echo ${OPTIONS[@]} | tr ' ' ',')
@@ -474,6 +477,18 @@ function parse_arguments() {
 			esac
 			shift 2
 			;;
+		--patch-ovn-nlb)
+			case $2 in
+				none|chassis|switch)
+					LXD_PATCH_OVN_NLB="$2"
+					;;
+				*)
+					echo_red_bold "Patch of type: $2 is not supported"
+					exit 1
+					;;
+			esac
+			shift 2;
+			;;
 		--)
 			shift
 			break
@@ -562,14 +577,26 @@ function determine_used_loadbalancers_on_network() {
 function determine_loadbalancer_ip() {
 	local NETWORK_NAME=$1
 	local NETWORK_IP=
-	local NETWORK_DEF=$(lxc network list --format=json | jq -r --arg NAME ${NETWORK_NAME} '.[]|select(.name == $NAME)')
-	local NETWORK_TYPE=$(jq -r '.type' <<< "${NETWORK_DEF}")
+	local NETWORK_DEFS=$(lxc network list --format=json | jq -r --arg NAME ${NETWORK_NAME} '.[]|select(.name == $NAME)')
+	local NETWORK_TYPE=$(jq -r '.type' <<< "${NETWORK_DEFS}")
 	local NETWORK_GREAT_PARENT=
 
 	if [ ${NETWORK_TYPE} = "ovn" ]; then
-		NETWORK_IP=$(jq -r '.config."volatile.network.ipv4.address"' <<< "${NETWORK_DEF}")
+		PARENT_NETWORK=$(jq -r '.config.network' <<< "${NETWORK_DEFS}")
+		PARENT_NETWORK_DEFS=$(lxc network list --format=json | jq -r --arg NAME ${PARENT_NETWORK} '.[]|select(.name == $NAME)')
+		PARENT_ROUTES=$(jq -r '.config."ipv4.routes"' <<< "${PARENT_NETWORK_DEFS}")
+		IFS=, read -a PARENT_ROUTES <<<"${PARENT_ROUTES}"
 
-		NETWORK_IP="${NETWORK_IP%.*}.${PRIVATE_IP_START}"
+		for PARENT_ROUTE in ${PARENT_ROUTES[@]}
+		do
+			if [[ ${PARENT_ROUTE} =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.0\/[0-9]{1,2} ]]; then
+				NETWORK_IP="${PARENT_ROUTE%.*}.${PRIVATE_IP_START}"
+				break
+			elif [[ ${PARENT_ROUTE} =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[1-9]{1,3}\.0\/[0-9]{1,2} ]]; then
+				NETWORK_IP="${PARENT_ROUTE%/*}"
+				break
+			fi
+		done
 	fi
 
 	echo -n "${NETWORK_IP}"
@@ -580,7 +607,7 @@ function determine_loadbalancer_ip() {
 #===========================================================================================================================================
 function determine_used_loadbalancers() {
 	if [ "${USE_NLB}" == "cloud" ]; then
-		if [ ${LXD_PATCH_OVN_NLB} == "YES" ]; then
+		if [ ${LXD_PATCH_OVN_NLB} != "none" ]; then
 			LXD_INTERNAL_NLB=$(determine_used_loadbalancers_on_network ${VC_NETWORK_PRIVATE})
 		elif [ ${HA_CLUSTER} == "true" ]; then
 			LXD_INTERNAL_NLB=keepalived
@@ -916,17 +943,27 @@ function append_ovn_nlb_member() {
 	if [ $(jq '.ports|length' <<< "${NLB_DEFS}") -eq 0 ]; then
 		lxc network load-balancer port add ${LXD_REMOTE}${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} tcp ${NLB_TARGET_PORTS} "${NLB_BACKEND}" --project ${LXD_PROJECT}
 
-		if [ ${LXD_PATCH_OVN_NLB} == "YES" ]; then
+		if [ ${LXD_PATCH_OVN_NLB} != "none" ]; then
 			OVN_NLB_NAME=$(sudo ovn-nbctl find load_balancer | grep "lb-${NLB_VIP_ADDRESS}-tcp" | awk '{print $3}')
 
-			sudo ovn-nbctl ls-lb-add "${OVN_NLB_NAME%-lb*}-ls-int" ${OVN_NLB_NAME}
-			# OVN_CHASSIS_UUID=$(sudo ovn-sbctl show | grep Chassis | cut -d ' ' -f 2 | tr -d '"')
-			# sudo ovn-nbctl --wait=hv set logical_router "${OVN_NLB_NAME%-lb*}-lr" options:chassis=${OVN_CHASSIS_UUID}
-			sleep 2
+			if [ ${LXD_PATCH_OVN_NLB} == "chassis" ]; then
+				OVN_CHASSIS_UUID=$(sudo ovn-sbctl show | grep Chassis | cut -d ' ' -f 2 | tr -d '"')
+				sudo ovn-nbctl --wait=hv set logical_router "${OVN_NLB_NAME%-lb*}-lr" options:chassis=${OVN_CHASSIS_UUID}
+			elif [ ${LXD_PATCH_OVN_NLB} == "switch" ]; then
+				sudo ovn-nbctl ls-lb-add "${OVN_NLB_NAME%-lb*}-ls-int" ${OVN_NLB_NAME}
+			fi
 		fi
+
+		sleep 2
 	else
 		echo "${NLB_DEFS}" | jq --arg NLB_BACKEND "${NLB_BACKEND}" '.ports[0].target_backend += [ $NLB_BACKEND ]' | yq -p json -o yaml \
 			| sudo "$(command -v lxc)" network load-balancer edit ${LXD_REMOTE}${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} --project ${LXD_PROJECT}
+
+		if [ ${LXD_PATCH_OVN_NLB} == "switch" ]; then
+			OVN_NLB_NAME=$(sudo ovn-nbctl find load_balancer | grep "lb-${NLB_VIP_ADDRESS}-tcp" | awk '{print $3}')
+			sudo ovn-nbctl ls-lb-add "${OVN_NLB_NAME%-lb*}-ls-int" $(sudo ovn-nbctl find load_balancer | grep "lb-${NLB_VIP_ADDRESS}-tcp" | awk '{print $3}')
+			sleep 2
+		fi
 	fi
 }
 

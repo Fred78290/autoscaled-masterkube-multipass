@@ -38,23 +38,21 @@ KUBERNETES_MINOR_RELEASE=$(echo -n ${KUBERNETES_VERSION} | awk -F. '{ print $2 }
 case ${KUBERNETES_MINOR_RELEASE} in
 	26)
 		CERT_MANAGER_VERSION=v1.11.5
-		GODADDY_WEBHOOK_VERSION=v1.26.1
 		;;
 	27)
 		CERT_MANAGER_VERSION=v1.12.7
-		GODADDY_WEBHOOK_VERSION=v1.27.2
 		;;
 	28)
 		CERT_MANAGER_VERSION=v1.13.3
-		GODADDY_WEBHOOK_VERSION=v1.28.4
 		;;
 	29)
 		CERT_MANAGER_VERSION=v1.14.4
-		GODADDY_WEBHOOK_VERSION=v1.29.0
 		;;
 	30)
 		CERT_MANAGER_VERSION=v1.14.4
-		GODADDY_WEBHOOK_VERSION=v1.29.0
+		;;
+	31)
+		CERT_MANAGER_VERSION=v1.16.0
 		;;
 	*)
 		echo_red_bold "Unsupported k8s release: ${KUBERNETES_VERSION}"
@@ -110,6 +108,28 @@ else
 		fi
 	elif [ "${EXTERNAL_DNS_PROVIDER}" == "godaddy" ]; then
 		echo_blue_bold "Register godaddy issuer"
+
+		case ${KUBERNETES_MINOR_RELEASE} in
+			26)
+				GODADDY_WEBHOOK_VERSION=v1.26.1
+				;;
+			27)
+				GODADDY_WEBHOOK_VERSION=v1.27.2
+				;;
+			28)
+				GODADDY_WEBHOOK_VERSION=v1.28.4
+				;;
+			29)
+				GODADDY_WEBHOOK_VERSION=v1.29.0
+				;;
+			30)
+				GODADDY_WEBHOOK_VERSION=v1.29.0
+				;;
+			*)
+				echo_red_bold "Unsupported k8s release: ${KUBERNETES_VERSION}"
+				exit 1
+		esac
+
 		helm repo add godaddy-webhook https://fred78290.github.io/cert-manager-webhook-godaddy/
 		helm repo update
 		helm upgrade -i godaddy-webhook godaddy-webhook/godaddy-webhook \

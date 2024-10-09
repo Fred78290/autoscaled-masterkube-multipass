@@ -11,15 +11,16 @@ export NAMESPACE=cattle-system
 
 kubectl create ns ${NAMESPACE} --dry-run=client --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -o yaml | kubectl apply --kubeconfig=${TARGET_CLUSTER_LOCATION}/config -f -
 
-if [ ${KUBERNETES_MINOR_RELEASE} -lt 27 ]; then
+if [ ${KUBERNETES_MINOR_RELEASE} -lt 31 ]; then
 	REPO=rancher-latest/rancher
 
 	helm repo add rancher-latest https://releases.rancher.com/server-charts/latest
 	helm repo update
 else
 	REPO=/tmp/rancher/
+	RANCHER_VERSION=2.8.5
 
-	curl -sL https://releases.rancher.com/server-charts/latest/rancher-2.8.3.tgz | tee /tmp/rancher-2.8.3.tgz | tar zxvf - -C /tmp
+	curl -sL https://releases.rancher.com/server-charts/latest/rancher-${RANCHER_VERSION}.tgz | tee /tmp/rancher-${RANCHER_VERSION}.tgz | tar zxvf - -C /tmp
 
 	sed -i -e '/kubeVersion/d' /tmp/rancher/Chart.yaml
 fi

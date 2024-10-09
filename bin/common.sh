@@ -332,6 +332,26 @@ fi
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
+function mandatories_command() {
+	local CMD_MISSING=()
+	local MANDATORY=
+
+	for MANDATORY in $@
+	do
+		if [ -z "$(command -v ${MANDATORY})" ]; then
+			CMD_MISSING+=(MANDATORY)
+		fi
+	done
+
+	if [ ${#CMD_MISSING[@]} -gt 0 ]; then
+		echo_red "The following command ${CMD_MISSING[@]} are missing"
+		exit 1
+	fi
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
 mkdir -p ${CACHE}
 
 if [ ! -d ${CURDIR}/plateform/${PLATEFORM} ]; then
@@ -348,11 +368,8 @@ source ${CURDIR}/plateform/${PLATEFORM}/plateform.sh
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-for MANDATORY in ${CMD_MANDATORIES}
-do
-	if [ -z "$(command -v ${MANDATORY})" ]; then
-		echo_red "The command ${MANDATORY} is missing"
-		exit 1
-	fi
-done
+mandatories_command ${CMD_MANDATORIES}
 
+if [ -n "${AWS_ROUTE53_PUBLIC_ZONE_ID}" ] || [ -n "${AWS_ACCESSKEY}" ] || [ -n "${AWS_SECRETKEY}" ]; then
+	mandatories_command aws
+fi

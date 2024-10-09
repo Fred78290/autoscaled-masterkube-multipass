@@ -10,6 +10,8 @@ VMDISK=10
 NODE_IPS=()
 INSTANCE_IPS=()
 OVNNAME=default
+export PRIMARY_INF=enp5s0
+export SECONDARY_INF=enp6s0
 
 OPTIONS=(
     "cpu:"
@@ -191,7 +193,7 @@ do
 
     lxc start ${VMNAME}
     
-    wait_container_ip ${VMNAME} enp5s0
+    wait_container_ip ${VMNAME} ${PRIMARY_INF}
 
     lxc exec ${VMNAME} -- apt update
     lxc exec ${VMNAME} -- bash -c 'DEBIAN_FRONTEND=noninteractive apt upgrade -y'
@@ -210,19 +212,19 @@ do
 
 #sysctl -p
 
-sed -i 's/#MulticastDNS=no/MulticastDNS=yes/' /etc/systemd/resolved.conf
-mkdir -p /etc/systemd/network/10-netplan-enp5s0.network.d
+#sed -i 's/#MulticastDNS=no/MulticastDNS=yes/' /etc/systemd/resolved.conf
+#mkdir -p /etc/systemd/network/10-netplan-${PRIMARY_INF}.network.d
 
-cat << EOF > /etc/systemd/network/10-netplan-enp5s0.network.d/override.conf
-[Network]
-MulticastDNS=yes
-EOF
+#cat << EOF > /etc/systemd/network/10-netplan-${PRIMARY_INF}.network.d/override.conf
+#[Network]
+#MulticastDNS=yes
+#EOF
 
 cat << EOF > /etc/netplan/99-microcloud.yaml
 network:
   version: 2
   ethernets:
-    enp6s0:
+    ${SECONDARY_INF}:
       accept-ra: false
       dhcp4: false
       link-local: []
@@ -234,7 +236,7 @@ SHELL
 
     lxc exec ${VMNAME} -- snap install yq
 
-    if [ ${UBUNTU_DISTRIBUTION} == "noble" ]; then
+    if [ -z "$(snap list|grep lxd)" ]; then
       lxc exec ${VMNAME} -- snap install lxd --channel=6.1/stable --cohort="+"
     else
       lxc exec ${VMNAME} -- snap refresh lxd --channel=6.1/stable  --cohort="+"
@@ -247,15 +249,15 @@ SHELL
 
 #    lxc exec ${VMNAME} -- mkdir -p /var/snap/microovn/common/state/certificates
 #    lxc exec ${VMNAME} -- mkdir -p /var/snap/microceph/common/state/certificates
-    lxc exec ${VMNAME} -- snap start microceph
-    lxc exec ${VMNAME} -- snap start microovn
+#    lxc exec ${VMNAME} -- snap start microceph
+#    lxc exec ${VMNAME} -- snap start microovn
 
     echo_blue_bold "Restart VM: ${VMNAME}"
     lxc restart ${VMNAME}
 
-    wait_container_ip ${VMNAME} enp5s0
+    wait_container_ip ${VMNAME} ${PRIMARY_INF}
 
-    NODE_IPS[${INDEX}]=$(container_ip ${VMNAME} enp5s0)
+    NODE_IPS[${INDEX}]=$(container_ip ${VMNAME} ${PRIMARY_INF})
 done
 
 #===========================================================================================================================================
@@ -265,11 +267,11 @@ LEADER_NAME=${ROOTNAME}-01
 
 lxc shell ${LEADER_NAME} <<SHELL
 cat > microcloud-init.yaml <<EOF
-lookup_subnet: \$(ip addr show enp5s0 | grep 'inet ' | awk '{print \$2}')
-lookup_interface: enp5s0
+lookup_subnet: \$(ip addr show ${PRIMARY_INF} | grep 'inet ' | awk '{print \$2}')
+lookup_interface: ${PRIMARY_INF}
 systems:
 - name: ${ROOTNAME}-01
-  ovn_uplink_interface: enp6s0
+  ovn_uplink_interface: ${SECONDARY_INF}
 #  ovn_underlay_ip: 10.0.2.101
   storage:
     local:
@@ -280,7 +282,7 @@ systems:
         wipe: true
         encrypt: false
 - name: ${ROOTNAME}-02
-  ovn_uplink_interface: enp6s0
+  ovn_uplink_interface: ${SECONDARY_INF}
 #  ovn_underlay_ip: 10.0.2.102
   storage:
     local:
@@ -291,7 +293,7 @@ systems:
         wipe: true
         encrypt: false
 - name: ${ROOTNAME}-03
-  ovn_uplink_interface: enp6s0
+  ovn_uplink_interface: ${SECONDARY_INF}
 #  ovn_underlay_ip: 10.0.2.103
   storage:
     local:
@@ -302,7 +304,7 @@ systems:
         wipe: true
         encrypt: false
 - name: ${ROOTNAME}-04
-  ovn_uplink_interface: enp6s0
+  ovn_uplink_interface: ${SECONDARY_INF}
 #  ovn_underlay_ip: 10.0.2.104
   storage:
     local:

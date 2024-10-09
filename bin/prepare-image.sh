@@ -376,7 +376,7 @@ EOF
 	echo "==============================================================================================================================="
 
 	cd /usr/local/bin
-	curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/${ARCH}/{kubeadm,kubelet,kubectl,kube-proxy}
+	curl -sL --remote-name-all https://dl.k8s.io/release/${KUBERNETES_VERSION}/bin/linux/${ARCH}/{kubeadm,kubelet,kubectl,kube-proxy}
 	chmod +x /usr/local/bin/kube*
 
 	echo
@@ -547,6 +547,6 @@ rm -rf /var/lib/cloud /var/lib/dbus/machine-id /var/lib/private /var/lib/systemd
 rm -f /var/lib/ubuntu-release-upgrader/release-upgrade-available
 rm -f /var/lib/update-notifier/fsck-at-reboot /var/lib/update-notifier/hwe-eol
 find /var/log -type f -exec rm -f {} +
-rm -r /tmp/* /tmp/.*-unix /var/tmp/*
+rm -r /tmp/* /tmp/.*-unix /var/tmp/* /var/lib/apt/*
 /bin/sync
 

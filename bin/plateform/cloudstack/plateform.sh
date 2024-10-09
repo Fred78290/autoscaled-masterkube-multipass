@@ -609,18 +609,6 @@ set secretkey ${CLOUDSTACK_SECRET_KEY}
 sync
 EOF
 
-	CLOUDSTACK_NETWORK_ID=$(get_network_id ${VC_NETWORK_PRIVATE})
-
-	if [ -z "${CLOUDSTACK_NETWORK_ID}" ]; then
-		echo_red_bold "Unable to find network id for network named: ${VC_NETWORK_PRIVATE}"
-		exit 1
-	fi
-	
-	CLOUDSTACK_VPC_ID=($(get_vpc_id ${CLOUDSTACK_NETWORK_ID}))
-
-	VPC_PUBLIC_SUBNET_IDS=()
-	VPC_PRIVATE_SUBNET_IDS=(${CLOUDSTACK_NETWORK_ID})
-
 	CLOUDSTACK_ZONE_ID=$(cloudmonkey list zones name=${CLOUDSTACK_ZONE_NAME} | jq -r '.zone[0].id//""')
 	if [ -z "${CLOUDSTACK_ZONE_ID}" ]; then
 		echo_red_bold "Zone: ${CLOUDSTACK_ZONE_NAME} not found, exit"
@@ -656,6 +644,17 @@ EOF
 		echo_red_bold "Project: ${CLOUDSTACK_PROJECT_NAME} not found, exit"
 		exit 1
 	fi
+
+	CLOUDSTACK_NETWORK_ID=$(get_network_id ${VC_NETWORK_PRIVATE})
+	if [ -z "${CLOUDSTACK_NETWORK_ID}" ]; then
+		echo_red_bold "Unable to find network id for network named: ${VC_NETWORK_PRIVATE}"
+		exit 1
+	fi
+	
+	CLOUDSTACK_VPC_ID=($(get_vpc_id ${CLOUDSTACK_NETWORK_ID}))
+
+	VPC_PUBLIC_SUBNET_IDS=()
+	VPC_PRIVATE_SUBNET_IDS=(${CLOUDSTACK_NETWORK_ID})
 
 	if [ -z "${PRIVATE_IP}" ]; then
 		local NETWORK_DEFS=$(cloudmonkey list networks projectid=${CLOUDSTACK_PROJECT_ID} id=${CLOUDSTACK_NETWORK_ID})

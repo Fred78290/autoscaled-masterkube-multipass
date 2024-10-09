@@ -988,7 +988,7 @@ function get_serviceoffering_id() {
 		name=$1 \
 		projectid=${CLOUDSTACK_PROJECT_ID} \
 		zoneid=${CLOUDSTACK_ZONE_ID} \
-		| jq -r --arg NAME "$1" '.serviceoffering[]|select(.name == $NAME)|.id//""'
+		| jq -r --arg NAME "$1" '.serviceoffering[]|select(.name == $NAME)|.id//""' 2> /dev/null || :
 }
 
 #===========================================================================================================================================
@@ -1001,7 +1001,7 @@ function get_image_uuid() {
 		name=${TARGET_IMAGE} \
 		templatefilter=self \
 		projectid=${CLOUDSTACK_PROJECT_ID} \
-		hypervisor=${CLOUDSTACK_HYPERVISOR} | jq -r '.template[0].id//""'
+		hypervisor=${CLOUDSTACK_HYPERVISOR} | jq -r '.template[0].id//""' 2> /dev/null || :
 }
 
 #===========================================================================================================================================
@@ -1017,7 +1017,7 @@ function get_vmuuid() {
 		podid=${CLOUDSTACK_POD_ID} \
 		clusterid=${CLOUDSTACK_CLUSTER_ID} \
 		hypervisor=${CLOUDSTACK_HYPERVISOR} \
-		| jq -r '.virtualmachine[0].id//""'
+		| jq -r '.virtualmachine[0].id//""' 2> /dev/null || :
 }
 
 #===========================================================================================================================================
@@ -1031,7 +1031,7 @@ function get_net_type() {
 		zoneid=${CLOUDSTACK_ZONE_ID} \
 		podid=${CLOUDSTACK_POD_ID} \
 		clusterid=${CLOUDSTACK_CLUSTER_ID} \
-		| jq -r --arg NAME "${NAME}" '.network[]|select(.name == $NAME)|.traffictype//""'
+		| jq -r --arg NAME "${NAME}" '.network[]|select(.name == $NAME)|.traffictype//""' 2> /dev/null || :
 }
 
 #===========================================================================================================================================
@@ -1045,7 +1045,7 @@ function get_network_id() {
 		zoneid=${CLOUDSTACK_ZONE_ID} \
 		podid=${CLOUDSTACK_POD_ID} \
 		clusterid=${CLOUDSTACK_CLUSTER_ID} \
-		| jq -r --arg NAME "${NAME}" '.network[]|select(.name == $NAME)|.id//""'
+		| jq -r --arg NAME "${NAME}" '.network[]|select(.name == $NAME)|.id//""' 2> /dev/null || :
 }
 
 #===========================================================================================================================================
@@ -1060,7 +1060,7 @@ function get_vpc_id() {
 		zoneid=${CLOUDSTACK_ZONE_ID} \
 		podid=${CLOUDSTACK_POD_ID} \
 		clusterid=${CLOUDSTACK_CLUSTER_ID} \
-		| jq -r '.network[0].vpcid//""'
+		| jq -r '.network[0].vpcid//""' 2> /dev/null || :
 }
 
 #===========================================================================================================================================
@@ -1201,7 +1201,7 @@ function prepare_plateform() {
 function check_ip_public_free() {
 	local IP=$1
 
-	ID=$(cloudmonkey list publicipaddresses state=free ipaddress=${IP} | jq -r '.publicipaddress[0].id')
+	ID=$(cloudmonkey list publicipaddresses state=free ipaddress=${IP} | jq -r '.publicipaddress[0].id' 2> /dev/null || :)
 
 	if [ -z "${ID}" ]; then
 		IP=$(nextip ${IP} true)

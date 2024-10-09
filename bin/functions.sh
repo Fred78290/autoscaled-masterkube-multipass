@@ -2123,7 +2123,7 @@ function plateform_autostart_ordered() {
 function create_all_vms() {
 	local LAUNCH_IN_BACKGROUND="NO"
 
-	if [ "${PLATEFORM}" == "openstack" ] || [ "${PLATEFORM}" == "aws" ] || [ "${PLATEFORM}" == "vsphere" ] || [ "${PLATEFORM}" == "cloudstack" ]; then
+	if [ "${PLATEFORM}" == "openstack" ] || [ "${PLATEFORM}" == "aws" ] || [ "${PLATEFORM}" == "vsphere" ] || [ "${PLATEFORM}" == "cloudstack" ] || [ "${PLATEFORM}" == "lxd" ]; then
 		LAUNCH_IN_BACKGROUND=YES
 	fi
 

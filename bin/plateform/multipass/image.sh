@@ -87,6 +87,13 @@ while true ; do
 	esac
 done
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+pushd ${CURDIR} > /dev/null
+PREPARE_SCRIPT=${PWD}/prepare-image.sh
+popd > /dev/null
+
 if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
 	KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
 fi
@@ -114,12 +121,6 @@ timezone: ${TZ}
 package_update: false
 package_upgrade: false
 ssh_pwauth: true
-write_files:
-- encoding: gzip+base64
-  content: $(cat ${CURDIR}/prepare-image.sh | gzip -c9 | base64 -w 0)
-  owner: root:adm
-  path: /usr/local/bin/prepare-image.sh
-  permissions: '0755'
 users:
   - name: ${KUBERNETES_USER}
     groups: users, admin
@@ -193,6 +194,7 @@ packer build \
 	-var SSH_PRIVATE_KEY="${SSH_PRIVATE_KEY}" \
 	-var ISO_CHECKSUM="sha256:${ISO_CHECKSUM}" \
 	-var ISO_FILE="${ISO_FILE}" \
+	-var PREPARE_SCRIPT="${PREPARE_SCRIPT}" \
 	-var INIT_SCRIPT="${INIT_SCRIPT}" \
 	template.json
 

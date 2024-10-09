@@ -90,6 +90,13 @@ while true ; do
 	esac
 done
 
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+pushd ${CURDIR} > /dev/null
+PREPARE_SCRIPT=${PWD}/prepare-image.sh
+popd > /dev/null
+
 if [ ${KUBERNETES_VERSION:0:1} != "v" ]; then
 	KUBERNETES_VERSION="v${KUBERNETES_VERSION}"
 fi
@@ -139,12 +146,6 @@ timezone: ${TZ}
 package_update: false
 package_upgrade: false
 ssh_pwauth: true
-write_files:
-- encoding: gzip+base64
-  content: $(cat ${CURDIR}/prepare-image.sh | gzip -c9 | base64 -w 0)
-  owner: root:adm
-  path: /usr/local/bin/prepare-image.sh
-  permissions: '0755'
 users:
   - name: ${KUBERNETES_USER}
     groups: users, admin
@@ -206,7 +207,7 @@ INIT_SCRIPT="/usr/local/bin/prepare-image.sh --container-runtime ${CONTAINER_ENG
 
 pushd ${CACHE}/packer/
 export PACKER_LOG=1
-packer build -var INIT_SCRIPT="${INIT_SCRIPT}" template.json
+packer build -var INIT_SCRIPT="${INIT_SCRIPT}" -var PREPARE_SCRIPT="${PREPARE_SCRIPT}" template.json
 popd
 
 echo_blue_bold "Created image ${TARGET_IMAGE} with kubernetes version ${KUBERNETES_VERSION}"

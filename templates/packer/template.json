@@ -31,6 +31,20 @@
 	],
 	"provisioners": [
 		{
+			"type": "file",
+			"source": "{{ user `PREPARE_SCRIPT` }}",
+			"destination": "/tmp/prepare-image.sh"
+		},
+		{
+			"type": "shell",
+			"execute_command": "sudo sh -xc '{{ .Vars }} {{ .Path }}'",
+			"inline": [
+				"cp /tmp/prepare-image.sh /usr/local/bin/prepare-image.sh",
+				"chown root:adm /usr/local/bin/prepare-image.sh",
+				"chmod +x /usr/local/bin/prepare-image.sh"
+			]
+		},
+		{
 			"type": "shell",
 			"execute_command": "sudo sh -xc '{{ .Vars }} {{ .Path }}'",
 			"remote_folder": "/tmp",

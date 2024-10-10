@@ -1203,7 +1203,7 @@ function prepare_environment() {
 		exit 1
 	fi
 
-	if [ ${PLATEFORM} != "cloudstack" ]; then
+	if [ ${PLATEFORM} != "cloudstack" ] && [ ${PLATEFORM} != "lxd" ]; then
 		if [ ${USE_NLB} == "nginx" ] || [ "${CONTROLPLANE_USE_PUBLICIP}" == "true" ] || [ ${WORKERNODE_USE_PUBLICIP} == "true" ]; then
 			if [ -z "${VC_NETWORK_PUBLIC}" ]; then
 				echo_red_bold "nodes exposed to public require public network"

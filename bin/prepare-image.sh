@@ -193,7 +193,9 @@ if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
 	curl -sL --remote-name-all https://dl.k8s.io/release/${KUBERNETES_VERSION}/bin/linux/${ARCH}/kubectl
 	chmod +x /usr/local/bin/kube*
 elif [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
-	echo "prepare rke2 image"
+	echo "==============================================================================================================================="
+	echo "= Install rke2 binaries"
+	echo "==============================================================================================================================="
 
 	curl -sfL https://get.rke2.io | INSTALL_RKE2_CHANNEL="${KUBERNETES_VERSION}" sh -
 
@@ -216,7 +218,9 @@ kubelet-arg:
 EOF
 
 elif [ "${KUBERNETES_DISTRO}" == "k3s" ]; then
-	echo "prepare k3s image"
+	echo "==============================================================================================================================="
+	echo "= Install k3s binaries"
+	echo "==============================================================================================================================="
 
 	curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${KUBERNETES_VERSION}" INSTALL_K3S_SKIP_ENABLE=true sh -
 

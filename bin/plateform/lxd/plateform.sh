@@ -4,7 +4,7 @@ CLOUD_PROVIDER=
 export LXD_INTERNAL_NLB=none
 export LXD_EXTERNAL_NLB=none
 export LXD_NLB_VIP_ADDR=
-export LXD_PATCH_OVN_NLB=chassis # none|chassis|switch
+export LXD_PATCH_OVN_NLB=none # none|chassis|switch
 
 source ${PLATEFORMDEFS}
 

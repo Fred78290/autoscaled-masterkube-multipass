@@ -190,7 +190,7 @@ if [ "${KUBERNETES_DISTRO}" == "microk8s" ]; then
 	echo "==============================================================================================================================="
 
 	cd /usr/local/bin
-	curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/${ARCH}/kubectl
+	curl -sL --remote-name-all https://dl.k8s.io/release/${KUBERNETES_VERSION}/bin/linux/${ARCH}/kubectl
 	chmod +x /usr/local/bin/kube*
 elif [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 	echo "prepare rke2 image"
@@ -198,7 +198,7 @@ elif [ "${KUBERNETES_DISTRO}" == "rke2" ]; then
 	curl -sfL https://get.rke2.io | INSTALL_RKE2_CHANNEL="${KUBERNETES_VERSION}" sh -
 
 	pushd /usr/local/bin
-	curl -sL --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION%%+*}/bin/linux/${ARCH}/{kubectl,kube-proxy}
+	curl -sL --remote-name-all https://dl.k8s.io/release/${KUBERNETES_VERSION%%+*}/bin/linux/${ARCH}/{kubectl,kube-proxy}
 	chmod +x /usr/local/bin/kube*
 	popd
 

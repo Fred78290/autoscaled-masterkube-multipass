@@ -130,14 +130,38 @@ fi
 prepare_environment
 
 echo_blue_bold "Delete masterkube ${MASTERKUBE} previous instance"
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function all_vm_names() {
+	local NAMES=()
+
+	for NODEINDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
+	do
+		NAMES+=($(get_vm_name ${NODEINDEX}))
+	done
+
+	echo ${NAMES[@]}
+}
+
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
 function delete_all_vms() {
-	for NODEINDEX in $(seq ${FIRSTNODE} ${LASTNODE_INDEX})
+	for NAME in $@
 	do
-		delete_vm_by_name $(get_vm_name ${NODEINDEX}) || true
+		delete_vm_by_name ${NAME} || true
 	done
+}
+
+#===========================================================================================================================================
+#
+#===========================================================================================================================================
+function list_nodes() {
+	local ALLNODES=$(kubectl get node -o json --kubeconfig ${TARGET_CLUSTER_LOCATION}/config)
+
+	echo ${ALLNODES} | jq -r '.items | .[] | .metadata.annotations["cluster.autoscaler.nodegroup/instance-name"]' | sort -r
 }
 
 #===========================================================================================================================================
@@ -160,14 +184,9 @@ function delete_nodes() {
 
 	INSTANCENAMES=$(echo ${ALLNODES} | jq -r '.items | .[] | .metadata.annotations["cluster.autoscaler.nodegroup/instance-name"]' | sort -r)
 
-	for VM in ${INSTANCENAMES}
-	do
-		delete_vm_by_name ${VM} || true
-	done
-	
-	delete_vm_by_name ${MASTERKUBE} || true
+	delete_all_vms ${MASTERKUBE} ${INSTANCENAMES}
+
 	wait_jobs_finish
-	delete_all_vms
 
 	rm ${TARGET_CLUSTER_LOCATION}/config
 }
@@ -175,18 +194,21 @@ function delete_nodes() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-if [ -f ${TARGET_CONFIG_LOCATION}/buildenv ]; then
-	source ${TARGET_CONFIG_LOCATION}/buildenv
-else
-	FORCE=YES
-fi
-
 if [ ! -f ${TARGET_CLUSTER_LOCATION}/config ]; then
+	VMNAMES=$(all_vm_names)
 	FORCE=YES
+else
+	VMNAMES=$(list_nodes)
+
+	if [ -f ${TARGET_CONFIG_LOCATION}/buildenv ]; then
+		source ${TARGET_CONFIG_LOCATION}/buildenv
+	else
+		FORCE=YES
+	fi
 fi
 
 if [ "${FORCE}" = "YES" ]; then
-	delete_all_vms
+	delete_all_vms ${VMNAMES}
 elif [ -f ${TARGET_CLUSTER_LOCATION}/config ]; then
 	delete_nodes
 fi

@@ -78,6 +78,7 @@ TRANSPORT_IF=$(ip route get ${KEEPALIVED_PEER1} | awk '{print $3;exit}')
 
 echo "net.ipv4.ip_nonlocal_bind = 1" >> /etc/sysctl.conf
 
+apt update -y
 apt install keepalived -y
 sysctl -p
 

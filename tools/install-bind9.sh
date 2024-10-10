@@ -49,6 +49,7 @@ while true; do
 	esac
 done
 
+apt update -y
 apt install resolvconf bind9 -y
 
 cat > /etc/bind/named.conf.options <<EOF

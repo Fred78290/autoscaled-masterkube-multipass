@@ -58,6 +58,7 @@ do
 	echo "${IP}   ${HOST}" >> /etc/hosts
 done
 
+apt update -y
 apt install nginx -y || echo "Need to reconfigure NGINX"
 
 UBUNTU_VERSION_ID=$(cat /etc/os-release | grep VERSION_ID | tr -d '"' | cut -d '=' -f 2)

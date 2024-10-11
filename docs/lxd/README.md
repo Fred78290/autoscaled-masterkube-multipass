@@ -20,6 +20,14 @@ You must create a project on your lxd plateform and setup network to be accessib
 
 To use cloud load balancer, you must prepare [LXD to use OVN stack](https://documentation.ubuntu.com/lxd/en/latest/howto/network_ovn_setup/)
 
+If the target network is not kind of OVN, them the load balancer will fallback to nginx or keepalived.
+
+Due a missing part in LXD load balancer [Load balancer on OVN network are not responsive from the same OVN network](https://github.com/canonical/lxd/issues/14166), you can specify the process to patch the ovn load balancer with the option **--patch-ovn-nlb=[chassis|switch]**. Use chassis for single node LXD and switch for LXD cluster multi nodes.
+
+If you choose to not patch OVN load balancer in this case OVN LB will be used as external load balancer and keepalived or nginx will be used as internal load balancerbut in this case public domain name and private domain name could not be the same.
+
+## Prepare environment
+
 First step is to fill a file named **bin/plateform/lxd/vars.defs** in the bin directory with the values needed
 
 ```
@@ -89,6 +97,7 @@ ZEROSSL_EAB_HMAC_SECRET=
 | --no-dhcp-autoscaled-node | Autoscaled node don't use DHCP | ${SCALEDNODES_DHCP} |
 | --dhcp-autoscaled-node | Autoscaled node use DHCP | ${SCALEDNODES_DHCP} |
 | --internet-facing | Expose the cluster on internet | ${EXPOSE_PUBLIC_CLUSTER} |
+| --patch-ovn-nlb=[none\|chassis\|switch]  | Temporary hack to support ovn load balancer | ${LXD_PATCH_OVN_NLB} |
 
 ```bash
 ./bin/create-masterkube.sh \

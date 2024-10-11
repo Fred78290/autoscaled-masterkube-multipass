@@ -32,6 +32,8 @@
 	"provisioners": [
 		{
 			"type": "file",
+			"pause_before": "1s",
+			"max_retries": 10,
 			"source": "{{ user `PREPARE_SCRIPT` }}",
 			"destination": "/tmp/prepare-image.sh"
 		},

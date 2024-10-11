@@ -83,6 +83,7 @@ function parse_arguments() {
 		"use-named-server"
 		"use-nlb:"
 		"vm-network:"
+		"vm"
 		"patch-ovn-nlb:"
 	)
 

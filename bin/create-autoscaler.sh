@@ -32,9 +32,13 @@ if [ "${GRPC_PROVIDER}" = "externalgrpc" ]; then
 fi
 
 case ${KUBERNETES_MINOR_RELEASE} in
-	29|30|31)
+	30)
 		CLUSTER_AUTOSCALER_VERSION=v1.30.0
-		CLOUD_AUTOSCALER_VERSION=v1.31.0-dev
+		CLOUD_AUTOSCALER_VERSION=v1.30.5
+		;;
+	31)
+		CLUSTER_AUTOSCALER_VERSION=v1.31.0
+		CLOUD_AUTOSCALER_VERSION=v1.31.0
 		;;
 	*)
 		echo "Former version aren't supported by cloud autoscaler"

@@ -112,7 +112,7 @@ if [ -z "${TARGET_IMAGE}" ]; then
 	TARGET_IMAGE=${UBUNTU_DISTRIBUTION}-${KUBERNETES_DISTRO}-${KUBERNETES_VERSION}-${SEED_ARCH}
 fi
 
-lxc project switch ${LXD_REMOTE}${LXD_PROJECT}
+lxc project switch ${LXD_REMOTE}:${LXD_PROJECT}
 
 SEED_IMAGE_ID=$(lxc image alias list ubuntu: --format=json | jq --arg UBUNTU_DISTRIBUTION ${UBUNTU_DISTRIBUTION} --arg CONTAINERTYPE ${LXD_CONTAINER_TYPE} '.[]|select(.name == $UBUNTU_DISTRIBUTION and .type == $CONTAINERTYPE)') 
 TARGET_IMAGE_ID=$(lxc image list ${LXD_REMOTE}: name=${TARGET_IMAGE} type=${LXD_CONTAINER_TYPE} --project ${LXD_PROJECT} --format=json | jq -r --arg TARGET_IMAGE "${TARGET_IMAGE}" '.[0].fingerprint//""')
@@ -126,9 +126,9 @@ echo_blue_bold "Ubuntu password:${KUBERNETES_PASSWORD}"
 
 mkdir -p ${CACHE}/packer/profile
 
-lxc profile delete ${LXD_REMOTE}${TARGET_IMAGE}-profile 2> /dev/null || :
+lxc profile delete ${LXD_REMOTE}:${TARGET_IMAGE}-profile 2> /dev/null || :
 
-lxc profile create ${LXD_REMOTE}${TARGET_IMAGE}-profile
+lxc profile create ${LXD_REMOTE}:${TARGET_IMAGE}-profile
 
 cat > ${CACHE}/packer/profile/config.yaml <<EOF
 description: ${TARGET_IMAGE} profile
@@ -201,6 +201,8 @@ else
 EOF
 fi
 
+lxc profile edit ${LXD_REMOTE}:${TARGET_IMAGE}-profile < ${CACHE}/packer/profile/config.yaml
+
 LXD_BUILDER=$(cat <<EOF
 {
 	"type": "lxd",
@@ -208,7 +210,7 @@ LXD_BUILDER=$(cat <<EOF
 	"output_image": "${TARGET_IMAGE}-${LXD_CONTAINER_TYPE}",
 	"container_name": "${TARGET_IMAGE}",
 	"virtual_machine": "${VIRTUALMACHINE}",
-	"publish_remote_name": "${LXD_REMOTE%:}",
+	"publish_remote_name": "${LXD_REMOTE%}",
 	"profile": "${TARGET_IMAGE}-profile",
 	"publish_properties": {
 		"name": "${TARGET_IMAGE}",
@@ -234,8 +236,8 @@ popd
 
 echo_blue_bold "Created image ${TARGET_IMAGE} with kubernetes version ${KUBERNETES_VERSION}"
 
-lxc profile delete ${LXD_REMOTE}${TARGET_IMAGE}-profile
+lxc profile delete ${LXD_REMOTE}:${TARGET_IMAGE}-profile
 
-lxc project switch ${LXD_REMOTE}default
+lxc project switch ${LXD_REMOTE}:default
 
 exit 0

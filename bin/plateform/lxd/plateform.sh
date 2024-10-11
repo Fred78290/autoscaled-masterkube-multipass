@@ -511,10 +511,10 @@ function parsed_arguments() {
 	VPC_PRIVATE_SUBNET_IDS=(${VC_NETWORK_PRIVATE})
 	PUBLIC_IP=NONE
 
-	if [ -z "$(lxc profile list ${LXD_REMOTE} --project ${LXD_PROJECT} --format=json | jq --arg LXD_KUBERNETES_PROFILE ${LXD_KUBERNETES_PROFILE} '.[]|select(.name == $LXD_KUBERNETES_PROFILE)|.name//""')" ]; then
-		echo_blue_bold "Create LXD profile ${LXD_REMOTE}${LXD_KUBERNETES_PROFILE}"
-		lxc profile create ${LXD_REMOTE}${LXD_KUBERNETES_PROFILE} --project ${LXD_PROJECT}
-		curl -Ls https://raw.githubusercontent.com/ubuntu/microk8s/master/tests/lxc/microk8s.profile | lxc profile edit ${LXD_REMOTE}${LXD_KUBERNETES_PROFILE} --project ${LXD_PROJECT} 
+	if [ -z "$(lxc profile list ${LXD_REMOTE}: --project ${LXD_PROJECT} --format=json | jq --arg LXD_KUBERNETES_PROFILE ${LXD_KUBERNETES_PROFILE} '.[]|select(.name == $LXD_KUBERNETES_PROFILE)|.name//""')" ]; then
+		echo_blue_bold "Create LXD profile ${LXD_REMOTE}:${LXD_KUBERNETES_PROFILE}"
+		lxc profile create ${LXD_REMOTE}:${LXD_KUBERNETES_PROFILE} --project ${LXD_PROJECT}
+		curl -Ls https://raw.githubusercontent.com/ubuntu/microk8s/master/tests/lxc/microk8s.profile | lxc profile edit ${LXD_REMOTE}:${LXD_KUBERNETES_PROFILE} --project ${LXD_PROJECT} 
 	fi
 
 	if [ -z "${PRIVATE_IP}" ]; then
@@ -760,7 +760,6 @@ EOF
 EOF
 		fi
 
-
 		echo_line
 		echo_blue_bold "Clone ${TARGET_IMAGE} to ${MASTERKUBE_NODE} TARGET_IMAGE=${TARGET_IMAGE} MASTERKUBE_NODE=${MASTERKUBE_NODE} MEMSIZE=${MEMSIZE} NUM_VCPUS=${NUM_VCPUS} DISK_SIZE=${DISK_SIZE}M"
 		echo_line
@@ -768,15 +767,15 @@ EOF
 		# Clone my template
 		echo_title "Launch ${MASTERKUBE_NODE}"
 
-		lxc init ${LXD_REMOTE}${TARGET_IMAGE_UUID} ${LXD_REMOTE}${MASTERKUBE_NODE} \
+		lxc init ${LXD_REMOTE}:${TARGET_IMAGE_UUID} ${LXD_REMOTE}:${MASTERKUBE_NODE} \
 			--project ${LXD_PROJECT} < ${TARGET_CONFIG_LOCATION}/config-${INDEX}.yaml
-		lxc start ${LXD_REMOTE}${MASTERKUBE_NODE} --project ${LXD_PROJECT}
+		lxc start ${LXD_REMOTE}:${MASTERKUBE_NODE} --project ${LXD_PROJECT}
 	else
 		echo_title "Already running ${MASTERKUBE_NODE} instance"
 	fi
 
 	while [ -z "${RUNNING_PRIVATE_IP}" ]; do
-		local MASTERKUBE_INFOS=$(lxc list ${LXD_REMOTE} name=${MASTERKUBE_NODE} --project ${LXD_PROJECT} --format=json | jq -r  '.[0]')
+		local MASTERKUBE_INFOS=$(lxc list ${LXD_REMOTE}: name=${MASTERKUBE_NODE} --project ${LXD_PROJECT} --format=json | jq -r  '.[0]')
 
 		RUNNING_PRIVATE_IP=$(jq -r --arg PRIVATE_NET_INF ${PRIVATE_NET_INF} '.state.network|.[$PRIVATE_NET_INF].addresses[]|select(.family == "inet")|.address' <<< "${MASTERKUBE_INFOS}")
 		sleep 1
@@ -791,7 +790,7 @@ function plateform_info_vm() {
 	local PUBLIC_IP=$2
 	local NODE_IP=$3
 	local MASTERKUBE_NODE=$(get_vm_name ${INDEX})
-	local MASTERKUBE_INFOS=$(lxc list ${LXD_REMOTE} name=${MASTERKUBE_NODE} --project ${LXD_PROJECT} --format=json | jq -r  '.[0]')
+	local MASTERKUBE_INFOS=$(lxc list ${LXD_REMOTE}: name=${MASTERKUBE_NODE} --project ${LXD_PROJECT} --format=json | jq -r  '.[0]')
 	local MASTERKUBE_NODE_UUID=$(jq -r  '.config."volatile.uuid"//""' <<< "${MASTERKUBE_INFOS}")
 	local SUFFIX=$(named_index_suffix $1)
 	local PRIVATE_IP=$(jq -r --arg PRIVATE_NET_INF ${PRIVATE_NET_INF} '.state.network|.[$PRIVATE_NET_INF].addresses[]|select(.family == "inet")|.address' <<< "${MASTERKUBE_INFOS}")
@@ -825,9 +824,9 @@ EOF
 function delete_vm_by_name() {
     local VMNAME=$1
 
-    if [ -n "$(lxc list ${LXD_REMOTE} name=${VMNAME} --project ${LXD_PROJECT} --format=json | jq -r  '.[0].name//""' 2>/dev/null)" ]; then
+    if [ -n "$(lxc list ${LXD_REMOTE}: name=${VMNAME} --project ${LXD_PROJECT} --format=json | jq -r  '.[0].name//""' 2>/dev/null)" ]; then
         echo_blue_bold "Delete VM: ${VMNAME}"
-        lxc delete ${LXD_REMOTE}${VMNAME} --project ${LXD_PROJECT}  -f
+        lxc delete ${LXD_REMOTE}:${VMNAME} --project ${LXD_PROJECT}  -f
 	fi
 
     delete_host "${VMNAME}"
@@ -841,10 +840,10 @@ function delete_ovn_loadbalancer() {
 	local NLB_NETWORK_NAME=$2
 
 	if [ -n "${NLB_NETWORK_NAME}" ] && [ -n "${NLB_NAME}" ]; then
-		LISTEN_ADDR=$(lxc network load-balancer list ${LXD_REMOTE}${NLB_NETWORK_NAME} --project ${LXD_PROJECT} --format json | jq -r --arg NAME ${NLB_NAME} '.[]|select(.config."user.name" == $NAME)|.listen_address')
+		LISTEN_ADDR=$(lxc network load-balancer list ${LXD_REMOTE}:${NLB_NETWORK_NAME} --project ${LXD_PROJECT} --format json | jq -r --arg NAME ${NLB_NAME} '.[]|select(.config."user.name" == $NAME)|.listen_address')
 
 		if [ -n "${LISTEN_ADDR}" ]; then
-			lxc network load-balancer delete ${LXD_REMOTE}${NLB_NETWORK_NAME} ${LISTEN_ADDR} --project ${LXD_PROJECT}
+			lxc network load-balancer delete ${LXD_REMOTE}:${NLB_NETWORK_NAME} ${LISTEN_ADDR} --project ${LXD_PROJECT}
 		fi
 	fi
 }
@@ -874,7 +873,7 @@ function update_provider_config() {
 #
 #===========================================================================================================================================
 function get_vmuuid() {
-	lxc list ${LXD_REMOTE} name=$1 --project ${LXD_PROJECT} --format=json | jq -r  '.[0].config."volatile.uuid"//""'
+	lxc list ${LXD_REMOTE}: name=$1 --project ${LXD_PROJECT} --format=json | jq -r  '.[0].config."volatile.uuid"//""'
 }
 
 #===========================================================================================================================================
@@ -906,7 +905,7 @@ function create_ovn_loadbalancer() {
 		NLB_VIP_ADDRESS="--allocate=ipv4"
 	fi
 
-	NLB_VIP_ADDRESS=$(lxc network load-balancer create ${LXD_REMOTE}${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} user.name=${NLB_NAME} --project ${LXD_PROJECT} | cut -d ' ' -f 4)
+	NLB_VIP_ADDRESS=$(lxc network load-balancer create ${LXD_REMOTE}:${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} user.name=${NLB_NAME} --project ${LXD_PROJECT} | cut -d ' ' -f 4)
 
 	if [ -n "${NLB_VIP_ADDRESS}" ]; then
 		for INDEX in $(seq ${CONTROLNODE_INDEX} $((CONTROLNODE_INDEX + ${CONTROLNODES} - 1)))
@@ -921,7 +920,7 @@ function create_ovn_loadbalancer() {
 				NLB_TARGET_IP=$(jq -r '.PrivateIpAddress//""' ${TARGET_CONFIG_LOCATION}/instance-${SUFFIX}.json)
 			fi
 
-			lxc network load-balancer backend add ${LXD_REMOTE}${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} "${BACKEND}" ${NLB_TARGET_IP} ${NLB_TARGET_PORTS} --project ${LXD_PROJECT}
+			lxc network load-balancer backend add ${LXD_REMOTE}:${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} "${BACKEND}" ${NLB_TARGET_IP} ${NLB_TARGET_PORTS} --project ${LXD_PROJECT}
 		done
 	else
 		echo_red_bold "Unable to create ovn load balancer"
@@ -938,11 +937,11 @@ function append_ovn_nlb_member() {
 	local NLB_NETWORK_NAME=$2
 	local NLB_TARGET_PORTS=$3
 	local NLB_BACKEND=$4
-	local NLB_DEFS=$(lxc network load-balancer list ${LXD_REMOTE}${NLB_NETWORK_NAME} --project ${LXD_PROJECT} --format json | jq -r --arg NAME "${NLB_NAME}" '.[]|select(.config."user.name" == $NAME)')
+	local NLB_DEFS=$(lxc network load-balancer list ${LXD_REMOTE}:${NLB_NETWORK_NAME} --project ${LXD_PROJECT} --format json | jq -r --arg NAME "${NLB_NAME}" '.[]|select(.config."user.name" == $NAME)')
 	local NLB_VIP_ADDRESS=$(jq -r '.listen_address//""' <<< "${NLB_DEFS}")
 
 	if [ $(jq '.ports|length' <<< "${NLB_DEFS}") -eq 0 ]; then
-		lxc network load-balancer port add ${LXD_REMOTE}${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} tcp ${NLB_TARGET_PORTS} "${NLB_BACKEND}" --project ${LXD_PROJECT}
+		lxc network load-balancer port add ${LXD_REMOTE}:${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} tcp ${NLB_TARGET_PORTS} "${NLB_BACKEND}" --project ${LXD_PROJECT}
 
 		if [ ${LXD_PATCH_OVN_NLB} != "none" ]; then
 			OVN_NLB_NAME=$(sudo ovn-nbctl find load_balancer | grep "lb-${NLB_VIP_ADDRESS}-tcp" | awk '{print $3}')
@@ -958,7 +957,7 @@ function append_ovn_nlb_member() {
 		sleep 2
 	else
 		echo "${NLB_DEFS}" | jq --arg NLB_BACKEND "${NLB_BACKEND}" '.ports[0].target_backend += [ $NLB_BACKEND ]' | yq -p json -o yaml \
-			| sudo "$(command -v lxc)" network load-balancer edit ${LXD_REMOTE}${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} --project ${LXD_PROJECT}
+			| sudo "$(command -v lxc)" network load-balancer edit ${LXD_REMOTE}:${NLB_NETWORK_NAME} ${NLB_VIP_ADDRESS} --project ${LXD_PROJECT}
 
 		if [ ${LXD_PATCH_OVN_NLB} == "switch" ]; then
 			OVN_NLB_NAME=$(sudo ovn-nbctl find load_balancer | grep "lb-${NLB_VIP_ADDRESS}-tcp" | awk '{print $3}')

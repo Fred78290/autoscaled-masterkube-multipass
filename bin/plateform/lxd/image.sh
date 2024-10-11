@@ -115,7 +115,7 @@ fi
 lxc project switch ${LXD_REMOTE}${LXD_PROJECT}
 
 SEED_IMAGE_ID=$(lxc image alias list ubuntu: --format=json | jq --arg UBUNTU_DISTRIBUTION ${UBUNTU_DISTRIBUTION} --arg CONTAINERTYPE ${LXD_CONTAINER_TYPE} '.[]|select(.name == $UBUNTU_DISTRIBUTION and .type == $CONTAINERTYPE)') 
-TARGET_IMAGE_ID=$(lxc image list ${LXD_REMOTE} name=${TARGET_IMAGE} --project ${LXD_PROJECT} --format=json | jq -r --arg TARGET_IMAGE "${TARGET_IMAGE}" '.[0].fingerprint//""')
+TARGET_IMAGE_ID=$(lxc image list ${LXD_REMOTE}: name=${TARGET_IMAGE} type=${LXD_CONTAINER_TYPE} --project ${LXD_PROJECT} --format=json | jq -r --arg TARGET_IMAGE "${TARGET_IMAGE}" '.[0].fingerprint//""')
 
 if [ -n "${TARGET_IMAGE_ID}" ]; then
 	echo_blue_bold "${TARGET_IMAGE} already exists!"
@@ -132,31 +132,9 @@ lxc profile create ${LXD_REMOTE}${TARGET_IMAGE}-profile
 
 cat > ${CACHE}/packer/profile/config.yaml <<EOF
 description: ${TARGET_IMAGE} profile
-devices:
-  eth0:
-    type: nic
-    network: ${PRIMARY_NETWORK_NAME}
-  root:
-    path: /
-    pool: default
-    type: disk
-  aadisable:
-    path: /sys/module/nf_conntrack/parameters/hashsize
-    source: /sys/module/nf_conntrack/parameters/hashsize
-    type: disk
-  aadisable2:
-    path: /dev/kmsg
-    source: /dev/kmsg
-    type: unix-char
-  aadisable3:
-    path: /sys/fs/bpf
-    source: /sys/fs/bpf
-    type: disk
-  aadisable4:
-    path: /proc/sys/net/netfilter/nf_conntrack_max
-    source: /proc/sys/net/netfilter/nf_conntrack_max
-    type: disk
 config:
+  limits.cpu: 2
+  limits.memory: 2048MiB
   boot.autostart: "true"
   linux.kernel_modules: ip_vs,ip_vs_rr,ip_vs_wrr,ip_vs_sh,ip_tables,ip6_tables,netlink_diag,nf_nat,overlay,br_netfilter
   raw.lxc: |
@@ -190,19 +168,44 @@ config:
       - ${SSH_KEY}
     apt:
       preserve_sources_list: true
+devices:
+  eth0:
+    type: nic
+    network: ${PRIMARY_NETWORK_NAME}
+  root:
+    path: /
+    pool: default
+    type: disk
 EOF
-
-lxc profile edit ${LXD_REMOTE}${TARGET_IMAGE}-profile < ${CACHE}/packer/profile/config.yaml
 
 if [ ${LXD_CONTAINER_TYPE} == "virtual-machine" ]; then
 	VIRTUALMACHINE=true
+else
+	cat >> ${CACHE}/packer/profile/config.yaml <<EOF
+  aadisable:
+    path: /sys/module/nf_conntrack/parameters/hashsize
+    source: /sys/module/nf_conntrack/parameters/hashsize
+    type: disk
+  aadisable2:
+    path: /dev/kmsg
+    source: /dev/kmsg
+    type: unix-char
+  aadisable3:
+    path: /sys/fs/bpf
+    source: /sys/fs/bpf
+    type: disk
+  aadisable4:
+    path: /proc/sys/net/netfilter/nf_conntrack_max
+    source: /proc/sys/net/netfilter/nf_conntrack_max
+    type: disk
+EOF
 fi
 
 LXD_BUILDER=$(cat <<EOF
 {
 	"type": "lxd",
 	"image": "ubuntu:${UBUNTU_DISTRIBUTION}",
-	"output_image": "${TARGET_IMAGE}",
+	"output_image": "${TARGET_IMAGE}-${LXD_CONTAINER_TYPE}",
 	"container_name": "${TARGET_IMAGE}",
 	"virtual_machine": "${VIRTUALMACHINE}",
 	"publish_remote_name": "${LXD_REMOTE%:}",

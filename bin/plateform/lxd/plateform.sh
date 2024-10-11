@@ -881,7 +881,7 @@ function get_vmuuid() {
 #
 #===========================================================================================================================================
 function get_image_uuid() {
-    lxc image list ${LXD_REMOTE} name=${TARGET_IMAGE} --project ${LXD_PROJECT} --format=json | jq -r --arg TARGET_IMAGE "${TARGET_IMAGE}" '.[0].fingerprint//""'
+    lxc image list ${LXD_REMOTE}: name=${TARGET_IMAGE} type=${LXD_CONTAINER_TYPE} --project ${LXD_PROJECT} --format=json | jq -r --arg TARGET_IMAGE "${TARGET_IMAGE}" '.[0].fingerprint//""'
 }
 
 #===========================================================================================================================================

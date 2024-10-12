@@ -2254,25 +2254,6 @@ function create_keepalived() {
 #===========================================================================================================================================
 #
 #===========================================================================================================================================
-function create_nameserver() {
-	if [ "${EXTERNAL_DNS_PROVIDER}" == "rfc2036" ]; then
-		IPADDR=${PRIVATE_ADDR_IPS[${INDEX}]}
-
-		echo_blue_bold "Start bind server with IP: ${IPADDR}"
-
-		eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-load-bind9.sh \
-			--cluster-nodes="${CLUSTER_NODES}" \
-			--master-dns=${PRIVATE_DNS} \
-			--public-zone-name=${PUBLIC_DOMAIN_NAME} \
-			--private-zone-name=${PRIVATE_DOMAIN_NAME} ${SILENT}
-		
-		eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ${TARGET_CLUSTER_LOCATION}/masterkube-key.key ${SILENT}
-	fi
-}
-
-#===========================================================================================================================================
-#
-#===========================================================================================================================================
 function create_nginx_gateway_with_dns() {
 	create_nginx_gateway YES
 }

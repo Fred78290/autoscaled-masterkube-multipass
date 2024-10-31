@@ -511,3 +511,23 @@ lxc config set network.ovn.northbound_connection=ssl:${LISTEN_IP}:6641
 lxc network create ovntest --type=ovn network=lxdbr0 ipv4.address=10.68.223.1/24 ipv4.nat=true volatile.network.ipv4.address=192.168.48.192
 
 sudo ip route add 10.68.223.0/24 via 192.168.48.192
+
+cat > /tmp/ovn-routes.service <<EOF
+[Install]
+WantedBy = multi-user.target
+
+[Unit]
+After = snap.lxd.activate.service
+Description = Service for routes to lxd ovn network
+
+[Service]
+Type = oneshot
+TimeoutStopSec = 30
+Restart = on-failure
+SyslogIdentifier = restore-ovn-routes
+ExecStart = sudo ip route add 10.68.223.0/24 via 192.168.48.192
+EOF
+
+sudo cp /tmp/ovn-routes.service /etc/systemd/system/ovn-routes.service
+sudo systemctl daemon-reload
+sudo systemctl enable ovn-routes.service
